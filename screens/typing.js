@@ -8,7 +8,7 @@ import {
   searchBibleChapters,
   fetchChapterVerses,
   getRandomVerseRef
-} from '../bible-data.js?v=20261104_v23';
+} from '../bible-data.js?v=20261104_v24';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -42,9 +42,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v23';
-import { trackEvent } from '../analytics.js?v=20261104_v23';
-import { navigate } from '../app.js?v=20261104_v23';
+} from '../api.js?v=20261104_v24';
+import { trackEvent } from '../analytics.js?v=20261104_v24';
+import { navigate } from '../app.js?v=20261104_v24';
 
 function escapeHtml(str) {
   return String(str)
@@ -386,38 +386,60 @@ export function renderTypingScreen(container, params = {}) {
           </div>
 
           <div class="typing-options-body">
-            <!-- Toggle: Single Verse Mode -->
-            <label class="typing-option-row" for="toggle-single-verse-checkbox">
-              <span class="option-title">Single Verse Mode</span>
-              <input type="checkbox" id="toggle-single-verse-checkbox" class="option-switch" ${singleVerseMode ? 'checked' : ''} />
-            </label>
-
-            <!-- Toggle: Shuffle Verses (only available if single verse mode is on) -->
-            <label class="typing-option-row typing-option-subrow" id="toggle-shuffle-row" for="toggle-shuffle-checkbox" ${singleVerseMode ? '' : 'hidden'}>
-              <span class="option-title">↳ Shuffle Next Verses</span>
-              <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} ${singleVerseMode ? '' : 'disabled'} />
-            </label>
-
-            <!-- Scope: Shuffle Range (Entire Bible vs Current Chapter) -->
-            <div class="typing-option-row typing-option-subrow" id="toggle-shuffle-scope-row" ${(singleVerseMode && shuffleVerses) ? '' : 'hidden'}>
-              <span class="option-title">↳ Shuffle Scope</span>
-              <select id="shuffle-scope-select" class="option-select-inline" ${(singleVerseMode && shuffleVerses) ? '' : 'disabled'}>
-                <option value="bible" ${shuffleScope === 'bible' ? 'selected' : ''}>Entire Bible (All 66 Books 🌍)</option>
-                <option value="chapter" ${shuffleScope === 'chapter' ? 'selected' : ''}>Current Chapter Only 📖</option>
-              </select>
+            <!-- Mode Segmented Control -->
+            <div class="typing-mode-switcher-wrap">
+              <div class="mode-segmented-control" role="tablist" aria-label="Typing Mode">
+                <button type="button" class="mode-segment-btn ${!singleVerseMode ? 'active' : ''}" id="mode-btn-chapter" role="tab" aria-selected="${!singleVerseMode}">
+                  📖 Full Chapter
+                </button>
+                <button type="button" class="mode-segment-btn ${singleVerseMode ? 'active' : ''}" id="mode-btn-single" role="tab" aria-selected="${singleVerseMode}">
+                  🔍 Single Verse
+                </button>
+              </div>
             </div>
 
-            <!-- Toggle: Wait for Advance Button (only available if single verse mode is on) -->
-            <label class="typing-option-row typing-option-subrow" id="toggle-advance-btn-row" for="toggle-advance-btn-checkbox" ${singleVerseMode ? '' : 'hidden'}>
-              <span class="option-title">↳ Wait for Advance Button</span>
-              <input type="checkbox" id="toggle-advance-btn-checkbox" class="option-switch" ${advanceButtonPref ? 'checked' : ''} ${singleVerseMode ? '' : 'disabled'} />
-            </label>
+            <!-- Single Verse Mode Options Group -->
+            <div class="typing-mode-group" id="group-single-verse-settings" ${singleVerseMode ? '' : 'hidden'}>
+              <!-- Toggle: Auto-Advance (Skip Popup) -->
+              <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
+                <span class="option-title">Auto-Advance (Skip Popup)</span>
+                <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
+              </label>
 
-            <!-- Toggle: Auto-Advance -->
-            <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
-              <span class="option-title">Auto-Advance (Skip Popup)</span>
-              <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
-            </label>
+              <!-- Toggle: Wait for Advance Button -->
+              <label class="typing-option-row" for="toggle-advance-btn-checkbox">
+                <span class="option-title">Wait for Advance Button</span>
+                <input type="checkbox" id="toggle-advance-btn-checkbox" class="option-switch" ${advanceButtonPref ? 'checked' : ''} />
+              </label>
+
+              <!-- Toggle: Shuffle Verses -->
+              <label class="typing-option-row" id="toggle-shuffle-row" for="toggle-shuffle-checkbox">
+                <span class="option-title">Shuffle Next Verses</span>
+                <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
+              </label>
+
+              <!-- Scope: Shuffle Range (Entire Bible vs Current Chapter) -->
+              <div class="typing-option-row typing-option-subrow" id="toggle-shuffle-scope-row" ${shuffleVerses ? '' : 'hidden'}>
+                <span class="option-title">↳ Shuffle Scope</span>
+                <select id="shuffle-scope-select" class="option-select-inline" ${shuffleVerses ? '' : 'disabled'}>
+                  <option value="bible" ${shuffleScope === 'bible' ? 'selected' : ''}>Entire Bible (All 66 Books 🌍)</option>
+                  <option value="chapter" ${shuffleScope === 'chapter' ? 'selected' : ''}>Current Chapter Only 📖</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Full Chapter Mode Options Group -->
+            <div class="typing-mode-group" id="group-chapter-settings" ${singleVerseMode ? 'hidden' : ''}>
+              <!-- Toggle: Skip Completed Verses -->
+              <label class="typing-option-row" for="toggle-skip-done-checkbox">
+                <span class="option-title">Skip Completed Verses</span>
+                <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
+              </label>
+            </div>
+
+            <div class="typing-options-section-divider">
+              <span>Display &amp; Actions</span>
+            </div>
 
             <!-- Toggle: Live Stats Bar -->
             <label class="typing-option-row" for="toggle-stats-checkbox">
@@ -425,29 +447,21 @@ export function renderTypingScreen(container, params = {}) {
               <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
             </label>
 
-            <!-- Toggle: Skip Completed Verses -->
-            <label class="typing-option-row" for="toggle-skip-done-checkbox">
-              <span class="option-title">Skip Completed Verses</span>
-              <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
-            </label>
-
-            <!-- Action: Mark Chapter Read -->
-            <div class="typing-option-row option-action-row">
+            <!-- Action: Mark Chapter Read (Chapter mode) -->
+            <div class="typing-option-row option-action-row" id="modal-mark-ch-row" ${singleVerseMode ? 'hidden' : ''}>
               <span class="option-title">${book.name} ${initialChapter}</span>
               <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
                 <span id="modal-mark-ch-read-label">📖 Mark Read</span>
               </button>
             </div>
 
-            ${singleVerseMode && targetSingleVerseNum ? `
-              <!-- Action: Mark Verse Read -->
-              <div class="typing-option-row option-action-row">
-                <span class="option-title">Verse ${targetSingleVerseNum}</span>
-                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
-                  <span id="modal-mark-verse-read-label">📖 Mark Read</span>
-                </button>
-              </div>
-            ` : ''}
+            <!-- Action: Mark Verse Read (Single Verse mode) -->
+            <div class="typing-option-row option-action-row" id="modal-mark-verse-row" ${singleVerseMode ? '' : 'hidden'}>
+              <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
+              <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
+                <span id="modal-mark-verse-read-label">📖 Mark Read</span>
+              </button>
+            </div>
 
             <!-- Action: Restart Passage -->
             <div class="typing-option-row option-action-row">
@@ -472,12 +486,16 @@ export function renderTypingScreen(container, params = {}) {
   const optionsBackdrop = container.querySelector('#typing-options-backdrop');
   const optionsCloseBtn = container.querySelector('#options-close-btn');
   const optionsDoneBtn = container.querySelector('#options-done-btn');
-  const toggleSingleVerseCheckbox = container.querySelector('#toggle-single-verse-checkbox');
+  const modeBtnChapter = container.querySelector('#mode-btn-chapter');
+  const modeBtnSingle = container.querySelector('#mode-btn-single');
+  const groupSingleVerseSettings = container.querySelector('#group-single-verse-settings');
+  const groupChapterSettings = container.querySelector('#group-chapter-settings');
+  const modalMarkChRow = container.querySelector('#modal-mark-ch-row');
+  const modalMarkVerseRow = container.querySelector('#modal-mark-verse-row');
   const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
   const toggleShuffleScopeRow = container.querySelector('#toggle-shuffle-scope-row');
   const shuffleScopeSelect = container.querySelector('#shuffle-scope-select');
-  const toggleAdvanceBtnRow = container.querySelector('#toggle-advance-btn-row');
   const toggleAdvanceBtnCheckbox = container.querySelector('#toggle-advance-btn-checkbox');
   const toggleSkipCelebrationCheckbox = container.querySelector('#toggle-skip-celebration-checkbox');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
@@ -504,25 +522,43 @@ export function renderTypingScreen(container, params = {}) {
   let pendingSingleVerseSwitch = null;
 
   // ── 1. Typing Options Modal Controls ───────────────────────────
-  function openOptionsModal() {
-    pendingSingleVerseSwitch = null;
-    const isSingle = singleVerseMode;
-    if (toggleSingleVerseCheckbox) toggleSingleVerseCheckbox.checked = isSingle;
-    if (toggleShuffleRow) toggleShuffleRow.hidden = !isSingle;
-    if (toggleShuffleCheckbox) {
-      toggleShuffleCheckbox.checked = shuffleVerses;
-      toggleShuffleCheckbox.disabled = !isSingle;
+  function setModalMode(isSingle) {
+    pendingSingleVerseSwitch = isSingle;
+    setSingleVerseModePref(isSingle);
+
+    if (modeBtnChapter) {
+      modeBtnChapter.classList.toggle('active', !isSingle);
+      modeBtnChapter.setAttribute('aria-selected', String(!isSingle));
     }
-    if (toggleShuffleScopeRow) toggleShuffleScopeRow.hidden = !(isSingle && shuffleVerses);
+    if (modeBtnSingle) {
+      modeBtnSingle.classList.toggle('active', isSingle);
+      modeBtnSingle.setAttribute('aria-selected', String(isSingle));
+    }
+
+    if (groupSingleVerseSettings) groupSingleVerseSettings.hidden = !isSingle;
+    if (groupChapterSettings) groupChapterSettings.hidden = isSingle;
+    if (modalMarkChRow) modalMarkChRow.hidden = isSingle;
+    if (modalMarkVerseRow) modalMarkVerseRow.hidden = !isSingle;
+
+    if (advanceStepBtn) {
+      advanceStepBtn.hidden = !isSingle || !advanceButtonPref;
+      advanceStepBtn.textContent = (isSingle && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+    }
+    updateReadButtons();
+  }
+
+  function openOptionsModal() {
+    const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
+    setModalMode(isSingle);
+    pendingSingleVerseSwitch = null;
+
+    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
+    if (toggleShuffleScopeRow) toggleShuffleScopeRow.hidden = !shuffleVerses;
     if (shuffleScopeSelect) {
       shuffleScopeSelect.value = shuffleScope;
-      shuffleScopeSelect.disabled = !(isSingle && shuffleVerses);
+      shuffleScopeSelect.disabled = !shuffleVerses;
     }
-    if (toggleAdvanceBtnRow) toggleAdvanceBtnRow.hidden = !isSingle;
-    if (toggleAdvanceBtnCheckbox) {
-      toggleAdvanceBtnCheckbox.checked = advanceButtonPref;
-      toggleAdvanceBtnCheckbox.disabled = !isSingle;
-    }
+    if (toggleAdvanceBtnCheckbox) toggleAdvanceBtnCheckbox.checked = advanceButtonPref;
     if (toggleSkipCelebrationCheckbox) toggleSkipCelebrationCheckbox.checked = skipCelebrationModal;
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
     if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
@@ -574,32 +610,15 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
-  if (toggleSingleVerseCheckbox) {
-    toggleSingleVerseCheckbox.addEventListener('change', () => {
-      const isSingle = toggleSingleVerseCheckbox.checked;
-      setSingleVerseModePref(isSingle);
-      pendingSingleVerseSwitch = isSingle;
-      if (toggleShuffleRow) {
-        toggleShuffleRow.hidden = !isSingle;
-      }
-      if (toggleShuffleCheckbox) {
-        toggleShuffleCheckbox.disabled = !isSingle;
-      }
-      if (toggleShuffleScopeRow) {
-        toggleShuffleScopeRow.hidden = !(isSingle && shuffleVerses);
-      }
-      if (shuffleScopeSelect) {
-        shuffleScopeSelect.disabled = !(isSingle && shuffleVerses);
-      }
-      if (toggleAdvanceBtnRow) {
-        toggleAdvanceBtnRow.hidden = !isSingle;
-      }
-      if (toggleAdvanceBtnCheckbox) {
-        toggleAdvanceBtnCheckbox.disabled = !isSingle;
-      }
-      if (advanceStepBtn) {
-        advanceStepBtn.hidden = !isSingle || !advanceButtonPref;
-      }
+  if (modeBtnChapter) {
+    modeBtnChapter.addEventListener('click', () => {
+      setModalMode(false);
+    });
+  }
+
+  if (modeBtnSingle) {
+    modeBtnSingle.addEventListener('click', () => {
+      setModalMode(true);
     });
   }
 
@@ -631,7 +650,8 @@ export function renderTypingScreen(container, params = {}) {
       advanceButtonPref = toggleAdvanceBtnCheckbox.checked;
       setAdvanceButtonPref(advanceButtonPref);
       if (advanceStepBtn) {
-        advanceStepBtn.hidden = !singleVerseMode || !advanceButtonPref;
+        const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
+        advanceStepBtn.hidden = !isSingle || !advanceButtonPref;
       }
     });
   }
@@ -687,24 +707,32 @@ export function renderTypingScreen(container, params = {}) {
       }
     }
 
-    if (singleVerseMode && targetSingleVerseNum) {
-      const vRec = sum.record?.completedVerses?.[String(targetSingleVerseNum)];
-      const isVRead = Boolean(isChRead || vRec?.isRead);
-      const markVBtn = container.querySelector('#modal-mark-verse-read-btn');
-      const markVLbl = container.querySelector('#modal-mark-verse-read-label');
-      const markVDesc = container.querySelector('#modal-verse-read-desc');
-      if (markVBtn && markVLbl) {
-        if (isVRead) {
-          markVBtn.classList.add('is-read-active');
-          markVLbl.textContent = '✓ Read';
-          if (markVDesc) markVDesc.textContent = `Verse ${targetSingleVerseNum} is marked as read`;
-          markVBtn.title = `Verse ${targetSingleVerseNum} is marked as read. Click to unmark.`;
-        } else {
-          markVBtn.classList.remove('is-read-active');
-          markVLbl.textContent = '📖 Mark Read';
-          if (markVDesc) markVDesc.textContent = `Mark verse ${targetSingleVerseNum} as read`;
-          markVBtn.title = `Mark verse ${targetSingleVerseNum} as read`;
-        }
+    function getActiveVerseNumberForRead() {
+      if (singleVerseMode && targetSingleVerseNum) return targetSingleVerseNum;
+      const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+      if (curVIdx >= 0 && verseRanges[curVIdx]) return verseRanges[curVIdx].verse;
+      return targetSingleVerseNum || 1;
+    }
+
+    const activeVNum = getActiveVerseNumberForRead();
+    const vTitleEl = container.querySelector('#modal-mark-verse-title');
+    if (vTitleEl) vTitleEl.textContent = `Verse ${activeVNum}`;
+    const vRec = sum.record?.completedVerses?.[String(activeVNum)];
+    const isVRead = Boolean(isChRead || vRec?.isRead);
+    const markVBtn = container.querySelector('#modal-mark-verse-read-btn');
+    const markVLbl = container.querySelector('#modal-mark-verse-read-label');
+    const markVDesc = container.querySelector('#modal-verse-read-desc');
+    if (markVBtn && markVLbl) {
+      if (isVRead) {
+        markVBtn.classList.add('is-read-active');
+        markVLbl.textContent = '✓ Read';
+        if (markVDesc) markVDesc.textContent = `Verse ${activeVNum} is marked as read`;
+        markVBtn.title = `Verse ${activeVNum} is marked as read. Click to unmark.`;
+      } else {
+        markVBtn.classList.remove('is-read-active');
+        markVLbl.textContent = '📖 Mark Read';
+        if (markVDesc) markVDesc.textContent = `Mark verse ${activeVNum} as read`;
+        markVBtn.title = `Mark verse ${activeVNum} as read`;
       }
     }
   }
@@ -717,10 +745,14 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
-  if (modalMarkVerseBtn && targetSingleVerseNum) {
+  if (modalMarkVerseBtn) {
     modalMarkVerseBtn.addEventListener('click', () => {
-      toggleVerseRead(book.id, initialChapter, targetSingleVerseNum, activeTranslation);
-      trackEvent('toggle_verse_read', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+      const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+      const vNum = (singleVerseMode && targetSingleVerseNum)
+        ? targetSingleVerseNum
+        : ((curVIdx >= 0 && verseRanges[curVIdx]) ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1));
+      toggleVerseRead(book.id, initialChapter, vNum, activeTranslation);
+      trackEvent('toggle_verse_read', { bookId: book.id, chapter: initialChapter, verse: vNum });
       updateReadButtons();
     });
   }
