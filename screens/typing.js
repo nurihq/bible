@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v18';
+} from '../bible-data.js?v=20261104_v19';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -32,9 +32,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v18';
-import { trackEvent } from '../analytics.js?v=20261104_v18';
-import { navigate } from '../app.js?v=20261104_v18';
+} from '../api.js?v=20261104_v19';
+import { trackEvent } from '../analytics.js?v=20261104_v19';
+import { navigate } from '../app.js?v=20261104_v19';
 
 function escapeHtml(str) {
   return String(str)
@@ -72,7 +72,15 @@ export function renderTypingScreen(container, params = {}) {
   const nextChapterRef = getNextChapterRef(book.id, initialChapter);
   const chapterKey = `${book.id}:${initialChapter}`;
 
-  // Ensure window does not scroll while typing; typing card fills remaining viewport height
+  // Cleanup any previous active session before setting up the new one
+  if (window.__bibleTypingCleanup) {
+    const prevCleanup = window.__bibleTypingCleanup;
+    window.__bibleTypingCleanup = null;
+    prevCleanup();
+  }
+
+  // Reset scroll and lock screen to viewport height
+  window.scrollTo(0, 0);
   document.documentElement.classList.add('typing-active-view');
   document.body.classList.add('typing-active-view');
 
@@ -104,11 +112,6 @@ export function renderTypingScreen(container, params = {}) {
   let verseMistakes = 0;
   let lastSkipJumpTime = 0;
   let sittingSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-  // Cleanup any previous intervals/listeners when navigating away
-  if (window.__bibleTypingCleanup) {
-    window.__bibleTypingCleanup();
-  }
 
   function clearTimer() {
     if (timerInterval) {
@@ -228,8 +231,8 @@ export function renderTypingScreen(container, params = {}) {
           </div>
 
           <div class="summary-actions-group">
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options & Actions" aria-label="Typing Options">
-              ⋯
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options & Actions">
+              ⚙️ Options
             </button>
           </div>
         </div>
@@ -263,11 +266,6 @@ export function renderTypingScreen(container, params = {}) {
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Chapter / Verse Progress Bar -->
-      <div class="typing-chapter-progress-track">
-        <div class="typing-chapter-progress-fill" id="typing-chapter-progress-fill" style="width: 0%"></div>
       </div>
 
       <!-- Strict Backspace Error Banner (Only shown when an active mistake needs Backspace) -->
@@ -375,96 +373,56 @@ export function renderTypingScreen(container, params = {}) {
           <div class="typing-options-body">
             <!-- Toggle: Single Verse Mode -->
             <label class="typing-option-row" for="toggle-single-verse-checkbox">
-              <div class="option-info">
-                <span class="option-title">Single Verse Mode</span>
-                <span class="option-desc">Type one verse at a time instead of typing the entire chapter</span>
-              </div>
-              <div class="option-control">
-                <input type="checkbox" id="toggle-single-verse-checkbox" class="option-switch" ${singleVerseMode ? 'checked' : ''} />
-              </div>
+              <span class="option-title">Single Verse Mode</span>
+              <input type="checkbox" id="toggle-single-verse-checkbox" class="option-switch" ${singleVerseMode ? 'checked' : ''} />
             </label>
 
-            <!-- Toggle: Shuffle Verses (Single Verse Mode) -->
+            <!-- Toggle: Shuffle Verses -->
             <label class="typing-option-row" for="toggle-shuffle-checkbox">
-              <div class="option-info">
-                <span class="option-title">Shuffle Verses</span>
-                <span class="option-desc">Jump to a random incomplete verse in this chapter after completing each verse</span>
-              </div>
-              <div class="option-control">
-                <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
-              </div>
+              <span class="option-title">Shuffle Next Verses</span>
+              <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
             </label>
 
-            <!-- Toggle: Auto-Advance / Skip Celebration Popup -->
+            <!-- Toggle: Auto-Advance -->
             <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
-              <div class="option-info">
-                <span class="option-title">Auto-Advance (Skip Celebration)</span>
-                <span class="option-desc">Instantly jump to the next verse without interruption in single verse mode</span>
-              </div>
-              <div class="option-control">
-                <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
-              </div>
+              <span class="option-title">Auto-Advance (Skip Popup)</span>
+              <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
             </label>
 
             <!-- Toggle: Live Stats Bar -->
             <label class="typing-option-row" for="toggle-stats-checkbox">
-              <div class="option-info">
-                <span class="option-title">Live Typing Stats</span>
-                <span class="option-desc">Show real-time WPM, CPM, accuracy, verse count, and timer bar</span>
-              </div>
-              <div class="option-control">
-                <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
-              </div>
+              <span class="option-title">Show Live Stats Bar</span>
+              <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
             </label>
 
             <!-- Toggle: Skip Completed Verses -->
             <label class="typing-option-row" for="toggle-skip-done-checkbox">
-              <div class="option-info">
-                <span class="option-title">Skip Completed Verses</span>
-                <span class="option-desc">Automatically advance past already-completed verses in this chapter</span>
-              </div>
-              <div class="option-control">
-                <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
-              </div>
+              <span class="option-title">Skip Completed Verses</span>
+              <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
             </label>
 
             <!-- Action: Mark Chapter Read -->
             <div class="typing-option-row option-action-row">
-              <div class="option-info">
-                <span class="option-title">Chapter Reading Status</span>
-                <span class="option-desc" id="modal-ch-read-desc">Mark ${book.name} ${initialChapter} as read</span>
-              </div>
-              <div class="option-control">
-                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
-                  <span id="modal-mark-ch-read-label">📖 Mark Read</span>
-                </button>
-              </div>
+              <span class="option-title">${book.name} ${initialChapter}</span>
+              <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
+                <span id="modal-mark-ch-read-label">📖 Mark Read</span>
+              </button>
             </div>
 
             ${singleVerseMode && targetSingleVerseNum ? `
               <!-- Action: Mark Verse Read -->
               <div class="typing-option-row option-action-row">
-                <div class="option-info">
-                  <span class="option-title">Verse Reading Status</span>
-                  <span class="option-desc" id="modal-verse-read-desc">Mark verse ${targetSingleVerseNum} as read</span>
-                </div>
-                <div class="option-control">
-                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
-                    <span id="modal-mark-verse-read-label">📖 Mark Read</span>
-                  </button>
-                </div>
+                <span class="option-title">Verse ${targetSingleVerseNum}</span>
+                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
+                  <span id="modal-mark-verse-read-label">📖 Mark Read</span>
+                </button>
               </div>
             ` : ''}
 
             <!-- Action: Restart Passage -->
             <div class="typing-option-row option-action-row">
-              <div class="option-info">
-                <span class="option-title">Restart Passage</span>
-                <span class="option-desc">Move the cursor back to the start (completed verses are kept)</span>
-              </div>
-              <div class="option-control">
-                <button type="button" class="btn btn-secondary btn-sm" id="modal-restart-btn">↺ Restart</button>
-              </div>
+              <span class="option-title">Cursor Position</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="modal-restart-btn">↺ Reset to Start</button>
             </div>
           </div>
 
@@ -507,8 +465,11 @@ export function renderTypingScreen(container, params = {}) {
   const telemetrySubStatusEl = null; // integrated into compact badges and modals
   const completionBackdrop = container.querySelector('#completion-modal-backdrop');
 
+  let pendingSingleVerseSwitch = null;
+
   // ── 1. Typing Options Modal Controls ───────────────────────────
   function openOptionsModal() {
+    pendingSingleVerseSwitch = null;
     if (toggleSingleVerseCheckbox) toggleSingleVerseCheckbox.checked = singleVerseMode;
     if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
     if (toggleSkipCelebrationCheckbox) toggleSkipCelebrationCheckbox.checked = skipCelebrationModal;
@@ -520,6 +481,19 @@ export function renderTypingScreen(container, params = {}) {
 
   function closeOptionsModal() {
     if (optionsBackdrop) optionsBackdrop.hidden = true;
+    if (pendingSingleVerseSwitch !== null && pendingSingleVerseSwitch !== singleVerseMode) {
+      const isSingle = pendingSingleVerseSwitch;
+      pendingSingleVerseSwitch = null;
+      if (isSingle) {
+        const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+        const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1);
+        navigate(`#/typing/${book.id}/${initialChapter}/${vNum}`);
+      } else {
+        const vNum = targetSingleVerseNum || 1;
+        navigate(`#/typing/${book.id}/${initialChapter}?verse=${vNum}`);
+      }
+      return;
+    }
     focusTypingInput();
   }
 
@@ -553,15 +527,7 @@ export function renderTypingScreen(container, params = {}) {
     toggleSingleVerseCheckbox.addEventListener('change', () => {
       const isSingle = toggleSingleVerseCheckbox.checked;
       setSingleVerseModePref(isSingle);
-      closeOptionsModal();
-      if (isSingle) {
-        const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
-        const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1);
-        navigate(`#/typing/${book.id}/${initialChapter}/${vNum}`);
-      } else {
-        const vNum = targetSingleVerseNum || 1;
-        navigate(`#/typing/${book.id}/${initialChapter}?verse=${vNum}`);
-      }
+      pendingSingleVerseSwitch = isSingle;
     });
   }
 
@@ -1118,19 +1084,21 @@ export function renderTypingScreen(container, params = {}) {
       activeVerseBlock.classList.add('is-active-verse');
     }
 
-    // Update progress bar
-    if (singleVerseMode) {
-      const pct = targetChars.length > 0 ? Math.min(100, (cursorIdx / targetChars.length) * 100) : 0;
-      progressFill.style.width = `${pct.toFixed(1)}%`;
-    } else {
-      const activeVIdx = charToVerseIdxMap[Math.min(cursorIdx, Math.max(0, charToVerseIdxMap.length - 1))] || 0;
-      const activeVR = verseRanges[activeVIdx];
-      const intraVerseFraction = activeVR
-        ? Math.min(1, Math.max(0, (cursorIdx - activeVR.startCharIdx) / Math.max(1, activeVR.charCount)))
-        : 0;
-      const effectiveDoneVerses = completedVerseSet.size + (completedVerseSet.has(currentVerseNum) ? 0 : intraVerseFraction);
-      const pct = verses.length > 0 ? Math.min(100, (effectiveDoneVerses / verses.length) * 100) : 0;
-      progressFill.style.width = `${pct.toFixed(1)}%`;
+    // Update progress bar if element exists
+    if (progressFill) {
+      if (singleVerseMode) {
+        const pct = targetChars.length > 0 ? Math.min(100, (cursorIdx / targetChars.length) * 100) : 0;
+        progressFill.style.width = `${pct.toFixed(1)}%`;
+      } else {
+        const activeVIdx = charToVerseIdxMap[Math.min(cursorIdx, Math.max(0, charToVerseIdxMap.length - 1))] || 0;
+        const activeVR = verseRanges[activeVIdx];
+        const intraVerseFraction = activeVR
+          ? Math.min(1, Math.max(0, (cursorIdx - activeVR.startCharIdx) / Math.max(1, activeVR.charCount)))
+          : 0;
+        const effectiveDoneVerses = completedVerseSet.size + (completedVerseSet.has(currentVerseNum) ? 0 : intraVerseFraction);
+        const pct = verses.length > 0 ? Math.min(100, (effectiveDoneVerses / verses.length) * 100) : 0;
+        progressFill.style.width = `${pct.toFixed(1)}%`;
+      }
     }
 
     // Smooth auto-scroll to keep the active character comfortably centered
@@ -1210,7 +1178,9 @@ export function renderTypingScreen(container, params = {}) {
       ? Math.round((correctKeystrokes / totalKeystrokes) * 1000) / 10
       : 100;
 
-    progressFill.style.width = '100%';
+    if (progressFill) {
+      progressFill.style.width = '100%';
+    }
     liveWpmEl.textContent = finalWpm.toFixed(1);
     liveCpmEl.textContent = String(finalCpm);
     liveAccEl.textContent = `${finalAcc}%`;
