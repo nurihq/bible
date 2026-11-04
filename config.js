@@ -4,8 +4,8 @@ export const CONFIG = {
   // Google OAuth 2.0 Web Client ID (Nuri HQ)
   GOOGLE_CLIENT_ID: '719377736713-fobtcss0udkkl5u930aifhe5318rlaf9.apps.googleusercontent.com',
 
-  // Google Analytics 4 Measurement ID
-  GA_MEASUREMENT_ID: 'G-M5WYQQQWVV',
+  // Google Analytics 4 Measurement ID (Property: bible, properties/562336985)
+  GA_MEASUREMENT_ID: 'G-6B52RELLEB',
 
   // Live AWS Lambda Function URLs (CloudFormation stack: `bible`, Region: `us-east-1`)
   API_ENDPOINTS: {
