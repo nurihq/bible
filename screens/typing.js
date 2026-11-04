@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v13';
+} from '../bible-data.js?v=20261104_v14';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -24,9 +24,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v13';
-import { trackEvent } from '../analytics.js?v=20261104_v13';
-import { navigate } from '../app.js?v=20261104_v13';
+} from '../api.js?v=20261104_v14';
+import { trackEvent } from '../analytics.js?v=20261104_v14';
+import { navigate } from '../app.js?v=20261104_v14';
 
 function escapeHtml(str) {
   return String(str)
@@ -591,7 +591,7 @@ export function renderTypingScreen(container, params = {}) {
 
     // Clear all transient .is-correct / .is-error / .is-current classes and refresh DOM styling
     refreshAllCharClasses();
-    updateCursorAndErrorClasses(prevCursor, prevErrLen);
+    updateCursorAndErrorClasses(cursorIdx, 0);
 
     if (options.statusMessage && telemetrySubStatusEl) {
       telemetrySubStatusEl.innerHTML = options.statusMessage;
@@ -602,6 +602,9 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function refreshAllCharClasses() {
+    const currentVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+    const currentVR = verseRanges[currentVIdx];
+
     for (let vIdx = 0; vIdx < verseRanges.length; vIdx++) {
       const vr = verseRanges[vIdx];
       const isVDone = completedVerseSet.has(vr.verse);
@@ -616,7 +619,9 @@ export function renderTypingScreen(container, params = {}) {
         const el = charEls[cIdx];
         if (!el) continue;
         el.classList.remove('is-current', 'is-error', 'is-error-caret');
-        if (cIdx < cursorIdx || isVDone) {
+        if (isVDone) {
+          el.classList.add('is-correct');
+        } else if (vr === currentVR && cIdx < cursorIdx) {
           el.classList.add('is-correct');
         } else {
           el.classList.remove('is-correct');
@@ -845,13 +850,18 @@ export function renderTypingScreen(container, params = {}) {
   function updateCursorAndErrorClasses(prevCursor, prevErrLen) {
     const clearStart = Math.max(0, Math.min(prevCursor, cursorIdx) - 2);
     const clearEnd = Math.min(charEls.length - 1, Math.max(prevCursor + prevErrLen, cursorIdx + errorBuffer.length) + 2);
+    const currentVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+    const currentVR = verseRanges[currentVIdx];
 
     for (let i = clearStart; i <= clearEnd; i++) {
       const el = charEls[i];
       if (!el) continue;
       el.classList.remove('is-current', 'is-error', 'is-error-caret');
       const vNum = charToVerseMap[i];
-      if (i < cursorIdx || completedVerseSet.has(vNum)) {
+      const isVDone = completedVerseSet.has(vNum);
+      if (isVDone) {
+        el.classList.add('is-correct');
+      } else if (currentVR && i >= currentVR.startCharIdx && i < cursorIdx) {
         el.classList.add('is-correct');
       } else {
         el.classList.remove('is-correct');
