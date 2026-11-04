@@ -4,16 +4,16 @@ import {
   getPreferredTranslation,
   setPreferredTranslation,
   getChapterProgressSummary
-} from '../api.js?v=20261104_v27';
+} from '../api.js?v=20261104_v28';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261104_v27';
-import { trackEvent } from '../analytics.js?v=20261104_v27';
-import { navigate } from '../app.js?v=20261104_v27';
+} from '../bible-data.js?v=20261104_v28';
+import { trackEvent } from '../analytics.js?v=20261104_v28';
+import { navigate } from '../app.js?v=20261104_v28';
 
 function escapeHtml(str) {
   return String(str)

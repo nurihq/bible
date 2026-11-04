@@ -8,7 +8,7 @@ import {
   searchBibleChapters,
   fetchChapterVerses,
   getRandomVerseRef
-} from '../bible-data.js?v=20261104_v27';
+} from '../bible-data.js?v=20261104_v28';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -19,12 +19,10 @@ import {
   setShowTypingStatsPref,
   getSingleVerseModePref,
   setSingleVerseModePref,
-  getSkipCelebrationModalPref,
-  setSkipCelebrationModalPref,
+  getAutoAdvancePref,
+  setAutoAdvancePref,
   getShuffleVersesPref,
   setShuffleVersesPref,
-  getAdvanceButtonPref,
-  setAdvanceButtonPref,
   pushRandomVerseHistory,
   popRandomVerseHistory,
   pushRandomVerseForward,
@@ -40,9 +38,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v27';
-import { trackEvent } from '../analytics.js?v=20261104_v27';
-import { navigate } from '../app.js?v=20261104_v27';
+} from '../api.js?v=20261104_v28';
+import { trackEvent } from '../analytics.js?v=20261104_v28';
+import { navigate } from '../app.js?v=20261104_v28';
 
 function escapeHtml(str) {
   return String(str)
@@ -71,9 +69,8 @@ export function renderTypingScreen(container, params = {}) {
   let activeTranslation = getPreferredTranslation() || 'ESV';
   let skipCompletedVerses = getSkipCompletedVersesPref();
   let showTypingStats = getShowTypingStatsPref();
-  let skipCelebrationModal = getSkipCelebrationModalPref();
+  let autoAdvance = getAutoAdvancePref();
   let shuffleVerses = getShuffleVersesPref();
-  let advanceButtonPref = getAdvanceButtonPref();
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
 
@@ -236,7 +233,7 @@ export function renderTypingScreen(container, params = {}) {
               <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
             </div>
             <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next ${singleVerseMode ? 'Verse' : 'Chapter'}">›</button>
-            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && advanceButtonPref ? '' : 'hidden'}>
+            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance ? '' : 'hidden'}>
               ${(singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›'}
             </button>
             <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
@@ -415,15 +412,9 @@ export function renderTypingScreen(container, params = {}) {
               <!-- Panel: Single Verse Mode -->
               <div class="modal-tab-panel ${singleVerseMode ? 'active' : ''}" id="panel-single-mode" role="tabpanel">
                 <!-- Toggle: Auto-Advance (Under Single Verse Mode) -->
-                <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
-                  <span class="option-title">Auto-Advance (Skip Popup)</span>
-                  <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
-                </label>
-
-                <!-- Toggle: Wait for Advance Button -->
-                <label class="typing-option-row" for="toggle-advance-btn-checkbox">
-                  <span class="option-title">Wait for Advance Button</span>
-                  <input type="checkbox" id="toggle-advance-btn-checkbox" class="option-switch" ${advanceButtonPref ? 'checked' : ''} />
+                <label class="typing-option-row" for="toggle-auto-advance-checkbox">
+                  <span class="option-title">Auto-Advance</span>
+                  <input type="checkbox" id="toggle-auto-advance-checkbox" class="option-switch" ${autoAdvance ? 'checked' : ''} />
                 </label>
 
                 <!-- Toggle: Shuffle Verses (Entire Bible) -->
@@ -481,8 +472,7 @@ export function renderTypingScreen(container, params = {}) {
   const panelSingleMode = container.querySelector('#panel-single-mode');
   const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
-  const toggleAdvanceBtnCheckbox = container.querySelector('#toggle-advance-btn-checkbox');
-  const toggleSkipCelebrationCheckbox = container.querySelector('#toggle-skip-celebration-checkbox');
+  const toggleAutoAdvanceCheckbox = container.querySelector('#toggle-auto-advance-checkbox');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
   const toggleSkipDoneCheckbox = container.querySelector('#toggle-skip-done-checkbox');
   const modalMarkChBtn = container.querySelector('#modal-mark-ch-read-btn');
@@ -535,7 +525,7 @@ export function renderTypingScreen(container, params = {}) {
     setModalTab(isSingle);
 
     if (advanceStepBtn) {
-      advanceStepBtn.hidden = !isSingle || !advanceButtonPref;
+      advanceStepBtn.hidden = !isSingle || autoAdvance;
       advanceStepBtn.textContent = (isSingle && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
     }
   }
@@ -545,8 +535,7 @@ export function renderTypingScreen(container, params = {}) {
     setModalTab(singleVerseMode);
 
     if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
-    if (toggleAdvanceBtnCheckbox) toggleAdvanceBtnCheckbox.checked = advanceButtonPref;
-    if (toggleSkipCelebrationCheckbox) toggleSkipCelebrationCheckbox.checked = skipCelebrationModal;
+    if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
     if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
     updateReadButtons();
@@ -624,13 +613,13 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
-  if (toggleAdvanceBtnCheckbox) {
-    toggleAdvanceBtnCheckbox.addEventListener('change', () => {
-      advanceButtonPref = toggleAdvanceBtnCheckbox.checked;
-      setAdvanceButtonPref(advanceButtonPref);
+  if (toggleAutoAdvanceCheckbox) {
+    toggleAutoAdvanceCheckbox.addEventListener('change', () => {
+      autoAdvance = toggleAutoAdvanceCheckbox.checked;
+      setAutoAdvancePref(autoAdvance);
       if (advanceStepBtn) {
         const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
-        advanceStepBtn.hidden = !isSingle || !advanceButtonPref;
+        advanceStepBtn.hidden = !isSingle || autoAdvance;
       }
     });
   }
@@ -638,13 +627,6 @@ export function renderTypingScreen(container, params = {}) {
   if (advanceStepBtn) {
     advanceStepBtn.addEventListener('click', () => {
       navigateNextStep();
-    });
-  }
-
-  if (toggleSkipCelebrationCheckbox) {
-    toggleSkipCelebrationCheckbox.addEventListener('change', () => {
-      skipCelebrationModal = toggleSkipCelebrationCheckbox.checked;
-      setSkipCelebrationModalPref(skipCelebrationModal);
     });
   }
 
@@ -821,6 +803,7 @@ export function renderTypingScreen(container, params = {}) {
     if (completionBackdrop) completionBackdrop.hidden = true;
     if (viewportWrapper) viewportWrapper.classList.remove('has-active-error');
     if (advanceStepBtn) {
+      advanceStepBtn.hidden = !singleVerseMode || autoAdvance;
       advanceStepBtn.classList.remove('btn-primary', 'is-ready');
       advanceStepBtn.classList.add('btn-secondary');
       advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
@@ -1329,7 +1312,11 @@ export function renderTypingScreen(container, params = {}) {
     const badgeEl = container.querySelector('#telemetry-completed-badge');
     if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
 
-    if (singleVerseMode && advanceButtonPref) {
+    if (singleVerseMode) {
+      if (autoAdvance) {
+        navigateNextStep();
+        return;
+      }
       if (advanceStepBtn) {
         advanceStepBtn.hidden = false;
         advanceStepBtn.classList.remove('btn-secondary');
@@ -1337,11 +1324,6 @@ export function renderTypingScreen(container, params = {}) {
         advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
         advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
       }
-      return;
-    }
-
-    if (singleVerseMode && skipCelebrationModal) {
-      navigateNextStep();
       return;
     }
 

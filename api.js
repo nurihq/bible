@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v27';
+import { CONFIG } from './config.js?v=20261104_v28';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v27';
+} from './bible-data.js?v=20261104_v28';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -247,15 +247,35 @@ export function setSingleVerseModePref(enabled) {
   saveLocalStore(store);
 }
 
-export function getSkipCelebrationModalPref() {
+export function getAutoAdvancePref() {
   const store = getLocalStore();
-  return Boolean(store.skipCelebrationModal);
+  if (store.autoAdvance !== undefined) {
+    return Boolean(store.autoAdvance);
+  }
+  if (store.advanceButton !== undefined) {
+    return !store.advanceButton;
+  }
+  if (store.skipCelebrationModal !== undefined) {
+    return Boolean(store.skipCelebrationModal);
+  }
+  return false;
+}
+
+export function setAutoAdvancePref(autoAdvance) {
+  const store = getLocalStore();
+  const val = Boolean(autoAdvance);
+  store.autoAdvance = val;
+  store.advanceButton = !val;
+  store.skipCelebrationModal = val;
+  saveLocalStore(store);
+}
+
+export function getSkipCelebrationModalPref() {
+  return getAutoAdvancePref();
 }
 
 export function setSkipCelebrationModalPref(skip) {
-  const store = getLocalStore();
-  store.skipCelebrationModal = Boolean(skip);
-  saveLocalStore(store);
+  setAutoAdvancePref(skip);
 }
 
 export function getShuffleVersesPref() {
@@ -1743,8 +1763,12 @@ export const Api = {
   setShowTypingStatsPref,
   getSingleVerseModePref,
   setSingleVerseModePref,
+  getAutoAdvancePref,
+  setAutoAdvancePref,
   getSkipCelebrationModalPref,
   setSkipCelebrationModalPref,
+  getAdvanceButtonPref,
+  setAdvanceButtonPref,
   getShuffleVersesPref,
   setShuffleVersesPref,
   getChapterProgressSummary,

@@ -1397,7 +1397,7 @@ body.typing-active-view .main-content {
 .modal-tab-panels-wrapper {
   display: grid;
   grid-template-areas: "tabpanel";
-  min-height: 205px;
+  min-height: 155px;
 }
 
 .modal-tab-panel {
