@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v17';
+import { CONFIG } from './config.js?v=20261104_v18';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v17';
+} from './bible-data.js?v=20261104_v18';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -163,6 +163,39 @@ export function getShowTypingStatsPref() {
 export function setShowTypingStatsPref(show) {
   const store = getLocalStore();
   store.showTypingStats = Boolean(show);
+  saveLocalStore(store);
+}
+
+export function getSingleVerseModePref() {
+  const store = getLocalStore();
+  return Boolean(store.singleVerseMode);
+}
+
+export function setSingleVerseModePref(enabled) {
+  const store = getLocalStore();
+  store.singleVerseMode = Boolean(enabled);
+  saveLocalStore(store);
+}
+
+export function getSkipCelebrationModalPref() {
+  const store = getLocalStore();
+  return Boolean(store.skipCelebrationModal);
+}
+
+export function setSkipCelebrationModalPref(skip) {
+  const store = getLocalStore();
+  store.skipCelebrationModal = Boolean(skip);
+  saveLocalStore(store);
+}
+
+export function getShuffleVersesPref() {
+  const store = getLocalStore();
+  return Boolean(store.shuffleVerses);
+}
+
+export function setShuffleVersesPref(shuffle) {
+  const store = getLocalStore();
+  store.shuffleVerses = Boolean(shuffle);
   saveLocalStore(store);
 }
 
@@ -1540,6 +1573,12 @@ export const Api = {
   setSkipCompletedVersesPref,
   getShowTypingStatsPref,
   setShowTypingStatsPref,
+  getSingleVerseModePref,
+  setSingleVerseModePref,
+  getSkipCelebrationModalPref,
+  setSkipCelebrationModalPref,
+  getShuffleVersesPref,
+  setShuffleVersesPref,
   getChapterProgressSummary,
   isChapterRecordFullyCompleted,
   isChapterRecordFullyRead,

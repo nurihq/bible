@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js?v=20261104_v17';
-import { Auth, syncLocalToCloud } from './api.js?v=20261104_v17';
-import { initGA, trackPageView } from './analytics.js?v=20261104_v17';
-import { getBookById } from './bible-data.js?v=20261104_v17';
+import { Navbar } from './components/navbar.js?v=20261104_v18';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getLocalStore } from './api.js?v=20261104_v18';
+import { initGA, trackPageView } from './analytics.js?v=20261104_v18';
+import { getBookById } from './bible-data.js?v=20261104_v18';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261104_v17';
-import { renderLandingScreen } from './screens/home.js?v=20261104_v17';
-import { renderTypingScreen } from './screens/typing.js?v=20261104_v17';
-import { renderProgressScreen } from './screens/progress.js?v=20261104_v17';
+import { renderSignInScreen } from './screens/signin.js?v=20261104_v18';
+import { renderLandingScreen } from './screens/home.js?v=20261104_v18';
+import { renderTypingScreen } from './screens/typing.js?v=20261104_v18';
+import { renderProgressScreen } from './screens/progress.js?v=20261104_v18';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';
@@ -153,6 +153,14 @@ class App {
     }
 
     if (path === '/typing') {
+      if (getSingleVerseModePref()) {
+        const store = getLocalStore();
+        const bId = store.lastBookId || 1;
+        const ch = store.lastChapter || 1;
+        const vr = store.lastVerse || 1;
+        navigate(`#/typing/${bId}/${ch}/${vr}`);
+        return;
+      }
       document.title = 'Bible Typing | bible';
       trackPageView('/typing', document.title);
       renderTypingScreen(this.mainContainer, {});

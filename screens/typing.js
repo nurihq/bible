@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v17';
+} from '../bible-data.js?v=20261104_v18';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -16,6 +16,12 @@ import {
   setSkipCompletedVersesPref,
   getShowTypingStatsPref,
   setShowTypingStatsPref,
+  getSingleVerseModePref,
+  setSingleVerseModePref,
+  getSkipCelebrationModalPref,
+  setSkipCelebrationModalPref,
+  getShuffleVersesPref,
+  setShuffleVersesPref,
   setLastSelectedChapter,
   recordCompletedVerse,
   recordCompletedChapter,
@@ -26,9 +32,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v17';
-import { trackEvent } from '../analytics.js?v=20261104_v17';
-import { navigate } from '../app.js?v=20261104_v17';
+} from '../api.js?v=20261104_v18';
+import { trackEvent } from '../analytics.js?v=20261104_v18';
+import { navigate } from '../app.js?v=20261104_v18';
 
 function escapeHtml(str) {
   return String(str)
@@ -57,6 +63,8 @@ export function renderTypingScreen(container, params = {}) {
   let activeTranslation = getPreferredTranslation() || 'ESV';
   let skipCompletedVerses = getSkipCompletedVersesPref();
   let showTypingStats = getShowTypingStatsPref();
+  let skipCelebrationModal = getSkipCelebrationModalPref();
+  let shuffleVerses = getShuffleVersesPref();
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
 
@@ -220,22 +228,7 @@ export function renderTypingScreen(container, params = {}) {
           </div>
 
           <div class="summary-actions-group">
-            ${singleVerseMode ? `
-              <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="open-full-chapter-top-btn" title="Open the entire chapter (${book.name} ${initialChapter})">
-                📖 Full Chapter (${book.abbr} ${initialChapter})
-              </button>
-              <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-verse-read-btn" title="Toggle marked as read for verse ${targetSingleVerseNum}">
-                <span id="mark-verse-read-label">📖 Mark Verse Read</span>
-              </button>
-              <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for whole chapter (${book.name} ${initialChapter})">
-                <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
-              </button>
-            ` : `
-              <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for ${book.name} ${initialChapter}">
-                <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
-              </button>
-            `}
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options (Stats, Skip Done, Restart)" aria-label="Typing Options">
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options & Actions" aria-label="Typing Options">
               ⋯
             </button>
           </div>
@@ -380,6 +373,39 @@ export function renderTypingScreen(container, params = {}) {
           </div>
 
           <div class="typing-options-body">
+            <!-- Toggle: Single Verse Mode -->
+            <label class="typing-option-row" for="toggle-single-verse-checkbox">
+              <div class="option-info">
+                <span class="option-title">Single Verse Mode</span>
+                <span class="option-desc">Type one verse at a time instead of typing the entire chapter</span>
+              </div>
+              <div class="option-control">
+                <input type="checkbox" id="toggle-single-verse-checkbox" class="option-switch" ${singleVerseMode ? 'checked' : ''} />
+              </div>
+            </label>
+
+            <!-- Toggle: Shuffle Verses (Single Verse Mode) -->
+            <label class="typing-option-row" for="toggle-shuffle-checkbox">
+              <div class="option-info">
+                <span class="option-title">Shuffle Verses</span>
+                <span class="option-desc">Jump to a random incomplete verse in this chapter after completing each verse</span>
+              </div>
+              <div class="option-control">
+                <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
+              </div>
+            </label>
+
+            <!-- Toggle: Auto-Advance / Skip Celebration Popup -->
+            <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
+              <div class="option-info">
+                <span class="option-title">Auto-Advance (Skip Celebration)</span>
+                <span class="option-desc">Instantly jump to the next verse without interruption in single verse mode</span>
+              </div>
+              <div class="option-control">
+                <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
+              </div>
+            </label>
+
             <!-- Toggle: Live Stats Bar -->
             <label class="typing-option-row" for="toggle-stats-checkbox">
               <div class="option-info">
@@ -401,6 +427,34 @@ export function renderTypingScreen(container, params = {}) {
                 <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
               </div>
             </label>
+
+            <!-- Action: Mark Chapter Read -->
+            <div class="typing-option-row option-action-row">
+              <div class="option-info">
+                <span class="option-title">Chapter Reading Status</span>
+                <span class="option-desc" id="modal-ch-read-desc">Mark ${book.name} ${initialChapter} as read</span>
+              </div>
+              <div class="option-control">
+                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
+                  <span id="modal-mark-ch-read-label">📖 Mark Read</span>
+                </button>
+              </div>
+            </div>
+
+            ${singleVerseMode && targetSingleVerseNum ? `
+              <!-- Action: Mark Verse Read -->
+              <div class="typing-option-row option-action-row">
+                <div class="option-info">
+                  <span class="option-title">Verse Reading Status</span>
+                  <span class="option-desc" id="modal-verse-read-desc">Mark verse ${targetSingleVerseNum} as read</span>
+                </div>
+                <div class="option-control">
+                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
+                    <span id="modal-mark-verse-read-label">📖 Mark Read</span>
+                  </button>
+                </div>
+              </div>
+            ` : ''}
 
             <!-- Action: Restart Passage -->
             <div class="typing-option-row option-action-row">
@@ -425,13 +479,17 @@ export function renderTypingScreen(container, params = {}) {
   // DOM Elements
   const prevStepBtn = container.querySelector('#prev-step-btn');
   const nextStepBtn = container.querySelector('#next-step-btn');
-  const openFullChapterTopBtn = container.querySelector('#open-full-chapter-top-btn');
   const optionsBtn = container.querySelector('#typing-options-btn');
   const optionsBackdrop = container.querySelector('#typing-options-backdrop');
   const optionsCloseBtn = container.querySelector('#options-close-btn');
   const optionsDoneBtn = container.querySelector('#options-done-btn');
+  const toggleSingleVerseCheckbox = container.querySelector('#toggle-single-verse-checkbox');
+  const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
+  const toggleSkipCelebrationCheckbox = container.querySelector('#toggle-skip-celebration-checkbox');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
   const toggleSkipDoneCheckbox = container.querySelector('#toggle-skip-done-checkbox');
+  const modalMarkChBtn = container.querySelector('#modal-mark-ch-read-btn');
+  const modalMarkVerseBtn = container.querySelector('#modal-mark-verse-read-btn');
   const modalRestartBtn = container.querySelector('#modal-restart-btn');
   const summaryStatsLine = container.querySelector('#typing-summary-stats-line');
   const hiddenInput = container.querySelector('#typing-hidden-input');
@@ -451,8 +509,12 @@ export function renderTypingScreen(container, params = {}) {
 
   // ── 1. Typing Options Modal Controls ───────────────────────────
   function openOptionsModal() {
+    if (toggleSingleVerseCheckbox) toggleSingleVerseCheckbox.checked = singleVerseMode;
+    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
+    if (toggleSkipCelebrationCheckbox) toggleSkipCelebrationCheckbox.checked = skipCelebrationModal;
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
     if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
+    updateReadButtons();
     if (optionsBackdrop) optionsBackdrop.hidden = false;
   }
 
@@ -487,6 +549,36 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
+  if (toggleSingleVerseCheckbox) {
+    toggleSingleVerseCheckbox.addEventListener('change', () => {
+      const isSingle = toggleSingleVerseCheckbox.checked;
+      setSingleVerseModePref(isSingle);
+      closeOptionsModal();
+      if (isSingle) {
+        const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+        const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1);
+        navigate(`#/typing/${book.id}/${initialChapter}/${vNum}`);
+      } else {
+        const vNum = targetSingleVerseNum || 1;
+        navigate(`#/typing/${book.id}/${initialChapter}?verse=${vNum}`);
+      }
+    });
+  }
+
+  if (toggleShuffleCheckbox) {
+    toggleShuffleCheckbox.addEventListener('change', () => {
+      shuffleVerses = toggleShuffleCheckbox.checked;
+      setShuffleVersesPref(shuffleVerses);
+    });
+  }
+
+  if (toggleSkipCelebrationCheckbox) {
+    toggleSkipCelebrationCheckbox.addEventListener('change', () => {
+      skipCelebrationModal = toggleSkipCelebrationCheckbox.checked;
+      setSkipCelebrationModalPref(skipCelebrationModal);
+    });
+  }
+
   if (toggleStatsCheckbox) {
     toggleStatsCheckbox.addEventListener('change', () => {
       showTypingStats = toggleStatsCheckbox.checked;
@@ -504,27 +596,23 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
-  // ── 2. Single-Verse <-> Full-Chapter Navigation Controls ───────
-  if (openFullChapterTopBtn) {
-    openFullChapterTopBtn.addEventListener('click', () => {
-      navigate(`#/typing/${book.id}/${initialChapter}?verse=${targetSingleVerseNum || 1}`);
-    });
-  }
-
   // ── Mark Chapter & Verse as Read Controls ─────────────────────
   function updateReadButtons() {
     const sum = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
     const isChRead = sum.isFullyRead;
-    const markChBtn = container.querySelector('#mark-ch-read-btn');
-    const markChLbl = container.querySelector('#mark-ch-read-label');
+    const markChBtn = container.querySelector('#modal-mark-ch-read-btn');
+    const markChLbl = container.querySelector('#modal-mark-ch-read-label');
+    const markChDesc = container.querySelector('#modal-ch-read-desc');
     if (markChBtn && markChLbl) {
       if (isChRead) {
         markChBtn.classList.add('is-read-active');
-        markChLbl.textContent = '✓ Ch. Read';
+        markChLbl.textContent = '✓ Read';
+        if (markChDesc) markChDesc.textContent = `${book.name} ${initialChapter} is marked as read`;
         markChBtn.title = `Chapter ${initialChapter} is marked as read. Click to unmark.`;
       } else {
         markChBtn.classList.remove('is-read-active');
-        markChLbl.textContent = '📖 Mark Ch. Read';
+        markChLbl.textContent = '📖 Mark Read';
+        if (markChDesc) markChDesc.textContent = `Mark ${book.name} ${initialChapter} as read`;
         markChBtn.title = `Mark all of ${book.name} ${initialChapter} as read`;
       }
     }
@@ -532,35 +620,38 @@ export function renderTypingScreen(container, params = {}) {
     if (singleVerseMode && targetSingleVerseNum) {
       const vRec = sum.record?.completedVerses?.[String(targetSingleVerseNum)];
       const isVRead = Boolean(isChRead || vRec?.isRead);
-      const markVBtn = container.querySelector('#mark-verse-read-btn');
-      const markVLbl = container.querySelector('#mark-verse-read-label');
+      const markVBtn = container.querySelector('#modal-mark-verse-read-btn');
+      const markVLbl = container.querySelector('#modal-mark-verse-read-label');
+      const markVDesc = container.querySelector('#modal-verse-read-desc');
       if (markVBtn && markVLbl) {
         if (isVRead) {
           markVBtn.classList.add('is-read-active');
-          markVLbl.textContent = '✓ Verse Read';
+          markVLbl.textContent = '✓ Read';
+          if (markVDesc) markVDesc.textContent = `Verse ${targetSingleVerseNum} is marked as read`;
           markVBtn.title = `Verse ${targetSingleVerseNum} is marked as read. Click to unmark.`;
         } else {
           markVBtn.classList.remove('is-read-active');
-          markVLbl.textContent = '📖 Mark Verse Read';
+          markVLbl.textContent = '📖 Mark Read';
+          if (markVDesc) markVDesc.textContent = `Mark verse ${targetSingleVerseNum} as read`;
           markVBtn.title = `Mark verse ${targetSingleVerseNum} as read`;
         }
       }
     }
   }
 
-  const markChBtn = container.querySelector('#mark-ch-read-btn');
-  if (markChBtn) {
-    markChBtn.addEventListener('click', () => {
+  if (modalMarkChBtn) {
+    modalMarkChBtn.addEventListener('click', () => {
       toggleChapterRead(book.id, initialChapter, activeTranslation);
       trackEvent('toggle_chapter_read', { bookId: book.id, chapter: initialChapter });
+      updateReadButtons();
     });
   }
 
-  const markVerseBtn = container.querySelector('#mark-verse-read-btn');
-  if (markVerseBtn && targetSingleVerseNum) {
-    markVerseBtn.addEventListener('click', () => {
+  if (modalMarkVerseBtn && targetSingleVerseNum) {
+    modalMarkVerseBtn.addEventListener('click', () => {
       toggleVerseRead(book.id, initialChapter, targetSingleVerseNum, activeTranslation);
       trackEvent('toggle_verse_read', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+      updateReadButtons();
     });
   }
 
@@ -591,6 +682,28 @@ export function renderTypingScreen(container, params = {}) {
 
   function navigateNextStep() {
     if (singleVerseMode && targetSingleVerseNum) {
+      if (shuffleVerses && allChapterVerses.length > 1) {
+        // Find incomplete verses in this chapter (excluding current)
+        const incompleteVerses = allChapterVerses
+          .map(v => v.verse)
+          .filter(vNum => vNum !== targetSingleVerseNum && !completedVerseSet.has(vNum));
+
+        let nextV;
+        if (incompleteVerses.length > 0) {
+          nextV = incompleteVerses[Math.floor(Math.random() * incompleteVerses.length)];
+        } else {
+          // All other verses in chapter are completed; pick any other verse randomly
+          const otherVerses = allChapterVerses
+            .map(v => v.verse)
+            .filter(vNum => vNum !== targetSingleVerseNum);
+          nextV = otherVerses.length > 0
+            ? otherVerses[Math.floor(Math.random() * otherVerses.length)]
+            : 1;
+        }
+        navigate(`#/typing/${book.id}/${initialChapter}/${nextV}`);
+        return;
+      }
+
       const maxV = allChapterVerses.length || targetSingleVerseNum;
       if (targetSingleVerseNum < maxV) {
         navigate(`#/typing/${book.id}/${initialChapter}/${targetSingleVerseNum + 1}`);
@@ -1122,6 +1235,11 @@ export function renderTypingScreen(container, params = {}) {
     const badgeEl = container.querySelector('#telemetry-completed-badge');
     if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
 
+    if (singleVerseMode && skipCelebrationModal) {
+      navigateNextStep();
+      return;
+    }
+
     const stats = getGlobalTypingStats();
     const trObj = getTranslationByCode(activeTranslation);
     const totalChVerses = allChapterVerses.length || verses.length;
@@ -1172,11 +1290,15 @@ export function renderTypingScreen(container, params = {}) {
     const nextBtn = container.querySelector('#comp-next-btn');
     if (nextBtn) {
       if (singleVerseMode && targetSingleVerseNum) {
-        const maxV = allChapterVerses.length || targetSingleVerseNum;
-        if (targetSingleVerseNum < maxV) {
-          nextBtn.textContent = `Next Verse: ${book.name} ${initialChapter}:${targetSingleVerseNum + 1} →`;
+        if (shuffleVerses) {
+          nextBtn.textContent = '🎲 Next Shuffled Verse →';
         } else {
-          nextBtn.textContent = `Next: ${nextChapterRef.bookName} ${nextChapterRef.chapter}:1 →`;
+          const maxV = allChapterVerses.length || targetSingleVerseNum;
+          if (targetSingleVerseNum < maxV) {
+            nextBtn.textContent = `Next Verse: ${book.name} ${initialChapter}:${targetSingleVerseNum + 1} →`;
+          } else {
+            nextBtn.textContent = `Next: ${nextChapterRef.bookName} ${nextChapterRef.chapter}:1 →`;
+          }
         }
       } else {
         nextBtn.textContent = `Next Chapter: ${nextChapterRef.bookName} ${nextChapterRef.chapter} →`;
