@@ -7,13 +7,15 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v16';
+} from '../bible-data.js?v=20261104_v17';
 import {
   getLocalStore,
   getPreferredTranslation,
   setPreferredTranslation,
   getSkipCompletedVersesPref,
   setSkipCompletedVersesPref,
+  getShowTypingStatsPref,
+  setShowTypingStatsPref,
   setLastSelectedChapter,
   recordCompletedVerse,
   recordCompletedChapter,
@@ -24,9 +26,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v16';
-import { trackEvent } from '../analytics.js?v=20261104_v16';
-import { navigate } from '../app.js?v=20261104_v16';
+} from '../api.js?v=20261104_v17';
+import { trackEvent } from '../analytics.js?v=20261104_v17';
+import { navigate } from '../app.js?v=20261104_v17';
 
 function escapeHtml(str) {
   return String(str)
@@ -54,6 +56,7 @@ export function renderTypingScreen(container, params = {}) {
 
   let activeTranslation = getPreferredTranslation() || 'ESV';
   let skipCompletedVerses = getSkipCompletedVersesPref();
+  let showTypingStats = getShowTypingStatsPref();
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
 
@@ -168,11 +171,7 @@ export function renderTypingScreen(container, params = {}) {
           </span>
         `;
       }
-      return `
-        <span class="chapter-partial-pill" title="Chapter reach: ${doneV}/${totalV || '?'} verses covered">
-          🎯 Single Verse · Ch. Reach: ${doneV}/${totalV || '?'}v
-        </span>
-      `;
+      return '';
     }
 
     if (summary.isBoth) {
@@ -195,15 +194,6 @@ export function renderTypingScreen(container, params = {}) {
       return `
         <span class="chapter-completed-pill is-read" title="All ${totalV} verses marked as read!">
           📖 Read (${totalV}/${totalV}v)
-        </span>
-      `;
-    }
-
-    if (doneV > 0) {
-      const pct = totalV > 0 ? Math.round((doneV / totalV) * 100) : 0;
-      return `
-        <span class="chapter-partial-pill" title="${doneV} of ${totalV} verses covered (${pct}%) — ${summary.readVersesCount} read, ${summary.typedVersesCount} typed">
-          ⏳ In Progress: ${doneV}/${totalV || '?'} verses (${pct}%)
         </span>
       `;
     }
@@ -245,25 +235,14 @@ export function renderTypingScreen(container, params = {}) {
                 <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
               </button>
             `}
-            ${!singleVerseMode ? `
-              <button
-                type="button"
-                class="skip-completed-toggle-pill ${skipCompletedVerses ? 'is-on' : 'is-off'}"
-                id="skip-completed-toggle-btn"
-                title="When enabled (default), typing skips past already-completed verses to the next incomplete verse in this chapter."
-              >
-                <span>⏭️ Skip Done:</span>
-                <strong id="skip-completed-state-label">${skipCompletedVerses ? 'ON' : 'OFF'}</strong>
-              </button>
-            ` : ''}
-            <button class="btn btn-secondary btn-sm summary-restart-btn" id="restart-chapter-btn" title="Restart passage (Esc)">
-              ↺ Restart
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options (Stats, Skip Done, Restart)" aria-label="Typing Options">
+              ⋯
             </button>
           </div>
         </div>
 
-        <!-- Line 2: Live Metrics / Telemetry -->
-        <div class="summary-line summary-line-bottom">
+        <!-- Line 2: Live Metrics / Telemetry (Toggled via Typing Options modal) -->
+        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${showTypingStats ? '' : 'hidden'}>
           <div class="summary-metrics-group">
             <div class="summary-stat-box">
               <span class="stat-lbl">WPM</span>
@@ -289,9 +268,6 @@ export function renderTypingScreen(container, params = {}) {
               <span class="stat-lbl">Time</span>
               <span class="stat-num" id="live-time">0:00</span>
             </div>
-          </div>
-          <div class="summary-metrics-hint">
-            <span>Click any verse to jump cursor · Backspace to correct mistakes</span>
           </div>
         </div>
       </div>
@@ -394,6 +370,55 @@ export function renderTypingScreen(container, params = {}) {
           </div>
         </div>
       </div>
+
+      <!-- Typing Options Modal Backdrop -->
+      <div class="typing-options-backdrop" id="typing-options-backdrop" hidden>
+        <div class="typing-options-card" role="dialog" aria-modal="true" aria-labelledby="typing-options-title">
+          <div class="typing-options-header">
+            <h2 class="typing-options-title" id="typing-options-title">⚙️ Typing Options</h2>
+            <button type="button" class="options-close-btn" id="options-close-btn" aria-label="Close options">✕</button>
+          </div>
+
+          <div class="typing-options-body">
+            <!-- Toggle: Live Stats Bar -->
+            <label class="typing-option-row" for="toggle-stats-checkbox">
+              <div class="option-info">
+                <span class="option-title">Live Typing Stats</span>
+                <span class="option-desc">Show real-time WPM, CPM, accuracy, verse count, and timer bar</span>
+              </div>
+              <div class="option-control">
+                <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
+              </div>
+            </label>
+
+            <!-- Toggle: Skip Completed Verses -->
+            <label class="typing-option-row" for="toggle-skip-done-checkbox">
+              <div class="option-info">
+                <span class="option-title">Skip Completed Verses</span>
+                <span class="option-desc">Automatically advance past already-completed verses in this chapter</span>
+              </div>
+              <div class="option-control">
+                <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
+              </div>
+            </label>
+
+            <!-- Action: Restart Passage -->
+            <div class="typing-option-row option-action-row">
+              <div class="option-info">
+                <span class="option-title">Restart Passage</span>
+                <span class="option-desc">Move the cursor back to the start (completed verses are kept)</span>
+              </div>
+              <div class="option-control">
+                <button type="button" class="btn btn-secondary btn-sm" id="modal-restart-btn">↺ Restart</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="typing-options-footer">
+            <button type="button" class="btn btn-primary btn-sm" id="options-done-btn">Done</button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -401,9 +426,14 @@ export function renderTypingScreen(container, params = {}) {
   const prevStepBtn = container.querySelector('#prev-step-btn');
   const nextStepBtn = container.querySelector('#next-step-btn');
   const openFullChapterTopBtn = container.querySelector('#open-full-chapter-top-btn');
-  const skipCompletedToggleBtn = container.querySelector('#skip-completed-toggle-btn');
-  const skipCompletedStateLabel = container.querySelector('#skip-completed-state-label');
-  const restartBtn = container.querySelector('#restart-chapter-btn');
+  const optionsBtn = container.querySelector('#typing-options-btn');
+  const optionsBackdrop = container.querySelector('#typing-options-backdrop');
+  const optionsCloseBtn = container.querySelector('#options-close-btn');
+  const optionsDoneBtn = container.querySelector('#options-done-btn');
+  const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
+  const toggleSkipDoneCheckbox = container.querySelector('#toggle-skip-done-checkbox');
+  const modalRestartBtn = container.querySelector('#modal-restart-btn');
+  const summaryStatsLine = container.querySelector('#typing-summary-stats-line');
   const hiddenInput = container.querySelector('#typing-hidden-input');
   const viewportWrapper = container.querySelector('#typing-viewport-wrapper');
   const focusBanner = container.querySelector('#typing-focus-banner');
@@ -419,17 +449,58 @@ export function renderTypingScreen(container, params = {}) {
   const telemetrySubStatusEl = null; // integrated into compact badges and modals
   const completionBackdrop = container.querySelector('#completion-modal-backdrop');
 
-  // ── 1. Skip Completed Verses Toggle ────────────────────────────
-  if (skipCompletedToggleBtn) {
-    skipCompletedToggleBtn.addEventListener('click', () => {
-      skipCompletedVerses = !skipCompletedVerses;
-      setSkipCompletedVersesPref(skipCompletedVerses);
-      skipCompletedToggleBtn.classList.toggle('is-on', skipCompletedVerses);
-      skipCompletedToggleBtn.classList.toggle('is-off', !skipCompletedVerses);
-      if (skipCompletedStateLabel) {
-        skipCompletedStateLabel.textContent = skipCompletedVerses ? 'ON' : 'OFF';
+  // ── 1. Typing Options Modal Controls ───────────────────────────
+  function openOptionsModal() {
+    if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
+    if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
+    if (optionsBackdrop) optionsBackdrop.hidden = false;
+  }
+
+  function closeOptionsModal() {
+    if (optionsBackdrop) optionsBackdrop.hidden = true;
+    focusTypingInput();
+  }
+
+  if (optionsBtn) {
+    optionsBtn.addEventListener('click', () => {
+      openOptionsModal();
+    });
+  }
+
+  if (optionsCloseBtn) {
+    optionsCloseBtn.addEventListener('click', () => {
+      closeOptionsModal();
+    });
+  }
+
+  if (optionsDoneBtn) {
+    optionsDoneBtn.addEventListener('click', () => {
+      closeOptionsModal();
+    });
+  }
+
+  if (optionsBackdrop) {
+    optionsBackdrop.addEventListener('click', (e) => {
+      if (e.target === optionsBackdrop) {
+        closeOptionsModal();
       }
-      focusTypingInput();
+    });
+  }
+
+  if (toggleStatsCheckbox) {
+    toggleStatsCheckbox.addEventListener('change', () => {
+      showTypingStats = toggleStatsCheckbox.checked;
+      setShowTypingStatsPref(showTypingStats);
+      if (summaryStatsLine) {
+        summaryStatsLine.hidden = !showTypingStats;
+      }
+    });
+  }
+
+  if (toggleSkipDoneCheckbox) {
+    toggleSkipDoneCheckbox.addEventListener('change', () => {
+      skipCompletedVerses = toggleSkipDoneCheckbox.checked;
+      setSkipCompletedVersesPref(skipCompletedVerses);
     });
   }
 
@@ -569,8 +640,9 @@ export function renderTypingScreen(container, params = {}) {
     focusTypingInput();
   }
 
-  if (restartBtn) {
-    restartBtn.addEventListener('click', () => {
+  if (modalRestartBtn) {
+    modalRestartBtn.addEventListener('click', () => {
+      closeOptionsModal();
       trackEvent('restart_bible_chapter', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
       restartTyping();
     });
@@ -1251,6 +1323,10 @@ export function renderTypingScreen(container, params = {}) {
 
     if (e.key === 'Escape') {
       e.preventDefault();
+      if (optionsBackdrop && !optionsBackdrop.hidden) {
+        closeOptionsModal();
+        return;
+      }
       restartTyping();
       return;
     }

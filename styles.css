@@ -1091,12 +1091,17 @@ body.typing-active-view .main-content {
 }
 
 .summary-line-top {
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .summary-line-bottom {
-  padding-top: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.summary-line-bottom[hidden] {
+  display: none !important;
 }
 
 .summary-nav-group {
@@ -1118,11 +1123,6 @@ body.typing-active-view .main-content {
   align-items: center;
   gap: 0.85rem;
   flex-wrap: wrap;
-}
-
-.summary-metrics-hint {
-  font-size: 0.74rem;
-  color: var(--text-muted);
 }
 
 .summary-stat-divider {
@@ -1222,11 +1222,189 @@ body.typing-active-view .main-content {
   opacity: 0.65;
 }
 
-.summary-restart-btn {
-  padding: 0.22rem 0.6rem;
-  font-size: 0.74rem;
-  min-height: 26px;
-  white-space: nowrap;
+.typing-options-btn {
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.15rem 0.65rem;
+  min-height: 28px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Typing Options Modal ───────────────────────────────────────── */
+.typing-options-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(20, 19, 24, 0.62);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.typing-options-backdrop[hidden] {
+  display: none !important;
+}
+
+.typing-options-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.6rem 1.75rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: optionsFadeIn 0.15s ease-out;
+}
+
+@keyframes optionsFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.typing-options-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.typing-options-title {
+  font-family: var(--font-sans);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.options-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.options-close-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.typing-options-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.typing-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.95rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+
+.typing-option-row:hover {
+  background: var(--bg-surface-elevated, var(--bg-surface));
+}
+
+.typing-option-row.option-action-row {
+  cursor: default;
+}
+
+.typing-option-row .option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.typing-option-row .option-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.typing-option-row .option-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.typing-option-row .option-control {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Modern iOS-style toggle switch */
+.option-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 24px;
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid var(--border-color);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  margin: 0;
+}
+
+.option-switch:checked {
+  background: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+}
+
+.option-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.option-switch:checked::after {
+  transform: translateX(20px);
+}
+
+.typing-options-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
 }
 
 .chapter-completed-pill {

@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v16';
+import { CONFIG } from './config.js?v=20261104_v17';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v16';
+} from './bible-data.js?v=20261104_v17';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -152,6 +152,17 @@ export function getSkipCompletedVersesPref() {
 export function setSkipCompletedVersesPref(skip) {
   const store = getLocalStore();
   store.skipCompletedVerses = Boolean(skip);
+  saveLocalStore(store);
+}
+
+export function getShowTypingStatsPref() {
+  const store = getLocalStore();
+  return Boolean(store.showTypingStats);
+}
+
+export function setShowTypingStatsPref(show) {
+  const store = getLocalStore();
+  store.showTypingStats = Boolean(show);
   saveLocalStore(store);
 }
 
@@ -1527,6 +1538,8 @@ export const Api = {
   setPreferredTranslation,
   getSkipCompletedVersesPref,
   setSkipCompletedVersesPref,
+  getShowTypingStatsPref,
+  setShowTypingStatsPref,
   getChapterProgressSummary,
   isChapterRecordFullyCompleted,
   isChapterRecordFullyRead,
