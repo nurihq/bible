@@ -1,20 +1,24 @@
-import { Navbar } from './components/navbar.js?v=20261104_v4';
-import { Auth, syncLocalToCloud } from './api.js?v=20261104_v4';
-import { initGA, trackPageView } from './analytics.js?v=20261104_v4';
-import { getBookById } from './bible-data.js?v=20261104_v4';
+import { Navbar } from './components/navbar.js?v=20261104_v6';
+import { Auth, syncLocalToCloud } from './api.js?v=20261104_v6';
+import { initGA, trackPageView } from './analytics.js?v=20261104_v6';
+import { getBookById } from './bible-data.js?v=20261104_v6';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261104_v4';
-import { renderLandingScreen, renderHubScreen } from './screens/home.js?v=20261104_v4';
-import { renderTypingScreen } from './screens/typing.js?v=20261104_v4';
-import { renderProgressScreen } from './screens/progress.js?v=20261104_v4';
+import { renderSignInScreen } from './screens/signin.js?v=20261104_v6';
+import { renderLandingScreen } from './screens/home.js?v=20261104_v6';
+import { renderTypingScreen } from './screens/typing.js?v=20261104_v6';
+import { renderProgressScreen } from './screens/progress.js?v=20261104_v6';
 
-function getActiveRoutePath() {
+function parseActiveRoute() {
   const rawHash = window.location.hash || '';
   if (rawHash && rawHash !== '#' && rawHash !== '#/') {
-    const hashPath = rawHash.replace(/^#/, '').replace(/\/+$/, '') || '/';
-    return hashPath.startsWith('/') ? hashPath : '/' + hashPath;
+    const withoutHash = rawHash.replace(/^#/, '');
+    const [rawPath, rawQuery = ''] = withoutHash.split('?');
+    const cleanPath = (rawPath || '/').replace(/\/+$/, '') || '/';
+    const path = cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath;
+    const query = new URLSearchParams(rawQuery);
+    return { path, query };
   }
-  return '/';
+  return { path: '/', query: new URLSearchParams() };
 }
 
 export function navigate(to) {
@@ -85,8 +89,8 @@ class App {
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && Auth.isAuthenticated()) {
         syncLocalToCloud().then(() => {
-          const currentPath = getActiveRoutePath();
-          if (currentPath.startsWith('/typing')) return;
+          const { path } = parseActiveRoute();
+          if (path.startsWith('/typing')) return;
           this.handleRoute();
         });
       }
@@ -114,7 +118,7 @@ class App {
   }
 
   handleRoute() {
-    const path = getActiveRoutePath();
+    const { path, query } = parseActiveRoute();
     const routeToken = path === '/' ? '#/' : `#${path}`;
 
     // Clean up active typing intervals when leaving the typing screen
@@ -134,7 +138,7 @@ class App {
 
     if (path === '/signin') {
       if (Auth.isAuthenticated()) {
-        navigate('#/hub');
+        navigate('#/typing');
         return;
       }
       document.title = 'Sign In | bible';
@@ -144,9 +148,7 @@ class App {
     }
 
     if (path === '/hub') {
-      document.title = 'Scripture Suite | bible';
-      trackPageView('/hub', document.title);
-      renderHubScreen(this.mainContainer);
+      navigate('#/typing');
       return;
     }
 
@@ -157,14 +159,39 @@ class App {
       return;
     }
 
+    // Single-Verse Granularity Route: #/typing/:bookId/:chapter/:verse
+    const typingVerseMatch = path.match(/^\/typing\/(\d+)\/(\d+)\/(\d+)$/);
+    if (typingVerseMatch) {
+      const bookId = Number(typingVerseMatch[1]);
+      const chapter = Number(typingVerseMatch[2]);
+      const verse = Number(typingVerseMatch[3]);
+      const book = getBookById(bookId);
+      document.title = `${book.name} ${chapter}:${verse} — Single Verse Typing | bible`;
+      trackPageView(path, document.title);
+      renderTypingScreen(this.mainContainer, {
+        bookId,
+        chapter,
+        verse,
+        singleVerseMode: true
+      });
+      return;
+    }
+
+    // Full-Chapter Route (with optional ?verse=X starting verse): #/typing/:bookId/:chapter
     const typingChapterMatch = path.match(/^\/typing\/(\d+)\/(\d+)$/);
     if (typingChapterMatch) {
       const bookId = Number(typingChapterMatch[1]);
       const chapter = Number(typingChapterMatch[2]);
+      const startVerse = query.get('verse') ? Number(query.get('verse')) : null;
       const book = getBookById(bookId);
-      document.title = `${book.name} ${chapter} — Bible Typing | bible`;
+      document.title = `${book.name} ${chapter}${startVerse ? ` (v. ${startVerse})` : ''} — Bible Typing | bible`;
       trackPageView(path, document.title);
-      renderTypingScreen(this.mainContainer, { bookId, chapter });
+      renderTypingScreen(this.mainContainer, {
+        bookId,
+        chapter,
+        startVerse,
+        singleVerseMode: false
+      });
       return;
     }
 

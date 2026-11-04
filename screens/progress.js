@@ -1,11 +1,9 @@
 import {
   BIBLE_BOOKS,
-  BIBLE_TRANSLATIONS,
   getTranslationByCode
-} from '../bible-data.js?v=20261104_v4';
-import { getGlobalTypingStats } from '../api.js?v=20261104_v4';
-import { trackEvent } from '../analytics.js?v=20261104_v4';
-import { navigate } from '../app.js?v=20261104_v4';
+} from '../bible-data.js?v=20261104_v6';
+import { getGlobalTypingStats, getChapterProgressSummary } from '../api.js?v=20261104_v6';
+import { trackEvent } from '../analytics.js?v=20261104_v6';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -39,7 +37,7 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
   if (chronological.length === 0) {
     return `
       <div class="chart-empty-state">
-        <p>Complete your first Bible chapter to see your WPM &amp; CPM speed progression chart.</p>
+        <p>Complete your first Bible verse or chapter to see your WPM &amp; CPM speed progression chart.</p>
         <a href="#/typing" class="btn btn-primary btn-sm">Start Typing →</a>
       </div>
     `;
@@ -104,11 +102,11 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
         ${points.map((p, i) => `
           <g class="chart-node-group">
             <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" fill="var(--bg-surface)" stroke="var(--primary)" stroke-width="2.5">
-              <title>${p.session.bookName} ${p.session.chapter} (${p.session.translation}): ${p.val} ${unitLabel} · ${p.session.accuracy}% acc</title>
+              <title>${p.session.bookName} ${p.session.chapter}${p.session.verseRange ? `:${p.session.verseRange}` : ''} (${p.session.translation}): ${p.val} ${unitLabel} · ${p.session.accuracy}% acc</title>
             </circle>
             ${(i === 0 || i === points.length - 1 || points.length <= 8) ? `
               <text x="${p.x.toFixed(1)}" y="${(padTop + plotH + 18).toFixed(1)}" text-anchor="middle" fill="var(--text-muted)" font-size="10">
-                ${p.session.bookName.slice(0, 3)} ${p.session.chapter}
+                ${p.session.bookName.slice(0, 3)} ${p.session.chapter}${p.session.verseNumber ? `:${p.session.verseNumber}` : ''}
               </text>
             ` : ''}
           </g>
@@ -120,42 +118,55 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
 
 export function renderProgressScreen(container) {
   let activeChartMetric = 'wpm';
-  let activeTranslationFilter = 'ALL'; // 'ALL' = overall completeness across any translation, or specific code like 'ESV'
+  let activeTranslationFilter = 'ALL';
   let showTranslationDrawer = false;
   let activeTestamentTab = 'ALL';
   let expandedBookIds = new Set();
+  let initializedExpanded = false;
 
   function render() {
     const stats = getGlobalTypingStats();
-
-    // Calculate displayed completeness based on activeTranslationFilter ('ALL' vs specific translation)
     const isSpecificTr = activeTranslationFilter !== 'ALL';
-    const trStat = isSpecificTr ? stats.byTranslation[activeTranslationFilter] : null;
 
-    function isChapterDoneInFilter(bookId, chapter) {
-      const rec = stats.chaptersMap[`${bookId}:${chapter}`];
-      if (!rec) return false;
-      if (!isSpecificTr) return true;
-      return Boolean(rec.translations && rec.translations[activeTranslationFilter]);
+    if (!initializedExpanded) {
+      initializedExpanded = true;
+      for (const b of BIBLE_BOOKS) {
+        let hasProg = false;
+        for (let c = 1; c <= b.chapters; c++) {
+          const sum = getChapterProgressSummary(b.id, c, activeTranslationFilter);
+          if (sum.isFullyCompleted || sum.isPartial) {
+            hasProg = true;
+            break;
+          }
+        }
+        if (hasProg) expandedBookIds.add(b.id);
+      }
+      if (expandedBookIds.size === 0) {
+        expandedBookIds.add(1); // Default Genesis expanded
+      }
     }
 
     let filteredCompletedCount = 0;
-    let filteredOtCount = 0;
-    let filteredNtCount = 0;
+    let filteredPartialCount = 0;
+    let filteredVersesCount = 0;
+
     for (const b of BIBLE_BOOKS) {
       for (let c = 1; c <= b.chapters; c++) {
-        if (isChapterDoneInFilter(b.id, c)) {
+        const sum = getChapterProgressSummary(b.id, c, activeTranslationFilter);
+        if (sum.isFullyCompleted) {
           filteredCompletedCount++;
-          if (b.testament === 'OT') filteredOtCount++;
-          else filteredNtCount++;
+          filteredVersesCount += Math.max(sum.completedVersesCount, sum.totalVerses);
+        } else if (sum.isPartial) {
+          filteredPartialCount++;
+          filteredVersesCount += sum.completedVersesCount;
         }
       }
     }
     const filteredPct = Math.round((filteredCompletedCount / stats.totalBibleChapters) * 1000) / 10;
 
-    // Sort translations for the subtle translation breakdown drawer: ESV first, then any with progress, then rest
     const translationBreakdownList = Object.values(stats.byTranslation).sort((a, b) => {
       if (b.completedChapters !== a.completedChapters) return b.completedChapters - a.completedChapters;
+      if ((b.completedVerses || 0) !== (a.completedVerses || 0)) return (b.completedVerses || 0) - (a.completedVerses || 0);
       if (a.code === 'ESV') return -1;
       if (b.code === 'ESV') return 1;
       return a.code.localeCompare(b.code);
@@ -175,7 +186,7 @@ export function renderProgressScreen(container) {
             </div>
             <h1 class="screen-title">Typing Progress &amp; Bible Completeness</h1>
             <p class="screen-subtitle">
-              Track your average WPM &amp; CPM speed, historic verses typed, and overall reach across all 66 books and 1,189 chapters.
+              Track your average WPM &amp; CPM speed, completed &amp; partial chapters, and verse-level reach across all 66 books and 1,189 chapters.
             </p>
           </div>
           <div class="screen-actions">
@@ -189,15 +200,26 @@ export function renderProgressScreen(container) {
         <div class="kpi-cards-grid">
           <div class="kpi-card">
             <div class="kpi-card-top">
-              <span class="kpi-label">Overall Bible Reach</span>
+              <span class="kpi-label">Chapters Completed</span>
               <span class="kpi-icon">📖</span>
             </div>
             <div class="kpi-value">${stats.overallCompletedChapters} <small>/ ${stats.totalBibleChapters}</small></div>
             <div class="kpi-sub">
-              <strong>${stats.overallPercentage}%</strong> complete · OT: ${stats.otCompletedChapters}/${stats.totalOtChapters} · NT: ${stats.ntCompletedChapters}/${stats.totalNtChapters}
+              <strong>${stats.overallPercentage}%</strong> full${stats.partialChaptersCount > 0 ? ` · <strong>+${stats.partialChaptersCount}</strong> partial` : ''} · OT: ${stats.otCompletedChapters} · NT: ${stats.ntCompletedChapters}
             </div>
             <div class="kpi-mini-bar">
               <div class="kpi-mini-fill" style="width: ${Math.max(stats.overallCompletedChapters > 0 ? stats.overallPercentage : 0, 0)}%"></div>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-card-top">
+              <span class="kpi-label">Verse-Level Reach</span>
+              <span class="kpi-icon">📜</span>
+            </div>
+            <div class="kpi-value">${stats.overallCompletedVerses.toLocaleString()} <small>/ ${stats.totalBibleVerses.toLocaleString()}</small></div>
+            <div class="kpi-sub">
+              <strong>${stats.overallVersesPercentage}%</strong> of Bible verses · ${stats.totalWordsTyped.toLocaleString()} words typed
             </div>
           </div>
 
@@ -214,23 +236,12 @@ export function renderProgressScreen(container) {
 
           <div class="kpi-card">
             <div class="kpi-card-top">
-              <span class="kpi-label">Verses &amp; Words Typed</span>
-              <span class="kpi-icon">📜</span>
-            </div>
-            <div class="kpi-value">${stats.totalVersesTyped.toLocaleString()} <small>verses</small></div>
-            <div class="kpi-sub">
-              ${stats.totalWordsTyped.toLocaleString()} words · ${stats.totalCharsTyped.toLocaleString()} chars
-            </div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-card-top">
               <span class="kpi-label">Accuracy &amp; Time</span>
               <span class="kpi-icon">🎯</span>
             </div>
             <div class="kpi-value">${stats.avgAccuracy}%</div>
             <div class="kpi-sub">
-              ${stats.sessionsCount} chapters typed · ${formatTotalDuration(stats.totalDurationMs)} total time
+              ${stats.sessionsCount} sessions · ${formatTotalDuration(stats.totalDurationMs)} total time
             </div>
           </div>
         </div>
@@ -240,7 +251,7 @@ export function renderProgressScreen(container) {
           <div class="section-card-header">
             <div>
               <h2 class="section-card-title">Speed Progression (${activeChartMetric.toUpperCase()})</h2>
-              <p class="section-card-subtitle">Your typing speed across recent completed chapters</p>
+              <p class="section-card-subtitle">Your typing speed across recent completed verses &amp; chapters</p>
             </div>
             <div class="chart-toggle-pills">
               <button type="button" class="pill-toggle-btn ${activeChartMetric === 'wpm' ? 'active' : ''}" data-metric="wpm">WPM</button>
@@ -260,8 +271,8 @@ export function renderProgressScreen(container) {
               </h2>
               <p class="section-card-subtitle">
                 ${isSpecificTr
-                  ? `Viewing chapters completed specifically in ${getTranslationByCode(activeTranslationFilter).name} (${filteredCompletedCount} / ${stats.totalBibleChapters} · ${filteredPct}%)`
-                  : `Overall completeness across all translations (${stats.overallCompletedChapters} / ${stats.totalBibleChapters} chapters · ${stats.overallPercentage}%). Click any book or chapter to type it.`}
+                  ? `Viewing progress in ${getTranslationByCode(activeTranslationFilter).name}: ${filteredCompletedCount}/${stats.totalBibleChapters} chapters full${filteredPartialCount > 0 ? `, ${filteredPartialCount} partial` : ''} (${filteredVersesCount.toLocaleString()} verses).`
+                  : `Overall completeness across all translations (${stats.overallCompletedChapters}/${stats.totalBibleChapters} full chapters${stats.partialChaptersCount > 0 ? `, +${stats.partialChaptersCount} partial chapters` : ''}, ${stats.overallCompletedVerses.toLocaleString()} verses). Click any book to expand its chapters; clicking a partial chapter resumes at the next incomplete verse.`}
               </p>
             </div>
 
@@ -272,7 +283,10 @@ export function renderProgressScreen(container) {
                 <button type="button" class="pill-toggle-btn ${activeTestamentTab === 'NT' ? 'active' : ''}" data-testament-tab="NT">NT (27)</button>
               </div>
 
-              <!-- Subtle Secondary Toggle for Per-Translation Completeness -->
+              <button type="button" class="btn btn-secondary btn-sm" id="toggle-expand-all-btn">
+                ${expandedBookIds.size === visibleBooks.length ? 'Collapse All Books' : 'Expand All Books'}
+              </button>
+
               <button type="button" class="btn btn-secondary btn-sm translation-breakdown-toggle" id="toggle-tr-breakdown-btn">
                 <span>🌐 By Translation: <strong>${isSpecificTr ? getTranslationByCode(activeTranslationFilter).shortName : 'All (Overall)'}</strong></span>
                 <span>${showTranslationDrawer ? '▴' : '▾'}</span>
@@ -280,11 +294,11 @@ export function renderProgressScreen(container) {
             </div>
           </div>
 
-          <!-- Collapsible Per-Translation Completeness Drawer (Secondary / Subtle) -->
+          <!-- Collapsible Per-Translation Completeness Drawer -->
           <div class="translation-breakdown-drawer" id="translation-breakdown-drawer" ${showTranslationDrawer ? '' : 'hidden'}>
             <div class="tr-drawer-top">
               <span class="tr-drawer-hint">
-                Every chapter you type counts toward your <strong>Overall Completeness</strong>. Select a translation below if you want to inspect your completeness within a specific translation:
+                Every verse and chapter you type counts toward your <strong>Overall Completeness</strong>. Select a translation below to inspect your completeness within a specific translation:
               </span>
               ${isSpecificTr ? `
                 <button type="button" class="btn btn-secondary btn-sm" id="reset-tr-filter-btn">
@@ -299,17 +313,17 @@ export function renderProgressScreen(container) {
                 data-tr-filter="ALL"
               >
                 <span class="tr-pill-code">All Translations (Overall)</span>
-                <span class="tr-pill-count">${stats.overallCompletedChapters}/${stats.totalBibleChapters} (${stats.overallPercentage}%)</span>
+                <span class="tr-pill-count">${stats.overallCompletedChapters}/${stats.totalBibleChapters} ch · ${stats.overallCompletedVerses}v</span>
               </button>
               ${translationBreakdownList.map(t => `
                 <button
                   type="button"
-                  class="tr-stat-pill ${activeTranslationFilter === t.code ? 'active' : ''} ${t.completedChapters > 0 ? 'has-progress' : ''}"
+                  class="tr-stat-pill ${activeTranslationFilter === t.code ? 'active' : ''} ${(t.completedChapters > 0 || t.completedVerses > 0) ? 'has-progress' : ''}"
                   data-tr-filter="${t.code}"
-                  title="${t.name}: ${t.completedChapters} of 1,189 chapters completed"
+                  title="${t.name}: ${t.completedChapters} full chapters, ${t.partialChapters || 0} partial chapters (${t.completedVerses || 0} verses)"
                 >
                   <span class="tr-pill-code">${t.shortName}</span>
-                  <span class="tr-pill-count">${t.completedChapters}/${stats.totalBibleChapters} (${t.percentage}%)</span>
+                  <span class="tr-pill-count">${t.completedChapters}/${stats.totalBibleChapters} ch${t.completedVerses > 0 ? ` · ${t.completedVerses}v` : ''}</span>
                 </button>
               `).join('')}
             </div>
@@ -319,37 +333,68 @@ export function renderProgressScreen(container) {
           <div class="books-reach-grid">
             ${visibleBooks.map(b => {
               let doneInBook = 0;
+              let partialInBook = 0;
+              let versesInBook = 0;
               for (let c = 1; c <= b.chapters; c++) {
-                if (isChapterDoneInFilter(b.id, c)) doneInBook++;
+                const sum = getChapterProgressSummary(b.id, c, activeTranslationFilter);
+                if (sum.isFullyCompleted) {
+                  doneInBook++;
+                  versesInBook += Math.max(sum.completedVersesCount, sum.totalVerses);
+                } else if (sum.isPartial) {
+                  partialInBook++;
+                  versesInBook += sum.completedVersesCount;
+                }
               }
-              const pct = Math.round((doneInBook / b.chapters) * 100);
+              const pct = Math.min(100, Math.round(((doneInBook + partialInBook * 0.4) / b.chapters) * 100));
               const isExpanded = expandedBookIds.has(b.id);
               const isComplete = doneInBook === b.chapters;
+              const hasProgress = doneInBook > 0 || partialInBook > 0;
 
               const chapterCells = [];
               if (isExpanded) {
                 for (let c = 1; c <= b.chapters; c++) {
-                  const rec = stats.chaptersMap[`${b.id}:${c}`];
-                  const done = isChapterDoneInFilter(b.id, c);
+                  const sum = getChapterProgressSummary(b.id, c, activeTranslationFilter);
+                  const rec = sum.record;
                   const trs = rec ? Object.keys(rec.translations || {}).join(', ') : '';
+                  let cellClass = '';
+                  let cellTitle = `Type ${b.name} ${c}`;
+                  let cellContent = `${c}`;
+
+                  if (sum.isFullyCompleted) {
+                    cellClass = 'is-done';
+                    cellTitle = `${b.name} ${c} — Completed (${sum.completedVersesCount}/${sum.totalVerses || sum.completedVersesCount}v in ${trs}) · Best: ${sum.bestWpm} WPM`;
+                  } else if (sum.isPartial) {
+                    cellClass = 'is-partial';
+                    cellTitle = `${b.name} ${c} — Partial (${sum.completedVersesCount}/${sum.totalVerses || '?'} verses completed: v. ${sum.completedVerseNums.join(', ')}) — Click to resume at next incomplete verse`;
+                    cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.completedVersesCount}v</sup>`;
+                  }
+
                   chapterCells.push(`
                     <a
                       href="#/typing/${b.id}/${c}"
-                      class="reach-ch-cell ${done ? 'is-done' : ''}"
-                      title="${rec ? `${b.name} ${c} — Completed in ${trs} · Best: ${rec.bestWpm} WPM (${rec.bestCpm} CPM)` : `Type ${b.name} ${c}`}"
+                      class="reach-ch-cell ${cellClass}"
+                      title="${cellTitle}"
                     >
-                      ${c}
+                      ${cellContent}
                     </a>
                   `);
                 }
               }
 
+              let bookCountLabel = `${doneInBook}/${b.chapters}`;
+              if (partialInBook > 0) {
+                bookCountLabel += ` (+${partialInBook}p)`;
+              }
+              if (versesInBook > 0) {
+                bookCountLabel += ` · ${versesInBook}v`;
+              }
+
               return `
-                <div class="book-reach-card ${isComplete ? 'is-book-complete' : ''} ${doneInBook > 0 ? 'has-book-progress' : ''}">
+                <div class="book-reach-card ${isComplete ? 'is-book-complete' : ''} ${hasProgress ? 'has-book-progress' : ''}">
                   <div class="book-reach-top" data-toggle-book="${b.id}" role="button" tabindex="0">
                     <div class="book-reach-title-row">
                       <strong>${b.name}</strong>
-                      <span class="book-reach-count">${doneInBook}/${b.chapters} ${isExpanded ? '▴' : '▾'}</span>
+                      <span class="book-reach-count">${bookCountLabel} ${isExpanded ? '▴' : '▾'}</span>
                     </div>
                     <div class="book-reach-bar-track">
                       <div class="book-reach-bar-fill" style="width: ${pct}%"></div>
@@ -372,14 +417,14 @@ export function renderProgressScreen(container) {
             <div>
               <h2 class="section-card-title">Historic Sessions &amp; Verses Typed</h2>
               <p class="section-card-subtitle">
-                Complete chronological log of every Bible chapter and verse range you have typed
+                Complete chronological log of every Bible chapter, partial sitting, and single verse you have typed
               </p>
             </div>
           </div>
 
           ${stats.sessions.length === 0 ? `
             <div class="chart-empty-state">
-              <p>No completed chapters recorded yet. Finish typing any chapter to build your history!</p>
+              <p>No completed verses or chapters recorded yet. Type any verse or chapter to build your history!</p>
               <a href="#/typing" class="btn btn-primary btn-sm">Open Bible Typing →</a>
             </div>
           ` : `
@@ -398,27 +443,35 @@ export function renderProgressScreen(container) {
                   </tr>
                 </thead>
                 <tbody>
-                  ${stats.sessions.map(s => `
-                    <tr>
-                      <td>
-                        <div class="hist-passage-cell">
-                          <strong>${s.bookName} ${s.chapter}:${s.verseRange || `1-${s.versesTyped}`}</strong>
-                          <span>${s.versesTyped} verses · ${(s.wordsTyped || 0).toLocaleString()} words</span>
-                        </div>
-                      </td>
-                      <td><span class="hist-tr-badge">${s.translation || 'ESV'}</span></td>
-                      <td><strong>${s.wpm} WPM</strong></td>
-                      <td>${s.cpm} CPM</td>
-                      <td>${s.accuracy ?? 100}%</td>
-                      <td>${formatTotalDuration(s.durationMs)}</td>
-                      <td class="hist-date-cell">${formatDateShort(s.completedAt)}</td>
-                      <td class="hist-action-cell">
-                        <a href="#/typing/${s.bookId}/${s.chapter}" class="btn btn-secondary btn-sm">
-                          Type →
-                        </a>
-                      </td>
-                    </tr>
-                  `).join('')}
+                  ${stats.sessions.map(s => {
+                    const singleV = s.verseNumber || (s.versesTyped === 1 && /^\d+$/.test(String(s.verseRange || '')) ? Number(s.verseRange) : null);
+                    return `
+                      <tr>
+                        <td>
+                          <div class="hist-passage-cell">
+                            <strong>${s.bookName} ${s.chapter}:${s.verseRange || `1-${s.versesTyped}`}</strong>
+                            <span>${s.versesTyped === 1 ? '1 verse' : `${s.versesTyped} verses`} · ${(s.wordsTyped || 0).toLocaleString()} words</span>
+                          </div>
+                        </td>
+                        <td><span class="hist-tr-badge">${s.translation || 'ESV'}</span></td>
+                        <td><strong>${s.wpm} WPM</strong></td>
+                        <td>${s.cpm} CPM</td>
+                        <td>${s.accuracy ?? 100}%</td>
+                        <td>${formatTotalDuration(s.durationMs)}</td>
+                        <td class="hist-date-cell">${formatDateShort(s.completedAt)}</td>
+                        <td class="hist-action-cell" style="white-space: nowrap;">
+                          ${singleV ? `
+                            <a href="#/typing/${s.bookId}/${s.chapter}/${singleV}" class="btn btn-secondary btn-sm" title="Practice only Verse ${singleV}">
+                              🎯 v.${singleV}
+                            </a>
+                          ` : ''}
+                          <a href="#/typing/${s.bookId}/${s.chapter}" class="btn btn-secondary btn-sm" title="Open ${s.bookName} ${s.chapter}">
+                            📖 Ch. →
+                          </a>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
                 </tbody>
               </table>
             </div>
@@ -465,6 +518,18 @@ export function renderProgressScreen(container) {
         render();
       });
     });
+
+    const toggleExpandAllBtn = container.querySelector('#toggle-expand-all-btn');
+    if (toggleExpandAllBtn) {
+      toggleExpandAllBtn.addEventListener('click', () => {
+        if (expandedBookIds.size === visibleBooks.length) {
+          expandedBookIds.clear();
+        } else {
+          visibleBooks.forEach(b => expandedBookIds.add(b.id));
+        }
+        render();
+      });
+    }
 
     container.querySelectorAll('[data-toggle-book]').forEach(el => {
       el.addEventListener('click', () => {

@@ -1,48 +1,130 @@
-import { Auth, getGlobalTypingStats, getLocalStore, getPreferredTranslation } from '../api.js?v=20261104_v4';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v4';
-import { trackEvent } from '../analytics.js?v=20261104_v4';
-import { navigate } from '../app.js?v=20261104_v4';
+import {
+  Auth,
+  getGlobalTypingStats,
+  getLocalStore,
+  getPreferredTranslation,
+  getChapterProgressSummary
+} from '../api.js?v=20261104_v6';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v6';
+import { trackEvent } from '../analytics.js?v=20261104_v6';
+import { navigate } from '../app.js?v=20261104_v6';
 
 export { renderLandingScreen as renderHomeScreen };
 
+const VERSE_OF_THE_DAY_POOL = [
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 3,
+    verse: 16,
+    text: 'For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.',
+    theme: 'Love & Eternal Life'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 23,
+    verse: 1,
+    text: 'The LORD is my shepherd; I shall not want.',
+    theme: 'Provision & Peace'
+  },
+  {
+    bookId: 45,
+    bookName: 'Romans',
+    chapter: 8,
+    verse: 28,
+    text: 'And we know that for those who love God all things work together for good, for those who are called according to his purpose.',
+    theme: 'Hope & Purpose'
+  },
+  {
+    bookId: 50,
+    bookName: 'Philippians',
+    chapter: 4,
+    verse: 13,
+    text: 'I can do all things through him who strengthens me.',
+    theme: 'Strength & Faith'
+  },
+  {
+    bookId: 20,
+    bookName: 'Proverbs',
+    chapter: 3,
+    verse: 5,
+    text: 'Trust in the LORD with all your heart, and do not lean on your own understanding.',
+    theme: 'Wisdom & Trust'
+  },
+  {
+    bookId: 1,
+    bookName: 'Genesis',
+    chapter: 1,
+    verse: 1,
+    text: 'In the beginning, God created the heavens and the earth.',
+    theme: 'Creation & Origin'
+  },
+  {
+    bookId: 23,
+    bookName: 'Isaiah',
+    chapter: 40,
+    verse: 31,
+    text: 'but they who wait for the LORD shall renew their strength; they shall mount up with wings like eagles; they shall run and not be weary; they shall walk and not faint.',
+    theme: 'Renewal & Endurance'
+  },
+  {
+    bookId: 6,
+    bookName: 'Joshua',
+    chapter: 1,
+    verse: 9,
+    text: 'Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the LORD your God is with you wherever you go.',
+    theme: 'Courage & Presence'
+  },
+  {
+    bookId: 40,
+    bookName: 'Matthew',
+    chapter: 11,
+    verse: 28,
+    text: 'Come to me, all who labor and are heavy laden, and I will give you rest.',
+    theme: 'Rest & Comfort'
+  },
+  {
+    bookId: 33,
+    bookName: 'Micah',
+    chapter: 6,
+    verse: 8,
+    text: 'He has told you, O man, what is good; and what does the LORD require of you but to do justice, and to love kindness, and to walk humbly with your God?',
+    theme: 'Justice & Humility'
+  },
+  {
+    bookId: 55,
+    bookName: '2 Timothy',
+    chapter: 1,
+    verse: 7,
+    text: 'for God gave us a spirit not of fear but of power and love and self-control.',
+    theme: 'Confidence & Spirit'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 46,
+    verse: 1,
+    text: 'God is our refuge and strength, a very present help in trouble.',
+    theme: 'Refuge & Deliverance'
+  }
+];
+
 export function renderLandingScreen(container) {
-  const PREVIEW_CARDS = [
-    {
-      ref: 'Genesis 1:1',
-      translation: 'ESV',
-      verseNum: '1',
-      frontText: 'In the beginning, God created the heavens and the earth.',
-      backTitle: 'Chapter 1 · 31 Verses',
-      backMeta: '798 words · ~4,120 chars · Law'
-    },
-    {
-      ref: 'Psalm 23:1',
-      translation: 'ESV',
-      verseNum: '1',
-      frontText: 'The LORD is my shepherd; I shall not want.',
-      backTitle: 'Psalm 23 · 6 Verses',
-      backMeta: '115 words · ~570 chars · Poetry'
-    },
-    {
-      ref: 'John 1:1',
-      translation: 'ESV',
-      verseNum: '1',
-      frontText: 'In the beginning was the Word, and the Word was with God...',
-      backTitle: 'Chapter 1 · 51 Verses',
-      backMeta: '1,032 words · ~5,180 chars · Gospels'
-    }
-  ];
+  // Deterministic daily verse of the day based on day of the year
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+  const votd = VERSE_OF_THE_DAY_POOL[dayOfYear % VERSE_OF_THE_DAY_POOL.length];
 
   container.innerHTML = `
     <div class="hero-wrapper">
       <div class="hero-badge">
         <span>✨</span>
-        <span>66 Books · 1,189 Chapters · 22 Translations</span>
+        <span>66 Books · 1,189 Chapters · 31,103 Verses</span>
       </div>
 
       <h1 class="hero-title">bible</h1>
       <p class="hero-subtitle">
-        Internalize Scripture at your keyboard. Type through any chapter of the Bible, track your WPM &amp; CPM speed, and map your reach across all 1,189 chapters.
+        Internalize Scripture at your keyboard. Type through any chapter or verse of the Bible, track your WPM &amp; CPM speed, and map your reach across all 1,189 chapters and 31,103 verses.
       </p>
 
       <div class="hero-actions">
@@ -52,185 +134,72 @@ export function renderLandingScreen(container) {
         </button>
       </div>
 
-      <!-- Interactive 3D Flippable Preview Cards -->
-      <div class="hero-preview-cards" id="hero-cards-container">
-        ${PREVIEW_CARDS.map((card, idx) => `
-          <div class="home-card-stage" data-card-idx="${idx}" data-ref="${card.ref}" title="Click to flip">
-            <div class="home-card-inner">
-              <!-- Front Side: Verse Text Preview -->
-              <div class="home-card-face home-card-front">
-                <div class="home-card-top-tag">
-                  <span>📖</span>
-                  <span>${card.ref} (${card.translation})</span>
-                </div>
-                <div class="home-card-verse-preview">
-                  <sup class="verse-num">${card.verseNum}</sup>${card.frontText}
-                </div>
-                <div class="home-card-hint">Tap to flip</div>
-              </div>
+      <!-- Single Verse of the Day Card (No Flipping) -->
+      <div class="votd-card-wrapper">
+        <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${votd.bookName} ${votd.chapter}:${votd.verse}">
+          <div class="votd-top-row">
+            <span class="votd-tag">☀️ Verse of the Day · ${votd.theme}</span>
+            <span class="votd-action-hint">Click card to type verse →</span>
+          </div>
 
-              <!-- Back Side: Chapter Typing Info -->
-              <div class="home-card-face home-card-back">
-                <div class="home-card-top-tag">
-                  <span>⌨️</span>
-                  <span>Typing Specs</span>
-                </div>
-                <div class="home-card-word">${card.backTitle}</div>
-                <div class="home-card-pronunciation">${card.backMeta}</div>
-                <div class="home-card-hint">Tap to flip back</div>
-              </div>
+          <div class="votd-quote">
+            <sup class="verse-num">${votd.verse}</sup>“${votd.text}”
+          </div>
+
+          <div class="votd-ref-row">
+            <div class="votd-ref-info">
+              <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
+              <span class="votd-ref-sub">ESV · Tap below to practice this single verse or the full chapter</span>
+            </div>
+
+            <div class="votd-ctas">
+              <a
+                href="#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}"
+                class="btn btn-primary btn-sm"
+                data-stop-card-nav="true"
+                title="Practice only this single verse"
+              >
+                🎯 Type This Verse →
+              </a>
+              <a
+                href="#/typing/${votd.bookId}/${votd.chapter}"
+                class="btn btn-secondary btn-sm"
+                data-stop-card-nav="true"
+                title="Open and type the full chapter"
+              >
+                📖 Type Whole Chapter (${votd.bookName} ${votd.chapter}) →
+              </a>
             </div>
           </div>
-        `).join('')}
+        </div>
       </div>
     </div>
   `;
 
-  container.querySelectorAll('.home-card-stage').forEach(stage => {
-    stage.addEventListener('click', () => {
-      stage.classList.toggle('is-flipped');
-      trackEvent('home_card_flip', { ref: stage.getAttribute('data-ref') });
+  const votdCard = container.querySelector('#votd-card');
+  if (votdCard) {
+    votdCard.addEventListener('click', (e) => {
+      if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a')) return;
+      trackEvent('votd_card_click', { ref: `${votd.bookName} ${votd.chapter}:${votd.verse}` });
+      navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
     });
-  });
+    votdCard.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target === votdCard) {
+        navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
+      }
+    });
+  }
 
   const startBtn = container.querySelector('#home-start-btn');
   if (startBtn) {
     startBtn.addEventListener('click', () => {
       trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
-      if (Auth.isAuthenticated()) {
-        navigate('#/hub');
-      } else {
-        navigate('#/signin');
-      }
+      navigate('#/typing');
     });
   }
 }
 
-export function renderHubScreen(container) {
-  const user = Auth.getUser();
-  const isAuthed = Auth.isAuthenticated();
-  const firstName = isAuthed ? (user?.name || 'Friend').split(' ')[0] : null;
-  const stats = getGlobalTypingStats();
-  const store = getLocalStore();
-  const prefTr = getTranslationByCode(getPreferredTranslation());
-
-  let suggestedRef = { bookId: 1, bookName: 'Genesis', chapter: 1 };
-  if (stats.sessions.length > 0) {
-    const latest = stats.sessions[0];
-    suggestedRef = getNextChapterRef(latest.bookId, latest.chapter);
-  } else if (store.lastBookId && store.lastChapter) {
-    const b = getBookById(store.lastBookId);
-    suggestedRef = { bookId: b.id, bookName: b.name, chapter: store.lastChapter };
-  }
-
-  const latestSession = stats.sessions[0] || null;
-  const fillWidth = stats.overallCompletedChapters > 0
-    ? Math.max(stats.overallPercentage, 2)
-    : 0;
-
-  container.innerHTML = `
-    <div class="hub-container">
-      <div class="screen-header">
-        <div class="screen-title-group">
-          <div class="screen-lang-tag">
-            <span>✨</span>
-            <span>${firstName ? `Welcome back, ${firstName}` : 'Scripture Study Hub'}</span>
-          </div>
-          <h1 class="screen-title">Scripture Suite</h1>
-          <p class="screen-subtitle">
-            Select a tool below to study, internalize, and track your journey through the Bible.
-          </p>
-        </div>
-      </div>
-
-      <div class="hub-cards-grid">
-        <!-- Feature 1: Bible Typing App Card -->
-        <div class="hub-card" id="bible-typing-feature-card" role="button" tabindex="0">
-          <div class="hub-card-top">
-            <div class="hub-glyph" aria-hidden="true">⌨️</div>
-            <div class="hub-meta">
-              <div class="hub-tag">
-                <span>📖</span>
-                <span>66 Books · 1,189 Chapters · ${prefTr.shortName}</span>
-              </div>
-              <h2 class="hub-title">
-                <a href="#/typing" class="hub-title-link">Bible Typing</a>
-              </h2>
-              <div class="hub-native">
-                Type through any chapter of Scripture · Verse numbers visible, never typed
-              </div>
-            </div>
-          </div>
-
-          <p class="hub-desc">
-            Search for any Bible book and chapter across 22 translations (defaulting to ESV) and type through the passage in strict accuracy mode. Tracks your WPM, CPM, completed chapters, and full Bible reach.
-          </p>
-
-          <div class="hub-subcards">
-            <div class="hub-subitem">
-              <div class="hub-subitem-info">
-                <strong>Next Suggested Chapter: ${suggestedRef.bookName} ${suggestedRef.chapter} (${prefTr.shortName})</strong>
-                <span>
-                  ${latestSession
-                    ? `Last completed: ${latestSession.bookName} ${latestSession.chapter} (${latestSession.translation}) · ${latestSession.wpm} WPM · ${latestSession.cpm} CPM`
-                    : 'No chapters completed yet — start with Genesis 1 or search any chapter'}
-                </span>
-              </div>
-              <div class="hub-subitem-links">
-                <a href="#/typing/${suggestedRef.bookId}/${suggestedRef.chapter}" class="btn btn-primary btn-sm" data-stop-card-nav="true">
-                  Type ${suggestedRef.bookName} ${suggestedRef.chapter} →
-                </a>
-              </div>
-            </div>
-
-            <div class="hub-subitem">
-              <div class="hub-subitem-info">
-                <strong>Typing Speed &amp; Bible Reach</strong>
-                <span>
-                  Avg: <strong>${stats.avgWpm} WPM</strong> (${stats.avgCpm} CPM) · Best: ${stats.bestWpm} WPM · ${stats.totalVersesTyped.toLocaleString()} verses typed
-                </span>
-              </div>
-              <div class="hub-subitem-links">
-                <a href="#/progress" class="btn btn-secondary btn-sm" data-stop-card-nav="true">
-                  📊 Progress &amp; Stats
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div class="hub-footer">
-            <div class="hub-progress-info">
-              <span>Overall Bible Reach (All Translations)</span>
-              <span><strong>${stats.overallCompletedChapters} / ${stats.totalBibleChapters}</strong> chapters (${stats.overallPercentage}%)</span>
-            </div>
-            <div class="hub-progress-track">
-              <div class="hub-progress-fill" style="width: ${fillWidth}%"></div>
-            </div>
-            <div class="hub-actions-row">
-              <a href="#/progress" class="btn btn-secondary hub-action-btn" data-stop-card-nav="true">
-                📊 Typing Progress &amp; Reach
-              </a>
-              <a href="#/typing" class="btn btn-primary hub-action-btn" data-stop-card-nav="true">
-                ⌨️ Open Bible Typing →
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const card = container.querySelector('#bible-typing-feature-card');
-  if (card) {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a')) return;
-      trackEvent('home_feature_card_click', { feature: 'bible_typing' });
-      navigate('#/typing');
-    });
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target === card) {
-        navigate('#/typing');
-      }
-    });
-  }
+/** Legacy route fallback — Hub removed per user request: redirect directly to typing */
+export function renderHubScreen() {
+  navigate('#/typing');
 }

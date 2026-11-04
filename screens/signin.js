@@ -1,7 +1,7 @@
-import { CONFIG } from '../config.js?v=20261104_v4';
-import { Auth, Api } from '../api.js?v=20261104_v4';
-import { trackEvent } from '../analytics.js?v=20261104_v4';
-import { navigate } from '../app.js?v=20261104_v4';
+import { CONFIG } from '../config.js?v=20261104_v6';
+import { Auth, Api } from '../api.js?v=20261104_v6';
+import { trackEvent } from '../analytics.js?v=20261104_v6';
+import { navigate } from '../app.js?v=20261104_v6';
 
 let firebaseAuthInstance = null;
 let googleProviderInstance = null;
@@ -143,7 +143,7 @@ export function renderSignInScreen(container) {
           })
           .catch(() => {});
 
-        navigate('#/hub');
+        navigate('#/typing');
       } catch (err) {
         if (btnLabel) btnLabel.textContent = 'Sign in with Google';
         googleBtn.disabled = false;
@@ -161,7 +161,7 @@ export function renderSignInScreen(container) {
   if (unauthBtn) {
     unauthBtn.addEventListener('click', () => {
       trackEvent('continue_unauthenticated');
-      navigate('#/hub');
+      navigate('#/typing');
     });
   }
 }

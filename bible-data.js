@@ -1,8 +1,20 @@
-// Complete Canon Metadata (66 Books, 1,189 Chapters) & 22 Bible Translations
+// Complete Canon Metadata (66 Books, 1,189 Chapters, ~31,100 Verses) & 22 Bible Translations
+import { VERSE_COUNTS } from './verse-counts.js?v=20261104_v6';
 
 export const TOTAL_BIBLE_CHAPTERS = 1189;
 export const TOTAL_OT_CHAPTERS = 929;
 export const TOTAL_NT_CHAPTERS = 260;
+export const TOTAL_BIBLE_VERSES = VERSE_COUNTS.reduce((sum, book) => sum + book.reduce((a, b) => a + b, 0), 0);
+
+export function getChapterVerseCount(bookId, chapter) {
+  const book = VERSE_COUNTS[Number(bookId) - 1];
+  return (book && book[Number(chapter) - 1]) || 0;
+}
+
+export function getBookVerseCount(bookId) {
+  const book = VERSE_COUNTS[Number(bookId) - 1];
+  return book ? book.reduce((a, b) => a + b, 0) : 0;
+}
 
 export const BIBLE_TRANSLATIONS = [
   { code: 'ESV', name: 'English Standard Version', shortName: 'ESV', year: '2016', isDefault: true },
@@ -132,20 +144,22 @@ export function getPrevChapterRef(bookId, chapter) {
 }
 
 /**
- * Smart search for Bible chapters (e.g. "Gen 1", "Psalm 23", "John 3", "1 Cor 13", "Romans")
+ * Smart search for Bible chapters & verses (e.g. "Gen 1", "John 3:16", "Psalm 23:1", "1 Cor 13:4", "Romans 8")
  */
 export function searchBibleChapters(rawQuery, maxResults = 12) {
   const q = (rawQuery || '').trim().toLowerCase();
   if (!q) return [];
 
-  // Match optional leading number (1/2/3), book name, and optional chapter(:verse)
-  const match = q.match(/^([1-3]?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s*(?:(\d+)(?::\d+)?)?$/i);
+  // Match optional leading number (1/2/3), book name, optional chapter, and optional :verse (or space verse)
+  const match = q.match(/^([1-3]?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s*(?:(\d+)(?:\s*[:.]\s*(\d+)|\s+(\d+))?)?$/i);
   const results = [];
 
   if (match) {
     const bookPart = match[1].trim().replace(/\s+/g, ' ');
     const bookCompact = bookPart.replace(/\s+/g, '');
     const chapterNum = match[2] ? parseInt(match[2], 10) : null;
+    const verseNumRaw = match[3] || match[4] || null;
+    const verseNum = verseNumRaw ? parseInt(verseNumRaw, 10) : null;
 
     // Score matching books
     const matchedBooks = [];
@@ -175,26 +189,61 @@ export function searchBibleChapters(rawQuery, maxResults = 12) {
     for (const { book } of matchedBooks) {
       if (chapterNum !== null) {
         if (chapterNum >= 1 && chapterNum <= book.chapters) {
-          results.push({
-            bookId: book.id,
-            bookName: book.name,
-            chapter: chapterNum,
-            label: `${book.name} ${chapterNum}`,
-            category: book.category,
-            testament: book.testament
-          });
-        }
-        // Also suggest chapters starting with those digits (e.g. Psalm 1 -> 1, 10..19, 100..150)
-        for (let c = 1; c <= book.chapters && results.length < maxResults; c++) {
-          if (c !== chapterNum && String(c).startsWith(String(chapterNum))) {
+          if (verseNum !== null && verseNum >= 1) {
+            // 1. Single-Verse Granularity option
             results.push({
               bookId: book.id,
               bookName: book.name,
-              chapter: c,
-              label: `${book.name} ${c}`,
+              chapter: chapterNum,
+              verse: verseNum,
+              mode: 'verse',
+              label: `${book.name} ${chapterNum}:${verseNum}`,
+              subtitle: `Single Verse · ${book.testament} · ${book.category}`,
               category: book.category,
               testament: book.testament
             });
+            // 2. Full Chapter starting at that verse option
+            results.push({
+              bookId: book.id,
+              bookName: book.name,
+              chapter: chapterNum,
+              verse: verseNum,
+              mode: 'chapter-at-verse',
+              label: `${book.name} ${chapterNum} (Start at v. ${verseNum})`,
+              subtitle: `Full Chapter starting at Verse ${verseNum}`,
+              category: book.category,
+              testament: book.testament
+            });
+          } else {
+            results.push({
+              bookId: book.id,
+              bookName: book.name,
+              chapter: chapterNum,
+              verse: null,
+              mode: 'chapter',
+              label: `${book.name} ${chapterNum}`,
+              subtitle: `${book.testament} · ${book.category}`,
+              category: book.category,
+              testament: book.testament
+            });
+          }
+        }
+        // Also suggest chapters starting with those digits when no specific verse was typed
+        if (verseNum === null) {
+          for (let c = 1; c <= book.chapters && results.length < maxResults; c++) {
+            if (c !== chapterNum && String(c).startsWith(String(chapterNum))) {
+              results.push({
+                bookId: book.id,
+                bookName: book.name,
+                chapter: c,
+                verse: null,
+                mode: 'chapter',
+                label: `${book.name} ${c}`,
+                subtitle: `${book.testament} · ${book.category}`,
+                category: book.category,
+                testament: book.testament
+              });
+            }
           }
         }
       } else {
@@ -205,7 +254,10 @@ export function searchBibleChapters(rawQuery, maxResults = 12) {
             bookId: book.id,
             bookName: book.name,
             chapter: c,
+            verse: null,
+            mode: 'chapter',
             label: `${book.name} ${c}`,
+            subtitle: `${book.testament} · ${book.category}`,
             category: book.category,
             testament: book.testament
           });
