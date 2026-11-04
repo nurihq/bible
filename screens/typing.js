@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v15';
+} from '../bible-data.js?v=20261104_v16';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -24,9 +24,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v15';
-import { trackEvent } from '../analytics.js?v=20261104_v15';
-import { navigate } from '../app.js?v=20261104_v15';
+} from '../api.js?v=20261104_v16';
+import { trackEvent } from '../analytics.js?v=20261104_v16';
+import { navigate } from '../app.js?v=20261104_v16';
 
 function escapeHtml(str) {
   return String(str)
@@ -241,9 +241,6 @@ export function renderTypingScreen(container, params = {}) {
                 <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
               </button>
             ` : `
-              <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="focus-single-verse-top-btn" title="Practice only the currently active verse">
-                🎯 Single Verse
-              </button>
               <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for ${book.name} ${initialChapter}">
                 <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
               </button>
@@ -404,7 +401,6 @@ export function renderTypingScreen(container, params = {}) {
   const prevStepBtn = container.querySelector('#prev-step-btn');
   const nextStepBtn = container.querySelector('#next-step-btn');
   const openFullChapterTopBtn = container.querySelector('#open-full-chapter-top-btn');
-  const focusSingleVerseTopBtn = container.querySelector('#focus-single-verse-top-btn');
   const skipCompletedToggleBtn = container.querySelector('#skip-completed-toggle-btn');
   const skipCompletedStateLabel = container.querySelector('#skip-completed-state-label');
   const restartBtn = container.querySelector('#restart-chapter-btn');
@@ -441,13 +437,6 @@ export function renderTypingScreen(container, params = {}) {
   if (openFullChapterTopBtn) {
     openFullChapterTopBtn.addEventListener('click', () => {
       navigate(`#/typing/${book.id}/${initialChapter}?verse=${targetSingleVerseNum || 1}`);
-    });
-  }
-
-  if (focusSingleVerseTopBtn) {
-    focusSingleVerseTopBtn.addEventListener('click', () => {
-      const currentVerseNum = charToVerseMap[Math.min(cursorIdx, Math.max(0, charToVerseMap.length - 1))] || 1;
-      navigate(`#/typing/${book.id}/${initialChapter}/${currentVerseNum}`);
     });
   }
 
