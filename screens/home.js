@@ -6,21 +6,21 @@ import {
   getChapterProgressSummary,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v8';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v8';
-import { trackEvent } from '../analytics.js?v=20261104_v8';
-import { navigate } from '../app.js?v=20261104_v8';
+} from '../api.js?v=20261104_v9';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v9';
+import { trackEvent } from '../analytics.js?v=20261104_v9';
+import { navigate } from '../app.js?v=20261104_v9';
 
 export { renderLandingScreen as renderHomeScreen };
 
 const VERSE_OF_THE_DAY_POOL = [
   {
-    bookId: 43,
-    bookName: 'John',
-    chapter: 3,
-    verse: 16,
-    text: 'For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.',
-    theme: 'Love & Eternal Life'
+    bookId: 24,
+    bookName: 'Jeremiah',
+    chapter: 29,
+    verse: 11,
+    text: 'For I know the plans I have for you, declares the LORD, plans for welfare and not for evil, to give you a future and a hope.',
+    theme: 'Hope & Future'
   },
   {
     bookId: 19,

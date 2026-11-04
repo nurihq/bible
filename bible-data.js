@@ -144,7 +144,7 @@ export function getPrevChapterRef(bookId, chapter) {
 }
 
 /**
- * Smart search for Bible chapters & verses (e.g. "Gen 1", "John 3:16", "Psalm 23:1", "1 Cor 13:4", "Romans 8")
+ * Smart search for Bible chapters & verses (e.g. "Gen 1", "Prov 3:5", "Psalm 23:1", "1 Cor 13:4", "Romans 8")
  */
 export function searchBibleChapters(rawQuery, maxResults = 12) {
   const q = (rawQuery || '').trim().toLowerCase();

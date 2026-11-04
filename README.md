@@ -16,7 +16,7 @@ A sleek Scripture study & typing suite modeled on `monogenesis`, featuring a ful
    - Updates immediately upon completing any chapter.
 
 4. **Bible Typing Game (`#/typing` & `#/typing/:bookId/:chapter`)**
-   - **Smart Chapter Search**: Search any book and chapter (e.g. `John 3`, `Psalm 23`, `Rom 8`, `Gen 1`) or browse all 66 books via the interactive Book & Chapter Drawer.
+   - **Smart Chapter Search**: Search any book and chapter (e.g. `Psalm 23`, `Prov 3`, `Rom 8`, `Gen 1`) or browse all 66 books via the interactive Book & Chapter Drawer.
    - **22 Bible Translations (Default: ESV)**: Supports `ESV`, `BSB`, `NLT`, `NASB`, `CSB17`, `LSB`, `NKJV`, `KJV`, `NET`, `WEB`, `RSV`, `NRSVCE`, `ASV`, `CEB`, `GNT`, `ERV`, `AMP`, `MSG`, `CJB`, `TLV`, `YLT`, and `GNV`.
    - **Visible Verse Numbers (Never Typed)**: Superscript verse badges (`1`, `2`, `3`...) are rendered inline for context while your cursor skips directly from verse text to verse text.
    - **Strict Backspace Mode**: Mistyped characters highlight in red and require pressing `Backspace` (`⌫`) before advancing.

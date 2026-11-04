@@ -4,16 +4,16 @@ import {
   getPreferredTranslation,
   setPreferredTranslation,
   getChapterProgressSummary
-} from '../api.js?v=20261104_v8';
+} from '../api.js?v=20261104_v9';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261104_v8';
-import { trackEvent } from '../analytics.js?v=20261104_v8';
-import { navigate } from '../app.js?v=20261104_v8';
+} from '../bible-data.js?v=20261104_v9';
+import { trackEvent } from '../analytics.js?v=20261104_v9';
+import { navigate } from '../app.js?v=20261104_v9';
 
 function escapeHtml(str) {
   return String(str)
@@ -390,7 +390,7 @@ export class Navbar {
                 type="text"
                 class="nav-search-input"
                 id="nav-search-input"
-                placeholder="Search e.g. John 3:16, Psalm 23, Rom 8"
+                placeholder="Search e.g. Psalm 23, Prov 3:5, Rom 8"
                 autocomplete="off"
                 aria-label="Search for a chapter or verse"
               />
