@@ -2340,40 +2340,36 @@ sup.verse-num.is-both {
   margin-right: 0.45rem;
 }
 
-.votd-ref-row {
+.votd-ref-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding-top: 1.15rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.votd-ref-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .votd-ref-title {
   font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
 }
 
 .votd-ref-sub {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
+.votd-bottom-row,
 .votd-ctas {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
+  padding-top: 0.25rem;
+  border-top: none;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

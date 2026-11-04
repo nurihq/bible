@@ -6,10 +6,10 @@ import {
   getChapterProgressSummary,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v11';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v11';
-import { trackEvent } from '../analytics.js?v=20261104_v11';
-import { navigate } from '../app.js?v=20261104_v11';
+} from '../api.js?v=20261104_v12';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v12';
+import { trackEvent } from '../analytics.js?v=20261104_v12';
+import { navigate } from '../app.js?v=20261104_v12';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -117,36 +117,15 @@ export function renderLandingScreen(container) {
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
   const votd = VERSE_OF_THE_DAY_POOL[dayOfYear % VERSE_OF_THE_DAY_POOL.length];
 
-  function getVotdStatusHtml() {
+  function getVotdStatus() {
     const chSum = getChapterProgressSummary(votd.bookId, votd.chapter);
     const vStat = chSum.record?.completedVerses?.[String(votd.verse)];
     const isVerseRead = Boolean(chSum.isFullyRead || vStat?.isRead);
-    const isVerseTyped = Boolean(chSum.isFullyTyped || vStat?.isTyped || (vStat?.count && vStat.count > 0));
-    const isChRead = Boolean(chSum.isFullyRead);
-
-    const badges = [];
-    if (isVerseRead && isVerseTyped) {
-      badges.push('<span class="votd-read-badge is-both">✓ Read &amp; Typed</span>');
-    } else if (isVerseTyped) {
-      badges.push('<span class="votd-read-badge is-done">✓ Typed</span>');
-    } else if (isVerseRead) {
-      badges.push('<span class="votd-read-badge is-read">📖 Verse Read</span>');
-    }
-
-    if (isChRead && !badges.some(b => b.includes('Ch. Read'))) {
-      badges.push('<span class="votd-read-badge is-read">📖 Chapter Read</span>');
-    }
-
-    return {
-      badgesHtml: badges.join(' '),
-      isVerseRead,
-      isChRead
-    };
+    return { isVerseRead };
   }
 
   function renderCard() {
-    const stats = getGlobalTypingStats();
-    const { badgesHtml, isVerseRead, isChRead } = getVotdStatusHtml();
+    const { isVerseRead } = getVotdStatus();
 
     container.innerHTML = `
       <div class="hero-wrapper">
@@ -160,15 +139,6 @@ export function renderLandingScreen(container) {
           Track your bible progress
         </p>
 
-        ${stats.overallCoveredChapters > 0 || stats.overallCoveredVerses > 0 ? `
-          <div class="hero-progress-banner">
-            <span>📊 Your Scripture Reach:</span>
-            <strong>${stats.overallCoveredChapters} / 1,189 Chapters (${stats.overallCoveredPercentage}%)</strong> ·
-            <span>${stats.overallCoveredVerses.toLocaleString()} verses</span> ·
-            <a href="#/progress" class="hero-progress-link">View Completeness Map →</a>
-          </div>
-        ` : ''}
-
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" id="home-start-btn">
             <span>Start Typing</span>
@@ -180,41 +150,35 @@ export function renderLandingScreen(container) {
         <div class="votd-card-wrapper">
           <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${votd.bookName} ${votd.chapter}:${votd.verse}">
             <div class="votd-top-row">
-              <div class="votd-top-badges">
-                ${badgesHtml}
+              <div class="votd-ref-header">
+                <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
+                <span class="votd-ref-sub">ESV</span>
               </div>
               <span class="votd-action-hint">Type verse →</span>
             </div>
 
             <div class="votd-quote">
-              <sup class="verse-num ${isVerseRead ? 'is-read' : ''}">${votd.verse}</sup>“${votd.text}”
+              “${votd.text}”
             </div>
 
-            <div class="votd-ref-row">
-              <div class="votd-ref-info">
-                <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
-                <span class="votd-ref-sub">ESV</span>
-              </div>
-
-              <div class="votd-ctas">
-                <button
-                  type="button"
-                  class="btn ${isVerseRead ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
-                  id="votd-mark-verse-btn"
-                  data-stop-card-nav="true"
-                  title="Mark verse ${votd.verse} as read to count toward your Bible completeness"
-                >
-                  ${isVerseRead ? '✓ Verse Read' : '📖 Mark Verse Read'}
-                </button>
-                <a
-                  href="#/typing/${votd.bookId}/${votd.chapter}"
-                  class="btn btn-primary btn-sm"
-                  data-stop-card-nav="true"
-                  title="Open and type the full chapter"
-                >
-                  📖 Type Whole Ch. →
-                </a>
-              </div>
+            <div class="votd-bottom-row">
+              <button
+                type="button"
+                class="btn ${isVerseRead ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
+                id="votd-mark-verse-btn"
+                data-stop-card-nav="true"
+                title="Mark verse ${votd.verse} as read to count toward your Bible completeness"
+              >
+                ${isVerseRead ? '✓ Verse Read' : '📖 Mark Verse Read'}
+              </button>
+              <a
+                href="#/typing/${votd.bookId}/${votd.chapter}"
+                class="btn btn-secondary btn-sm"
+                data-stop-card-nav="true"
+                title="Open and type the full chapter"
+              >
+                📖 Type Whole Ch.
+              </a>
             </div>
           </div>
         </div>
