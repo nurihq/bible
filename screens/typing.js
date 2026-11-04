@@ -7,8 +7,12 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses,
-  getRandomVerseRef
-} from '../bible-data.js?v=20261104_v28';
+  getCachedChapterVerses,
+  prefetchChapterVerses,
+  getRandomVerseRef,
+  getNextPreloadedRandomVerse,
+  replenishRandomVersePreloads
+} from '../bible-data.js?v=20261104_v29';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -38,9 +42,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v28';
-import { trackEvent } from '../analytics.js?v=20261104_v28';
-import { navigate } from '../app.js?v=20261104_v28';
+} from '../api.js?v=20261104_v29';
+import { trackEvent } from '../analytics.js?v=20261104_v29';
+import { navigate } from '../app.js?v=20261104_v29';
 
 function escapeHtml(str) {
   return String(str)
@@ -549,7 +553,7 @@ export function renderTypingScreen(container, params = {}) {
       pendingSingleVerseSwitch = null;
       if (isSingle) {
         if (shuffleVerses) {
-          const randRef = getRandomVerseRef({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum || 1 });
+          const randRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum || 1 });
           navigate(`#/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
         } else {
           const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
@@ -764,8 +768,8 @@ export function renderTypingScreen(container, params = {}) {
         pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
         clearRandomVerseForward();
 
-        // Always pick a random verse uniformly across the entire Bible (all 66 books, 31,102 verses)
-        const nextRef = getRandomVerseRef({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+        // Use preloaded random verse for instantaneous transition
+        const nextRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
         navigate(`#/typing/${nextRef.bookId}/${nextRef.chapter}/${nextRef.verse}`);
         return;
       }
@@ -1637,10 +1641,35 @@ export function renderTypingScreen(container, params = {}) {
     navigateNextStep();
   });
 
+  function triggerBackgroundPrefetches() {
+    if (singleVerseMode) {
+      if (shuffleVerses) {
+        replenishRandomVersePreloads(activeTranslation, {
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: targetSingleVerseNum
+        });
+      } else if (nextChapterRef) {
+        prefetchChapterVerses(activeTranslation, nextChapterRef.bookId, nextChapterRef.chapter);
+      }
+    } else if (nextChapterRef) {
+      prefetchChapterVerses(activeTranslation, nextChapterRef.bookId, nextChapterRef.chapter);
+    }
+  }
+
   // ── 8. Fetch & Initialize Chapter Verses ───────────────────────
   async function loadAndRenderPassage() {
     clearTimer();
     const trObj = getTranslationByCode(activeTranslation);
+
+    // Instant zero-delay render if already in synchronous cache
+    const cached = getCachedChapterVerses(activeTranslation, book.id, initialChapter);
+    if (cached && cached.length > 0) {
+      buildPassageDOM(cached);
+      triggerBackgroundPrefetches();
+      return;
+    }
+
     passageContent.innerHTML = `
       <div class="typing-loading-state">
         <div class="loading-spinner"></div>
@@ -1652,6 +1681,7 @@ export function renderTypingScreen(container, params = {}) {
       const loaded = await fetchChapterVerses(activeTranslation, book.id, initialChapter);
       if (!container.contains(passageContent)) return;
       buildPassageDOM(loaded);
+      triggerBackgroundPrefetches();
     } catch (err) {
       if (!container.contains(passageContent)) return;
       passageContent.innerHTML = `

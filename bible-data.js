@@ -348,6 +348,56 @@ export function sanitizeVerseText(raw) {
 }
 
 const CHAPTER_CACHE_PREFIX = 'bible_ch_cache_v1_';
+const inMemoryChapterCache = new Map();
+const inFlightChapterPromises = new Map();
+
+function safeStoreCache(key, verses) {
+  const valueStr = JSON.stringify(verses);
+  try {
+    sessionStorage.setItem(key, valueStr);
+  } catch (e) {}
+  try {
+    localStorage.setItem(key, valueStr);
+  } catch (e) {
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(CHAPTER_CACHE_PREFIX)) {
+          keysToRemove.push(k);
+        }
+      }
+      for (let i = 0; i < Math.min(keysToRemove.length, 25); i++) {
+        localStorage.removeItem(keysToRemove[i]);
+      }
+      localStorage.setItem(key, valueStr);
+    } catch (e2) {}
+  }
+}
+
+export function getCachedChapterVerses(translation = 'ESV', bookId = 1, chapter = 1) {
+  const tr = getTranslationByCode(translation).code;
+  const book = getBookById(bookId);
+  const ch = Math.max(1, Math.min(Number(chapter) || 1, book.chapters));
+  const cacheKey = `${CHAPTER_CACHE_PREFIX}${tr}_${book.id}_${ch}`;
+
+  if (inMemoryChapterCache.has(cacheKey)) {
+    return inMemoryChapterCache.get(cacheKey);
+  }
+
+  try {
+    const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryChapterCache.set(cacheKey, parsed);
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
 
 export async function fetchChapterVerses(translation = 'ESV', bookId = 1, chapter = 1) {
   const tr = getTranslationByCode(translation).code;
@@ -355,57 +405,128 @@ export async function fetchChapterVerses(translation = 'ESV', bookId = 1, chapte
   const ch = Math.max(1, Math.min(Number(chapter) || 1, book.chapters));
   const cacheKey = `${CHAPTER_CACHE_PREFIX}${tr}_${book.id}_${ch}`;
 
-  // Check sessionStorage / localStorage cache first
-  try {
-    const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {}
-
-  // Primary API: bolls.life (supports ESV, BSB, NLT, NASB, CSB17, LSB, NKJV, KJV, NET, WEB, RSV, etc.)
-  try {
-    const url = `https://bolls.life/get-text/${encodeURIComponent(tr)}/${book.id}/${ch}/`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    if (Array.isArray(data) && data.length > 0) {
-      const verses = data
-        .map(v => ({
-          verse: Number(v.verse),
-          text: sanitizeVerseText(v.text)
-        }))
-        .filter(v => v.text.length > 0);
-
-      if (verses.length > 0) {
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify(verses));
-        } catch (e) {}
-        return verses;
-      }
-    }
-  } catch (primaryErr) {
-    console.warn('Primary Bible API failed, trying fallback:', primaryErr);
+  // 1. Check synchronous cache first
+  const cached = getCachedChapterVerses(tr, book.id, ch);
+  if (cached) {
+    return cached;
   }
 
-  // Fallback API: bible-api.com
-  const fallbackTr = tr === 'KJV' ? 'kjv' : 'web';
-  const fallbackUrl = `https://bible-api.com/${encodeURIComponent(book.name + ' ' + ch)}?translation=${fallbackTr}`;
-  const fallbackRes = await fetch(fallbackUrl);
-  if (!fallbackRes.ok) {
-    throw new Error(`Unable to load ${book.name} ${ch} (${tr}). Please check your connection.`);
+  // 2. Reuse in-flight request if already fetching this chapter
+  if (inFlightChapterPromises.has(cacheKey)) {
+    return inFlightChapterPromises.get(cacheKey);
   }
-  const fallbackData = await fallbackRes.json();
-  const verses = (fallbackData.verses || [])
-    .map(v => ({
-      verse: Number(v.verse),
-      text: sanitizeVerseText(v.text)
-    }))
-    .filter(v => v.text.length > 0);
 
-  return verses;
+  const fetchPromise = (async () => {
+    // Primary API: bolls.life (supports ESV, BSB, NLT, NASB, CSB17, LSB, NKJV, KJV, NET, WEB, RSV, etc.)
+    try {
+      const url = `https://bolls.life/get-text/${encodeURIComponent(tr)}/${book.id}/${ch}/`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        const verses = data
+          .map(v => ({
+            verse: Number(v.verse),
+            text: sanitizeVerseText(v.text)
+          }))
+          .filter(v => v.text.length > 0);
+
+        if (verses.length > 0) {
+          inMemoryChapterCache.set(cacheKey, verses);
+          safeStoreCache(cacheKey, verses);
+          return verses;
+        }
+      }
+    } catch (primaryErr) {
+      console.warn('Primary Bible API failed, trying fallback:', primaryErr);
+    }
+
+    // Fallback API: bible-api.com
+    const fallbackTr = tr === 'KJV' ? 'kjv' : 'web';
+    const fallbackUrl = `https://bible-api.com/${encodeURIComponent(book.name + ' ' + ch)}?translation=${fallbackTr}`;
+    const fallbackRes = await fetch(fallbackUrl);
+    if (!fallbackRes.ok) {
+      throw new Error(`Unable to load ${book.name} ${ch} (${tr}). Please check your connection.`);
+    }
+    const fallbackData = await fallbackRes.json();
+    const verses = (fallbackData.verses || [])
+      .map(v => ({
+        verse: Number(v.verse),
+        text: sanitizeVerseText(v.text)
+      }))
+      .filter(v => v.text.length > 0);
+
+    if (verses.length > 0) {
+      inMemoryChapterCache.set(cacheKey, verses);
+      safeStoreCache(cacheKey, verses);
+    }
+
+    return verses;
+  })();
+
+  inFlightChapterPromises.set(cacheKey, fetchPromise);
+  try {
+    return await fetchPromise;
+  } finally {
+    inFlightChapterPromises.delete(cacheKey);
+  }
+}
+
+export function prefetchChapterVerses(translation = 'ESV', bookId = 1, chapter = 1) {
+  return fetchChapterVerses(translation, bookId, chapter).catch((err) => {
+    console.debug('Prefetch chapter verse failed silently:', err);
+    return null;
+  });
+}
+
+const PRELOAD_POOL_SIZE = 5;
+let randomVersePreloadQueue = [];
+let isReplenishingPreloads = false;
+
+export function getNextPreloadedRandomVerse(translation = 'ESV', exclude = null) {
+  let selected = null;
+  while (randomVersePreloadQueue.length > 0) {
+    const candidate = randomVersePreloadQueue.shift();
+    if (exclude && candidate.bookId === exclude.bookId && candidate.chapter === exclude.chapter && candidate.verse === exclude.verse) {
+      continue;
+    }
+    selected = candidate;
+    break;
+  }
+
+  if (!selected) {
+    selected = getRandomVerseRef(exclude);
+  }
+
+  // Replenish in background
+  replenishRandomVersePreloads(translation, selected);
+  return selected;
+}
+
+export async function replenishRandomVersePreloads(translation = 'ESV', exclude = null) {
+  if (isReplenishingPreloads) return;
+  isReplenishingPreloads = true;
+
+  try {
+    while (randomVersePreloadQueue.length < PRELOAD_POOL_SIZE) {
+      let candidate = null;
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const ref = getRandomVerseRef(exclude);
+        const inQueue = randomVersePreloadQueue.some(
+          item => item.bookId === ref.bookId && item.chapter === ref.chapter && item.verse === ref.verse
+        );
+        if (!inQueue) {
+          candidate = ref;
+          break;
+        }
+      }
+      if (!candidate) break;
+
+      randomVersePreloadQueue.push(candidate);
+      await prefetchChapterVerses(translation, candidate.bookId, candidate.chapter);
+    }
+  } finally {
+    isReplenishingPreloads = false;
+  }
 }
