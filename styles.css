@@ -1271,9 +1271,10 @@ body.typing-active-view .main-content {
   background: rgba(20, 19, 24, 0.62);
   backdrop-filter: blur(6px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 1.25rem;
+  padding: clamp(3rem, 9vh, 5.5rem) 1.25rem 2rem;
+  overflow-y: auto;
 }
 
 .typing-options-backdrop[hidden] {
@@ -1291,17 +1292,18 @@ body.typing-active-view .main-content {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  animation: optionsFadeIn 0.15s ease-out;
+  transform-origin: top center;
+  animation: modalSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes optionsFadeIn {
+@keyframes modalSlideDown {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -1392,11 +1394,31 @@ body.typing-active-view .main-content {
   border-color: var(--accent-emerald);
 }
 
+.modal-tab-panels-wrapper {
+  display: grid;
+  grid-template-areas: "tabpanel";
+  min-height: 205px;
+}
+
 .modal-tab-panel {
+  grid-area: tabpanel;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  min-height: 95px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.22s ease;
+}
+
+.modal-tab-panel.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .typing-options-section-divider {

@@ -8,7 +8,7 @@ import {
   searchBibleChapters,
   fetchChapterVerses,
   getRandomVerseRef
-} from '../bible-data.js?v=20261104_v26';
+} from '../bible-data.js?v=20261104_v27';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -40,9 +40,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v26';
-import { trackEvent } from '../analytics.js?v=20261104_v26';
-import { navigate } from '../app.js?v=20261104_v26';
+} from '../api.js?v=20261104_v27';
+import { trackEvent } from '../analytics.js?v=20261104_v27';
+import { navigate } from '../app.js?v=20261104_v27';
 
 function escapeHtml(str) {
   return String(str)
@@ -393,49 +393,52 @@ export function renderTypingScreen(container, params = {}) {
               </button>
             </div>
 
-            <!-- Panel: Chapter Mode -->
-            <div class="modal-tab-panel" id="panel-chapter-mode" ${singleVerseMode ? 'hidden' : ''} role="tabpanel">
-              <!-- Toggle: Skip Completed Verses (Only configurable under Chapter Mode) -->
-              <label class="typing-option-row" for="toggle-skip-done-checkbox">
-                <span class="option-title">Skip Completed Verses</span>
-                <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
-              </label>
+            <!-- Mode Panels Wrapper (fixed height to prevent layout jumps) -->
+            <div class="modal-tab-panels-wrapper">
+              <!-- Panel: Chapter Mode -->
+              <div class="modal-tab-panel ${!singleVerseMode ? 'active' : ''}" id="panel-chapter-mode" role="tabpanel">
+                <!-- Toggle: Skip Completed Verses (Only configurable under Chapter Mode) -->
+                <label class="typing-option-row" for="toggle-skip-done-checkbox">
+                  <span class="option-title">Skip Completed Verses</span>
+                  <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
+                </label>
 
-              <!-- Action: Mark Chapter Read -->
-              <div class="typing-option-row option-action-row" id="modal-mark-ch-row">
-                <span class="option-title">${book.name} ${initialChapter}</span>
-                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
-                  <span id="modal-mark-ch-read-label">📖 Mark Read</span>
-                </button>
+                <!-- Action: Mark Chapter Read -->
+                <div class="typing-option-row option-action-row" id="modal-mark-ch-row">
+                  <span class="option-title">${book.name} ${initialChapter}</span>
+                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
+                    <span id="modal-mark-ch-read-label">📖 Mark Read</span>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <!-- Panel: Single Verse Mode -->
-            <div class="modal-tab-panel" id="panel-single-mode" ${singleVerseMode ? '' : 'hidden'} role="tabpanel">
-              <!-- Toggle: Auto-Advance (Under Single Verse Mode) -->
-              <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
-                <span class="option-title">Auto-Advance (Skip Popup)</span>
-                <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
-              </label>
+              <!-- Panel: Single Verse Mode -->
+              <div class="modal-tab-panel ${singleVerseMode ? 'active' : ''}" id="panel-single-mode" role="tabpanel">
+                <!-- Toggle: Auto-Advance (Under Single Verse Mode) -->
+                <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
+                  <span class="option-title">Auto-Advance (Skip Popup)</span>
+                  <input type="checkbox" id="toggle-skip-celebration-checkbox" class="option-switch" ${skipCelebrationModal ? 'checked' : ''} />
+                </label>
 
-              <!-- Toggle: Wait for Advance Button -->
-              <label class="typing-option-row" for="toggle-advance-btn-checkbox">
-                <span class="option-title">Wait for Advance Button</span>
-                <input type="checkbox" id="toggle-advance-btn-checkbox" class="option-switch" ${advanceButtonPref ? 'checked' : ''} />
-              </label>
+                <!-- Toggle: Wait for Advance Button -->
+                <label class="typing-option-row" for="toggle-advance-btn-checkbox">
+                  <span class="option-title">Wait for Advance Button</span>
+                  <input type="checkbox" id="toggle-advance-btn-checkbox" class="option-switch" ${advanceButtonPref ? 'checked' : ''} />
+                </label>
 
-              <!-- Toggle: Shuffle Verses (Entire Bible) -->
-              <label class="typing-option-row" id="toggle-shuffle-row" for="toggle-shuffle-checkbox">
-                <span class="option-title">Shuffle Next Verses (Entire Bible)</span>
-                <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
-              </label>
+                <!-- Toggle: Shuffle Verses (Entire Bible) -->
+                <label class="typing-option-row" id="toggle-shuffle-row" for="toggle-shuffle-checkbox">
+                  <span class="option-title">Shuffle Next Verses (Entire Bible)</span>
+                  <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
+                </label>
 
-              <!-- Action: Mark Verse Read -->
-              <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
-                <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
-                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
-                  <span id="modal-mark-verse-read-label">📖 Mark Read</span>
-                </button>
+                <!-- Action: Mark Verse Read -->
+                <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
+                  <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
+                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
+                    <span id="modal-mark-verse-read-label">📖 Mark Read</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -514,8 +517,14 @@ export function renderTypingScreen(container, params = {}) {
       tabBtnSingle.setAttribute('aria-selected', String(isSingle));
     }
 
-    if (panelChapterMode) panelChapterMode.hidden = isSingle;
-    if (panelSingleMode) panelSingleMode.hidden = !isSingle;
+    if (panelChapterMode) {
+      panelChapterMode.classList.toggle('active', !isSingle);
+      panelChapterMode.removeAttribute('hidden');
+    }
+    if (panelSingleMode) {
+      panelSingleMode.classList.toggle('active', isSingle);
+      panelSingleMode.removeAttribute('hidden');
+    }
 
     updateReadButtons();
   }
