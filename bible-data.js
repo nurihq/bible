@@ -16,6 +16,35 @@ export function getBookVerseCount(bookId) {
   return book ? book.reduce((a, b) => a + b, 0) : 0;
 }
 
+export function getRandomVerseRef(exclude = null) {
+  let attempts = 0;
+  while (attempts < 20) {
+    attempts++;
+    const targetIdx = Math.floor(Math.random() * TOTAL_BIBLE_VERSES);
+    let curIdx = 0;
+    for (let b = 0; b < VERSE_COUNTS.length; b++) {
+      const bookVerses = VERSE_COUNTS[b];
+      let found = false;
+      for (let c = 0; c < bookVerses.length; c++) {
+        const count = bookVerses[c];
+        if (targetIdx < curIdx + count) {
+          const bookId = b + 1;
+          const chapter = c + 1;
+          const verse = (targetIdx - curIdx) + 1;
+          if (exclude && exclude.bookId === bookId && exclude.chapter === chapter && exclude.verse === verse) {
+            found = true;
+            break;
+          }
+          return { bookId, chapter, verse };
+        }
+        curIdx += count;
+      }
+      if (found) break;
+    }
+  }
+  return { bookId: 43, chapter: 3, verse: 16 };
+}
+
 export const BIBLE_TRANSLATIONS = [
   { code: 'ESV', name: 'English Standard Version', shortName: 'ESV', year: '2016', isDefault: true },
   { code: 'BSB', name: 'Berean Standard Bible', shortName: 'BSB', year: '2023' },

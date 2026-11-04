@@ -6,8 +6,9 @@ import {
   getNextChapterRef,
   getPrevChapterRef,
   searchBibleChapters,
-  fetchChapterVerses
-} from '../bible-data.js?v=20261104_v22';
+  fetchChapterVerses,
+  getRandomVerseRef
+} from '../bible-data.js?v=20261104_v23';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -22,6 +23,8 @@ import {
   setSkipCelebrationModalPref,
   getShuffleVersesPref,
   setShuffleVersesPref,
+  getShuffleScopePref,
+  setShuffleScopePref,
   getAdvanceButtonPref,
   setAdvanceButtonPref,
   pushRandomVerseHistory,
@@ -39,9 +42,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v22';
-import { trackEvent } from '../analytics.js?v=20261104_v22';
-import { navigate } from '../app.js?v=20261104_v22';
+} from '../api.js?v=20261104_v23';
+import { trackEvent } from '../analytics.js?v=20261104_v23';
+import { navigate } from '../app.js?v=20261104_v23';
 
 function escapeHtml(str) {
   return String(str)
@@ -72,6 +75,7 @@ export function renderTypingScreen(container, params = {}) {
   let showTypingStats = getShowTypingStatsPref();
   let skipCelebrationModal = getSkipCelebrationModalPref();
   let shuffleVerses = getShuffleVersesPref();
+  let shuffleScope = getShuffleScopePref();
   let advanceButtonPref = getAdvanceButtonPref();
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
@@ -394,6 +398,15 @@ export function renderTypingScreen(container, params = {}) {
               <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} ${singleVerseMode ? '' : 'disabled'} />
             </label>
 
+            <!-- Scope: Shuffle Range (Entire Bible vs Current Chapter) -->
+            <div class="typing-option-row typing-option-subrow" id="toggle-shuffle-scope-row" ${(singleVerseMode && shuffleVerses) ? '' : 'hidden'}>
+              <span class="option-title">↳ Shuffle Scope</span>
+              <select id="shuffle-scope-select" class="option-select-inline" ${(singleVerseMode && shuffleVerses) ? '' : 'disabled'}>
+                <option value="bible" ${shuffleScope === 'bible' ? 'selected' : ''}>Entire Bible (All 66 Books 🌍)</option>
+                <option value="chapter" ${shuffleScope === 'chapter' ? 'selected' : ''}>Current Chapter Only 📖</option>
+              </select>
+            </div>
+
             <!-- Toggle: Wait for Advance Button (only available if single verse mode is on) -->
             <label class="typing-option-row typing-option-subrow" id="toggle-advance-btn-row" for="toggle-advance-btn-checkbox" ${singleVerseMode ? '' : 'hidden'}>
               <span class="option-title">↳ Wait for Advance Button</span>
@@ -462,6 +475,8 @@ export function renderTypingScreen(container, params = {}) {
   const toggleSingleVerseCheckbox = container.querySelector('#toggle-single-verse-checkbox');
   const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
+  const toggleShuffleScopeRow = container.querySelector('#toggle-shuffle-scope-row');
+  const shuffleScopeSelect = container.querySelector('#shuffle-scope-select');
   const toggleAdvanceBtnRow = container.querySelector('#toggle-advance-btn-row');
   const toggleAdvanceBtnCheckbox = container.querySelector('#toggle-advance-btn-checkbox');
   const toggleSkipCelebrationCheckbox = container.querySelector('#toggle-skip-celebration-checkbox');
@@ -497,6 +512,11 @@ export function renderTypingScreen(container, params = {}) {
     if (toggleShuffleCheckbox) {
       toggleShuffleCheckbox.checked = shuffleVerses;
       toggleShuffleCheckbox.disabled = !isSingle;
+    }
+    if (toggleShuffleScopeRow) toggleShuffleScopeRow.hidden = !(isSingle && shuffleVerses);
+    if (shuffleScopeSelect) {
+      shuffleScopeSelect.value = shuffleScope;
+      shuffleScopeSelect.disabled = !(isSingle && shuffleVerses);
     }
     if (toggleAdvanceBtnRow) toggleAdvanceBtnRow.hidden = !isSingle;
     if (toggleAdvanceBtnCheckbox) {
@@ -565,6 +585,12 @@ export function renderTypingScreen(container, params = {}) {
       if (toggleShuffleCheckbox) {
         toggleShuffleCheckbox.disabled = !isSingle;
       }
+      if (toggleShuffleScopeRow) {
+        toggleShuffleScopeRow.hidden = !(isSingle && shuffleVerses);
+      }
+      if (shuffleScopeSelect) {
+        shuffleScopeSelect.disabled = !(isSingle && shuffleVerses);
+      }
       if (toggleAdvanceBtnRow) {
         toggleAdvanceBtnRow.hidden = !isSingle;
       }
@@ -581,6 +607,22 @@ export function renderTypingScreen(container, params = {}) {
     toggleShuffleCheckbox.addEventListener('change', () => {
       shuffleVerses = toggleShuffleCheckbox.checked;
       setShuffleVersesPref(shuffleVerses);
+      if (toggleShuffleScopeRow) {
+        toggleShuffleScopeRow.hidden = !shuffleVerses;
+      }
+      if (shuffleScopeSelect) {
+        shuffleScopeSelect.disabled = !shuffleVerses;
+      }
+      if (advanceStepBtn) {
+        advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+      }
+    });
+  }
+
+  if (shuffleScopeSelect) {
+    shuffleScopeSelect.addEventListener('change', () => {
+      shuffleScope = shuffleScopeSelect.value;
+      setShuffleScopePref(shuffleScope);
     });
   }
 
@@ -726,30 +768,37 @@ export function renderTypingScreen(container, params = {}) {
           return;
         }
 
-        if (allChapterVerses.length > 1) {
-          pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-          clearRandomVerseForward();
+        pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+        clearRandomVerseForward();
 
-          // Find incomplete verses in this chapter (excluding current)
-          const incompleteVerses = allChapterVerses
-            .map(v => v.verse)
-            .filter(vNum => vNum !== targetSingleVerseNum && !completedVerseSet.has(vNum));
-
-          let nextV;
-          if (incompleteVerses.length > 0) {
-            nextV = incompleteVerses[Math.floor(Math.random() * incompleteVerses.length)];
-          } else {
-            // All other verses in chapter are completed; pick any other verse randomly
-            const otherVerses = allChapterVerses
+        if (shuffleScope === 'chapter') {
+          if (allChapterVerses.length > 1) {
+            // Find incomplete verses in this chapter (excluding current)
+            const incompleteVerses = allChapterVerses
               .map(v => v.verse)
-              .filter(vNum => vNum !== targetSingleVerseNum);
-            nextV = otherVerses.length > 0
-              ? otherVerses[Math.floor(Math.random() * otherVerses.length)]
-              : 1;
+              .filter(vNum => vNum !== targetSingleVerseNum && !completedVerseSet.has(vNum));
+
+            let nextV;
+            if (incompleteVerses.length > 0) {
+              nextV = incompleteVerses[Math.floor(Math.random() * incompleteVerses.length)];
+            } else {
+              // All other verses in chapter are completed; pick any other verse randomly
+              const otherVerses = allChapterVerses
+                .map(v => v.verse)
+                .filter(vNum => vNum !== targetSingleVerseNum);
+              nextV = otherVerses.length > 0
+                ? otherVerses[Math.floor(Math.random() * otherVerses.length)]
+                : 1;
+            }
+            navigate(`#/typing/${book.id}/${initialChapter}/${nextV}`);
+            return;
           }
-          navigate(`#/typing/${book.id}/${initialChapter}/${nextV}`);
-          return;
         }
+
+        // Entire Bible scope: pick random verse across all 31,102 verses
+        const nextRef = getRandomVerseRef({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+        navigate(`#/typing/${nextRef.bookId}/${nextRef.chapter}/${nextRef.verse}`);
+        return;
       }
 
       const maxV = allChapterVerses.length || targetSingleVerseNum;

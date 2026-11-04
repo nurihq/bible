@@ -1378,6 +1378,28 @@ body.typing-active-view .main-content {
   color: var(--text-primary);
 }
 
+.option-select-inline {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.option-select-inline:focus {
+  border-color: var(--accent-emerald);
+}
+
+.option-select-inline:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Compact iOS toggle switch */
 .option-switch {
   appearance: none;

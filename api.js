@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v22';
+import { CONFIG } from './config.js?v=20261104_v23';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v22';
+} from './bible-data.js?v=20261104_v23';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -271,6 +271,17 @@ export function getShuffleVersesPref() {
 export function setShuffleVersesPref(shuffle) {
   const store = getLocalStore();
   store.shuffleVerses = Boolean(shuffle);
+  saveLocalStore(store);
+}
+
+export function getShuffleScopePref() {
+  const store = getLocalStore();
+  return store.shuffleScope || 'bible';
+}
+
+export function setShuffleScopePref(scope) {
+  const store = getLocalStore();
+  store.shuffleScope = scope === 'chapter' ? 'chapter' : 'bible';
   saveLocalStore(store);
 }
 
