@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v3';
+} from '../bible-data.js?v=20261104_v4';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -15,9 +15,9 @@ import {
   setLastSelectedChapter,
   recordCompletedChapter,
   getGlobalTypingStats
-} from '../api.js?v=20261104_v3';
-import { trackEvent } from '../analytics.js?v=20261104_v3';
-import { navigate } from '../app.js?v=20261104_v3';
+} from '../api.js?v=20261104_v4';
+import { trackEvent } from '../analytics.js?v=20261104_v4';
+import { navigate } from '../app.js?v=20261104_v4';
 
 function escapeHtml(str) {
   return String(str)

@@ -1,7 +1,7 @@
-import { Auth, getGlobalTypingStats, getLocalStore, getPreferredTranslation } from '../api.js?v=20261104_v3';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v3';
-import { trackEvent } from '../analytics.js?v=20261104_v3';
-import { navigate } from '../app.js?v=20261104_v3';
+import { Auth, getGlobalTypingStats, getLocalStore, getPreferredTranslation } from '../api.js?v=20261104_v4';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v4';
+import { trackEvent } from '../analytics.js?v=20261104_v4';
+import { navigate } from '../app.js?v=20261104_v4';
 
 export { renderLandingScreen as renderHomeScreen };
 

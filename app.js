@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js?v=20261104_v3';
-import { Auth, syncLocalToCloud } from './api.js?v=20261104_v3';
-import { initGA, trackPageView } from './analytics.js?v=20261104_v3';
-import { getBookById } from './bible-data.js?v=20261104_v3';
+import { Navbar } from './components/navbar.js?v=20261104_v4';
+import { Auth, syncLocalToCloud } from './api.js?v=20261104_v4';
+import { initGA, trackPageView } from './analytics.js?v=20261104_v4';
+import { getBookById } from './bible-data.js?v=20261104_v4';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261104_v3';
-import { renderLandingScreen, renderHubScreen } from './screens/home.js?v=20261104_v3';
-import { renderTypingScreen } from './screens/typing.js?v=20261104_v3';
-import { renderProgressScreen } from './screens/progress.js?v=20261104_v3';
+import { renderSignInScreen } from './screens/signin.js?v=20261104_v4';
+import { renderLandingScreen, renderHubScreen } from './screens/home.js?v=20261104_v4';
+import { renderTypingScreen } from './screens/typing.js?v=20261104_v4';
+import { renderProgressScreen } from './screens/progress.js?v=20261104_v4';
 
 function getActiveRoutePath() {
   const rawHash = window.location.hash || '';

@@ -1,6 +1,6 @@
-import { Auth, getGlobalTypingStats } from '../api.js?v=20261104_v3';
-import { trackEvent } from '../analytics.js?v=20261104_v3';
-import { navigate } from '../app.js?v=20261104_v3';
+import { Auth, getGlobalTypingStats } from '../api.js?v=20261104_v4';
+import { trackEvent } from '../analytics.js?v=20261104_v4';
+import { navigate } from '../app.js?v=20261104_v4';
 
 export class Navbar {
   constructor(onThemeChange, onSignOut) {
