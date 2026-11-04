@@ -1,7 +1,7 @@
-import { CONFIG } from '../config.js?v=20261104_v21';
-import { Auth, Api } from '../api.js?v=20261104_v21';
-import { trackEvent } from '../analytics.js?v=20261104_v21';
-import { navigate } from '../app.js?v=20261104_v21';
+import { CONFIG } from '../config.js?v=20261104_v22';
+import { Auth, Api } from '../api.js?v=20261104_v22';
+import { trackEvent } from '../analytics.js?v=20261104_v22';
+import { navigate } from '../app.js?v=20261104_v22';
 
 let firebaseAuthInstance = null;
 let googleProviderInstance = null;
@@ -134,6 +134,8 @@ export function renderSignInScreen(container) {
         };
 
         Auth.setUser(userObj);
+        Auth.setSessionExpiry();
+        window.dispatchEvent(new CustomEvent('bible:auth-changed', { detail: { authenticated: true } }));
         trackEvent('sign_in', { method: 'google', sub });
 
         // Trigger two-way cloud sync with Nuri AWS DynamoDB

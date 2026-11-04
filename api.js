@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v21';
+import { CONFIG } from './config.js?v=20261104_v22';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,14 +8,16 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v21';
+} from './bible-data.js?v=20261104_v22';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
 const USER_KEY = `${STORAGE_PREFIX}user`;
+const AUTH_SESSION_EXP_KEY = `${STORAGE_PREFIX}auth_session_exp`;
 const LOCAL_DATA_KEY = `${STORAGE_PREFIX}local_data_v1`;
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-// ── Authentication & Session Management ─────────────────────────
+// ── Authentication & Session Management (30-day login session) ───
 export const Auth = {
   getToken() {
     return localStorage.getItem(AUTH_TOKEN_KEY);
@@ -36,6 +38,14 @@ export const Auth = {
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
     else localStorage.removeItem(USER_KEY);
   },
+  getSessionExpiry() {
+    const raw = localStorage.getItem(AUTH_SESSION_EXP_KEY);
+    return raw ? Number(raw) : 0;
+  },
+  setSessionExpiry(timestamp = null) {
+    const exp = timestamp || (Date.now() + THIRTY_DAYS_MS);
+    localStorage.setItem(AUTH_SESSION_EXP_KEY, String(exp));
+  },
   isTokenValid() {
     const token = this.getToken();
     if (!token) return false;
@@ -47,11 +57,34 @@ export const Auth = {
     }
   },
   isAuthenticated() {
-    return this.isTokenValid() && !!this.getUser();
+    const user = this.getUser();
+    const token = this.getToken();
+    if (!user || !token) return false;
+    const exp = this.getSessionExpiry();
+    if (!exp) {
+      this.setSessionExpiry();
+      return true;
+    }
+    return exp > Date.now();
   },
   signOut() {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(AUTH_SESSION_EXP_KEY);
+    try {
+      if (CONFIG.FIREBASE_CONFIG) {
+        Promise.all([
+          import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js'),
+          import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js')
+        ]).then(([{ getApps }, { getAuth, signOut }]) => {
+          const apps = getApps();
+          if (apps.length > 0) {
+            signOut(getAuth(apps[0])).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('bible:auth-changed', { detail: { authenticated: false } }));
   }
 };
 
@@ -74,6 +107,7 @@ export async function attemptSilentGoogleRefresh() {
         const freshToken = await auth.currentUser.getIdToken(true);
         if (freshToken) {
           Auth.setToken(freshToken);
+          Auth.setSessionExpiry();
           isRefreshingToken = false;
           return true;
         }
@@ -83,6 +117,47 @@ export async function attemptSilentGoogleRefresh() {
 
   isRefreshingToken = false;
   return false;
+}
+
+let firebaseObserverInitialized = false;
+export async function initFirebaseAuthObserver() {
+  if (firebaseObserverInitialized || !CONFIG.FIREBASE_CONFIG) return;
+  firebaseObserverInitialized = true;
+
+  try {
+    const [{ initializeApp, getApps }, { getAuth, onAuthStateChanged }] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js')
+    ]);
+    const apps = getApps();
+    const app = apps.length > 0 ? apps[0] : initializeApp(CONFIG.FIREBASE_CONFIG);
+    const auth = getAuth(app);
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const freshToken = await user.getIdToken();
+          if (freshToken) {
+            Auth.setToken(freshToken);
+            Auth.setSessionExpiry();
+            const sub = user.providerData?.[0]?.uid || user.uid;
+            Auth.setUser({
+              sub,
+              name: user.displayName || (user.email ? user.email.split('@')[0] : 'Reader'),
+              email: user.email || '',
+              picture: user.photoURL || ''
+            });
+            window.dispatchEvent(new CustomEvent('bible:auth-changed', { detail: { authenticated: true } }));
+          }
+        } catch (e) {}
+      } else {
+        // Firebase reports user is no longer signed in
+        if (Auth.getUser() || Auth.getToken()) {
+          Auth.signOut();
+        }
+      }
+    });
+  } catch (e) {}
 }
 
 // ── Local & Cloud Store ─────────────────────────────────────────
@@ -1447,10 +1522,17 @@ export function getGlobalTypingStats() {
 // ── Cloud Sync Helpers ──────────────────────────────────────────
 async function fetchWithAuth(url, options = {}) {
   if (!Auth.isTokenValid()) {
-    await attemptSilentGoogleRefresh();
+    const refreshed = await attemptSilentGoogleRefresh();
+    if (!refreshed && !Auth.isTokenValid()) {
+      Auth.signOut();
+      throw new Error('Not authenticated - Firebase session expired');
+    }
   }
   const token = Auth.getToken();
-  if (!token) throw new Error('Not authenticated');
+  if (!token) {
+    Auth.signOut();
+    throw new Error('Not authenticated');
+  }
 
   const headers = {
     'Content-Type': 'application/json',
@@ -1459,6 +1541,11 @@ async function fetchWithAuth(url, options = {}) {
   };
 
   const res = await fetch(url, { ...options, headers });
+  if (res.status === 401 || res.status === 403) {
+    Auth.signOut();
+    throw new Error(`Authentication expired (HTTP ${res.status}). Please sign in again.`);
+  }
+
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status}: ${text}`);

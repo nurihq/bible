@@ -4,16 +4,16 @@ import {
   getPreferredTranslation,
   setPreferredTranslation,
   getChapterProgressSummary
-} from '../api.js?v=20261104_v21';
+} from '../api.js?v=20261104_v22';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261104_v21';
-import { trackEvent } from '../analytics.js?v=20261104_v21';
-import { navigate } from '../app.js?v=20261104_v21';
+} from '../bible-data.js?v=20261104_v22';
+import { trackEvent } from '../analytics.js?v=20261104_v22';
+import { navigate } from '../app.js?v=20261104_v22';
 
 function escapeHtml(str) {
   return String(str)
@@ -38,7 +38,12 @@ export class Navbar {
     this.drawerOpen = false;
     this.drawerTestament = 'ALL';
     this.drawerBookId = 1;
-    this.drawerChapter = 1;
+    // Re-render immediately when authentication state changes
+    window.addEventListener('bible:auth-changed', () => {
+      if (this.currentContainer) {
+        this.render(this.currentContainer, this.currentRoute || window.location.hash);
+      }
+    });
 
     // Cmd/Ctrl+K focuses the search bar from anywhere
     window.addEventListener('keydown', (e) => {

@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js?v=20261104_v21';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getLocalStore } from './api.js?v=20261104_v21';
-import { initGA, trackPageView } from './analytics.js?v=20261104_v21';
-import { getBookById } from './bible-data.js?v=20261104_v21';
+import { Navbar } from './components/navbar.js?v=20261104_v22';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261104_v22';
+import { initGA, trackPageView } from './analytics.js?v=20261104_v22';
+import { getBookById } from './bible-data.js?v=20261104_v22';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261104_v21';
-import { renderLandingScreen } from './screens/home.js?v=20261104_v21';
-import { renderTypingScreen } from './screens/typing.js?v=20261104_v21';
-import { renderProgressScreen } from './screens/progress.js?v=20261104_v21';
+import { renderSignInScreen } from './screens/signin.js?v=20261104_v22';
+import { renderLandingScreen } from './screens/home.js?v=20261104_v22';
+import { renderTypingScreen } from './screens/typing.js?v=20261104_v22';
+import { renderProgressScreen } from './screens/progress.js?v=20261104_v22';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';
@@ -102,9 +102,20 @@ class App {
         syncLocalToCloud();
       }
     }, 20000);
+
+    // Re-render and handle sync immediately when auth state changes
+    window.addEventListener('bible:auth-changed', () => {
+      const { path } = parseActiveRoute();
+      const routeToken = path === '/' ? '#/' : `#${path}`;
+      this.navbar.render(this.navContainer, routeToken);
+      if (Auth.isAuthenticated()) {
+        syncLocalToCloud().catch(() => {});
+      }
+    });
   }
 
   init() {
+    initFirebaseAuthObserver().catch(() => {});
     this.handleRoute();
   }
 
