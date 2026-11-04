@@ -1,9 +1,9 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261104_v6';
-import { getGlobalTypingStats, getChapterProgressSummary } from '../api.js?v=20261104_v6';
-import { trackEvent } from '../analytics.js?v=20261104_v6';
+} from '../bible-data.js?v=20261104_v7';
+import { getGlobalTypingStats, getChapterProgressSummary } from '../api.js?v=20261104_v7';
+import { trackEvent } from '../analytics.js?v=20261104_v7';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -118,6 +118,7 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
 
 export function renderProgressScreen(container) {
   let activeChartMetric = 'wpm';
+  let activeCoverageFilter = 'ALL'; // 'ALL' (Read & Typed) | 'TYPED' | 'READ'
   let activeTranslationFilter = 'ALL';
   let showTranslationDrawer = false;
   let activeTestamentTab = 'ALL';
@@ -162,7 +163,6 @@ export function renderProgressScreen(container) {
         }
       }
     }
-    const filteredPct = Math.round((filteredCompletedCount / stats.totalBibleChapters) * 1000) / 10;
 
     const translationBreakdownList = Object.values(stats.byTranslation).sort((a, b) => {
       if (b.completedChapters !== a.completedChapters) return b.completedChapters - a.completedChapters;
@@ -182,11 +182,11 @@ export function renderProgressScreen(container) {
           <div class="screen-title-group">
             <div class="screen-lang-tag">
               <span>📊</span>
-              <span>Analytics &amp; Scripture Reach</span>
+              <span>Scripture Completeness &amp; Speed</span>
             </div>
-            <h1 class="screen-title">Typing Progress &amp; Bible Completeness</h1>
+            <h1 class="screen-title">Bible Reach &amp; Typing Progress</h1>
             <p class="screen-subtitle">
-              Track your average WPM &amp; CPM speed, completed &amp; partial chapters, and verse-level reach across all 66 books and 1,189 chapters.
+              Track your journey through the whole Bible (read or typed), your WPM speed, and verse-level reach across all 66 books, 1,189 chapters, and 31,103 verses.
             </p>
           </div>
           <div class="screen-actions">
@@ -196,33 +196,59 @@ export function renderProgressScreen(container) {
           </div>
         </div>
 
-        <!-- Top KPI Summary Cards -->
+        <!-- Top 4 KPI Summary Cards -->
         <div class="kpi-cards-grid">
-          <div class="kpi-card">
+          <!-- Card 1: Total Scripture Covered (Read OR Typed) -->
+          <div class="kpi-card is-primary-kpi">
             <div class="kpi-card-top">
-              <span class="kpi-label">Chapters Completed</span>
-              <span class="kpi-icon">📖</span>
+              <span class="kpi-label">Total Scripture Covered</span>
+              <span class="kpi-icon">🌟</span>
             </div>
-            <div class="kpi-value">${stats.overallCompletedChapters} <small>/ ${stats.totalBibleChapters}</small></div>
+            <div class="kpi-value">${stats.overallCoveredChapters} <small>/ ${stats.totalBibleChapters} ch</small></div>
             <div class="kpi-sub">
-              <strong>${stats.overallPercentage}%</strong> full${stats.partialChaptersCount > 0 ? ` · <strong>+${stats.partialChaptersCount}</strong> partial` : ''} · OT: ${stats.otCompletedChapters} · NT: ${stats.ntCompletedChapters}
+              <strong>${stats.overallCoveredPercentage}%</strong> chapters · <strong>${stats.overallCoveredVerses.toLocaleString()}</strong> verses (${stats.overallCoveredVersesPercentage}%)
+            </div>
+            <div class="kpi-breakdown-row">
+              <span class="kpi-badge is-read">📖 ${stats.overallReadChapters} read</span>
+              <span class="kpi-badge is-done">⌨️ ${stats.overallTypedChapters} typed</span>
+              ${stats.overallBothChapters > 0 ? `<span class="kpi-badge is-both">✨ ${stats.overallBothChapters} both</span>` : ''}
             </div>
             <div class="kpi-mini-bar">
-              <div class="kpi-mini-fill" style="width: ${Math.max(stats.overallCompletedChapters > 0 ? stats.overallPercentage : 0, 0)}%"></div>
+              <div class="kpi-mini-fill" style="width: ${Math.max(stats.overallCoveredChapters > 0 ? stats.overallCoveredPercentage : 0, 0)}%"></div>
             </div>
           </div>
 
+          <!-- Card 2: Scripture Read -->
           <div class="kpi-card">
             <div class="kpi-card-top">
-              <span class="kpi-label">Verse-Level Reach</span>
-              <span class="kpi-icon">📜</span>
+              <span class="kpi-label">Scripture Read</span>
+              <span class="kpi-icon">📖</span>
             </div>
-            <div class="kpi-value">${stats.overallCompletedVerses.toLocaleString()} <small>/ ${stats.totalBibleVerses.toLocaleString()}</small></div>
+            <div class="kpi-value">${stats.overallReadChapters} <small>/ ${stats.totalBibleChapters} ch</small></div>
             <div class="kpi-sub">
-              <strong>${stats.overallVersesPercentage}%</strong> of Bible verses · ${stats.totalWordsTyped.toLocaleString()} words typed
+              <strong>${stats.overallReadPercentage}%</strong> chapters · <strong>${stats.overallReadVerses.toLocaleString()}</strong> verses read (${stats.overallReadVersesPercentage}%)
+            </div>
+            <div class="kpi-note-text">
+              Marked as read while studying on mobile or desktop
             </div>
           </div>
 
+          <!-- Card 3: Scripture Typed -->
+          <div class="kpi-card">
+            <div class="kpi-card-top">
+              <span class="kpi-label">Scripture Typed</span>
+              <span class="kpi-icon">⌨️</span>
+            </div>
+            <div class="kpi-value">${stats.overallTypedChapters} <small>/ ${stats.totalBibleChapters} ch</small></div>
+            <div class="kpi-sub">
+              <strong>${stats.overallTypedPercentage}%</strong> chapters · <strong>${stats.overallTypedVerses.toLocaleString()}</strong> verses typed (${stats.overallTypedVersesPercentage}%)
+            </div>
+            <div class="kpi-note-text">
+              ${stats.totalWordsTyped.toLocaleString()} words typed across ${stats.sessionsCount} sessions
+            </div>
+          </div>
+
+          <!-- Card 4: Typing Speed & Accuracy -->
           <div class="kpi-card">
             <div class="kpi-card-top">
               <span class="kpi-label">Average Speed</span>
@@ -230,18 +256,10 @@ export function renderProgressScreen(container) {
             </div>
             <div class="kpi-value">${stats.avgWpm} <small>WPM</small></div>
             <div class="kpi-sub">
-              <strong>${stats.avgCpm} CPM</strong> avg · Best: <strong>${stats.bestWpm} WPM</strong> (${stats.bestCpm} CPM)
+              <strong>${stats.avgCpm} CPM</strong> avg · <strong>${stats.avgAccuracy}%</strong> acc · Best: <strong>${stats.bestWpm} WPM</strong>
             </div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-card-top">
-              <span class="kpi-label">Accuracy &amp; Time</span>
-              <span class="kpi-icon">🎯</span>
-            </div>
-            <div class="kpi-value">${stats.avgAccuracy}%</div>
-            <div class="kpi-sub">
-              ${stats.sessionsCount} sessions · ${formatTotalDuration(stats.totalDurationMs)} total time
+            <div class="kpi-note-text">
+              ${formatTotalDuration(stats.totalDurationMs)} total typing time
             </div>
           </div>
         </div>
@@ -272,11 +290,19 @@ export function renderProgressScreen(container) {
               <p class="section-card-subtitle">
                 ${isSpecificTr
                   ? `Viewing progress in ${getTranslationByCode(activeTranslationFilter).name}: ${filteredCompletedCount}/${stats.totalBibleChapters} chapters full${filteredPartialCount > 0 ? `, ${filteredPartialCount} partial` : ''} (${filteredVersesCount.toLocaleString()} verses).`
-                  : `Overall completeness across all translations (${stats.overallCompletedChapters}/${stats.totalBibleChapters} full chapters${stats.partialChaptersCount > 0 ? `, +${stats.partialChaptersCount} partial chapters` : ''}, ${stats.overallCompletedVerses.toLocaleString()} verses). Click any book to expand its chapters; clicking a partial chapter resumes at the next incomplete verse.`}
+                  : `Total Scripture covered: <strong>${stats.overallCoveredChapters}/${stats.totalBibleChapters} chapters</strong> (${stats.overallCoveredVerses.toLocaleString()} verses). Click any book to view chapters; click any chapter to start typing.`}
               </p>
             </div>
 
             <div class="reach-header-controls">
+              <!-- Coverage Category Filter -->
+              <div class="chart-toggle-pills" title="Filter map view by activity type">
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'ALL' ? 'active' : ''}" data-coverage-filter="ALL">All Covered (${stats.overallCoveredChapters})</button>
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'TYPED' ? 'active' : ''}" data-coverage-filter="TYPED">Typed Only (${stats.overallTypedChapters})</button>
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'READ' ? 'active' : ''}" data-coverage-filter="READ">Read Only (${stats.overallReadChapters})</button>
+              </div>
+
+              <!-- Testament Tabs -->
               <div class="chart-toggle-pills">
                 <button type="button" class="pill-toggle-btn ${activeTestamentTab === 'ALL' ? 'active' : ''}" data-testament-tab="ALL">All (66)</button>
                 <button type="button" class="pill-toggle-btn ${activeTestamentTab === 'OT' ? 'active' : ''}" data-testament-tab="OT">OT (39)</button>
@@ -284,14 +310,22 @@ export function renderProgressScreen(container) {
               </div>
 
               <button type="button" class="btn btn-secondary btn-sm" id="toggle-expand-all-btn">
-                ${expandedBookIds.size === visibleBooks.length ? 'Collapse All Books' : 'Expand All Books'}
+                ${expandedBookIds.size === visibleBooks.length ? 'Collapse All' : 'Expand All'}
               </button>
 
               <button type="button" class="btn btn-secondary btn-sm translation-breakdown-toggle" id="toggle-tr-breakdown-btn">
-                <span>🌐 By Translation: <strong>${isSpecificTr ? getTranslationByCode(activeTranslationFilter).shortName : 'All (Overall)'}</strong></span>
+                <span>🌐 Versions: <strong>${isSpecificTr ? getTranslationByCode(activeTranslationFilter).shortName : 'All'}</strong></span>
                 <span>${showTranslationDrawer ? '▴' : '▾'}</span>
               </button>
             </div>
+          </div>
+
+          <!-- Color Legend Bar -->
+          <div class="completeness-legend-bar">
+            <span class="legend-item"><i class="legend-swatch is-done"></i> <strong>Typed</strong></span>
+            <span class="legend-item"><i class="legend-swatch is-read"></i> <strong>Read</strong></span>
+            <span class="legend-item"><i class="legend-swatch is-both"></i> <strong>Both Read &amp; Typed</strong></span>
+            <span class="legend-item"><i class="legend-swatch is-partial"></i> <strong>In Progress</strong></span>
           </div>
 
           <!-- Collapsible Per-Translation Completeness Drawer -->
@@ -313,7 +347,7 @@ export function renderProgressScreen(container) {
                 data-tr-filter="ALL"
               >
                 <span class="tr-pill-code">All Translations (Overall)</span>
-                <span class="tr-pill-count">${stats.overallCompletedChapters}/${stats.totalBibleChapters} ch · ${stats.overallCompletedVerses}v</span>
+                <span class="tr-pill-count">${stats.overallCoveredChapters}/${stats.totalBibleChapters} ch · ${stats.overallCoveredVerses}v</span>
               </button>
               ${translationBreakdownList.map(t => `
                 <button
@@ -337,12 +371,30 @@ export function renderProgressScreen(container) {
               let versesInBook = 0;
               for (let c = 1; c <= b.chapters; c++) {
                 const sum = getChapterProgressSummary(b.id, c, activeTranslationFilter);
-                if (sum.isFullyCompleted) {
-                  doneInBook++;
-                  versesInBook += Math.max(sum.completedVersesCount, sum.totalVerses);
-                } else if (sum.isPartial) {
-                  partialInBook++;
-                  versesInBook += sum.completedVersesCount;
+                if (activeCoverageFilter === 'TYPED') {
+                  if (sum.isFullyTyped) {
+                    doneInBook++;
+                    versesInBook += sum.totalVerses;
+                  } else if (sum.typedVersesCount > 0) {
+                    partialInBook++;
+                    versesInBook += sum.typedVersesCount;
+                  }
+                } else if (activeCoverageFilter === 'READ') {
+                  if (sum.isFullyRead) {
+                    doneInBook++;
+                    versesInBook += sum.totalVerses;
+                  } else if (sum.readVersesCount > 0) {
+                    partialInBook++;
+                    versesInBook += sum.readVersesCount;
+                  }
+                } else {
+                  if (sum.isFullyCompleted) {
+                    doneInBook++;
+                    versesInBook += Math.max(sum.completedVersesCount, sum.totalVerses);
+                  } else if (sum.isPartial) {
+                    partialInBook++;
+                    versesInBook += sum.completedVersesCount;
+                  }
                 }
               }
               const pct = Math.min(100, Math.round(((doneInBook + partialInBook * 0.4) / b.chapters) * 100));
@@ -360,13 +412,43 @@ export function renderProgressScreen(container) {
                   let cellTitle = `Type ${b.name} ${c}`;
                   let cellContent = `${c}`;
 
-                  if (sum.isFullyCompleted) {
-                    cellClass = 'is-done';
-                    cellTitle = `${b.name} ${c} — Completed (${sum.completedVersesCount}/${sum.totalVerses || sum.completedVersesCount}v in ${trs}) · Best: ${sum.bestWpm} WPM`;
-                  } else if (sum.isPartial) {
-                    cellClass = 'is-partial';
-                    cellTitle = `${b.name} ${c} — Partial (${sum.completedVersesCount}/${sum.totalVerses || '?'} verses completed: v. ${sum.completedVerseNums.join(', ')}) — Click to resume at next incomplete verse`;
-                    cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.completedVersesCount}v</sup>`;
+                  if (activeCoverageFilter === 'TYPED') {
+                    if (sum.isFullyTyped) {
+                      cellClass = 'is-done';
+                      cellTitle = `${b.name} ${c} — Fully Typed (${sum.typedVersesCount}/${sum.totalVerses}v) · Best: ${sum.bestWpm} WPM`;
+                    } else if (sum.typedVersesCount > 0) {
+                      cellClass = 'is-partial';
+                      cellTitle = `${b.name} ${c} — Partially Typed (${sum.typedVersesCount}/${sum.totalVerses}v)`;
+                      cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.typedVersesCount}v</sup>`;
+                    }
+                  } else if (activeCoverageFilter === 'READ') {
+                    if (sum.isFullyRead) {
+                      cellClass = 'is-read';
+                      cellTitle = `${b.name} ${c} — Marked as Read (${sum.readVersesCount}/${sum.totalVerses}v)`;
+                    } else if (sum.readVersesCount > 0) {
+                      cellClass = 'is-partial';
+                      cellTitle = `${b.name} ${c} — Partially Read (${sum.readVersesCount}/${sum.totalVerses}v)`;
+                      cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.readVersesCount}v</sup>`;
+                    }
+                  } else {
+                    // Default ALL (Read or Typed)
+                    if (sum.isBoth) {
+                      cellClass = 'is-both';
+                      cellTitle = `${b.name} ${c} — Read & Typed (${sum.completedVersesCount}/${sum.totalVerses}v) · Best: ${sum.bestWpm} WPM`;
+                    } else if (sum.isTypedOnly || (sum.isFullyTyped && !sum.isFullyRead)) {
+                      cellClass = 'is-done';
+                      cellTitle = `${b.name} ${c} — Typed (${sum.typedVersesCount}/${sum.totalVerses}v in ${trs}) · Best: ${sum.bestWpm} WPM`;
+                    } else if (sum.isReadOnly || (sum.isFullyRead && !sum.isFullyTyped)) {
+                      cellClass = 'is-read';
+                      cellTitle = `${b.name} ${c} — Marked as Read (${sum.readVersesCount}/${sum.totalVerses}v) — Click to practice typing`;
+                    } else if (sum.isPartial) {
+                      cellClass = 'is-partial';
+                      const parts = [];
+                      if (sum.readVersesCount > 0) parts.push(`${sum.readVersesCount} read`);
+                      if (sum.typedVersesCount > 0) parts.push(`${sum.typedVersesCount} typed`);
+                      cellTitle = `${b.name} ${c} — In Progress (${sum.completedVersesCount}/${sum.totalVerses || '?'}v: ${parts.join(', ')}) — Click to type`;
+                      cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.completedVersesCount}v</sup>`;
+                    }
                   }
 
                   chapterCells.push(`
@@ -488,6 +570,14 @@ export function renderProgressScreen(container) {
       });
     });
 
+    container.querySelectorAll('[data-coverage-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeCoverageFilter = btn.getAttribute('data-coverage-filter');
+        trackEvent('filter_coverage_category', { filter: activeCoverageFilter });
+        render();
+      });
+    });
+
     container.querySelectorAll('[data-testament-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         activeTestamentTab = btn.getAttribute('data-testament-tab');
@@ -546,3 +636,4 @@ export function renderProgressScreen(container) {
 
   render();
 }
+

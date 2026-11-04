@@ -4,16 +4,16 @@ import {
   getPreferredTranslation,
   setPreferredTranslation,
   getChapterProgressSummary
-} from '../api.js?v=20261104_v6';
+} from '../api.js?v=20261104_v7';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261104_v6';
-import { trackEvent } from '../analytics.js?v=20261104_v6';
-import { navigate } from '../app.js?v=20261104_v6';
+} from '../bible-data.js?v=20261104_v7';
+import { trackEvent } from '../analytics.js?v=20261104_v7';
+import { navigate } from '../app.js?v=20261104_v7';
 
 function escapeHtml(str) {
   return String(str)
@@ -153,12 +153,22 @@ export class Navbar {
       const s = getChapterProgressSummary(selBook.id, c, 'ALL');
       const isCurrent = selBook.id === passage.bookId && c === passage.chapter;
       const pct = s.totalVerses > 0 ? Math.min(100, Math.round((s.completedVersesCount / s.totalVerses) * 100)) : 0;
-      const cls = s.isFullyCompleted ? 'is-completed' : (s.isPartial ? 'is-partial' : '');
-      const title = s.isFullyCompleted
-        ? `${selBook.name} ${c} — Completed (${s.totalVerses}/${s.totalVerses} verses)`
-        : (s.isPartial
-          ? `${selBook.name} ${c} — ${s.completedVersesCount}/${s.totalVerses} verses`
-          : `${selBook.name} ${c} — ${s.totalVerses} verses`);
+      let cls = '';
+      if (s.isBoth) cls = 'is-both is-completed';
+      else if (s.isFullyTyped) cls = 'is-completed';
+      else if (s.isFullyRead) cls = 'is-read';
+      else if (s.isPartial) cls = 'is-partial';
+
+      const title = s.isBoth
+        ? `${selBook.name} ${c} — Read & Typed (${s.totalVerses}/${s.totalVerses} verses)`
+        : (s.isFullyTyped
+          ? `${selBook.name} ${c} — Typed (${s.totalVerses}/${s.totalVerses} verses)`
+          : (s.isFullyRead
+            ? `${selBook.name} ${c} — Read (${s.totalVerses}/${s.totalVerses} verses)`
+            : (s.isPartial
+              ? `${selBook.name} ${c} — ${s.completedVersesCount}/${s.totalVerses} verses`
+              : `${selBook.name} ${c} — ${s.totalVerses} verses`)));
+
       chapterBtns.push(`
         <button type="button" class="drawer-chapter-pill ${cls} ${isCurrent ? 'is-current' : ''} ${c === this.drawerChapter ? 'is-drawer-selected' : ''}"
           data-chapter="${c}" title="${title}">
@@ -171,11 +181,26 @@ export class Navbar {
     const verseCount = getChapterVerseCount(selBook.id, this.drawerChapter) || chSum.totalVerses;
     const verseBtns = [];
     for (let v = 1; v <= verseCount; v++) {
-      const vDone = chSum.isFullyCompleted || chSum.completedVerseNums.includes(v);
+      const vRec = chSum.record?.completedVerses?.[String(v)];
+      const vIsRead = Boolean(chSum.isFullyRead || vRec?.isRead);
+      const vIsTyped = Boolean(chSum.isFullyTyped || vRec?.isTyped || (vRec?.count && vRec.count > 0));
+      let vCls = '';
+      let vBadge = '';
+      if (vIsRead && vIsTyped) {
+        vCls = 'is-both';
+        vBadge = '<span class="drawer-v-check">✓</span>';
+      } else if (vIsTyped) {
+        vCls = 'is-completed';
+        vBadge = '<span class="drawer-v-check">✓</span>';
+      } else if (vIsRead) {
+        vCls = 'is-read';
+        vBadge = '<span class="drawer-v-check">📖</span>';
+      }
+
       verseBtns.push(`
-        <button type="button" class="drawer-verse-pill ${vDone ? 'is-completed' : ''}" data-verse="${v}"
-          title="Type only ${selBook.name} ${this.drawerChapter}:${v}${vDone ? ' (✓ completed)' : ''}">
-          ${v}${vDone ? '<span class="drawer-v-check">✓</span>' : ''}
+        <button type="button" class="drawer-verse-pill ${vCls}" data-verse="${v}"
+          title="Type only ${selBook.name} ${this.drawerChapter}:${v}${vIsRead && vIsTyped ? ' (Read & Typed)' : vIsTyped ? ' (Typed)' : vIsRead ? ' (Read)' : ''}">
+          ${v}${vBadge}
         </button>`);
     }
 

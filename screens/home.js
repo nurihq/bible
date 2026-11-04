@@ -3,11 +3,13 @@ import {
   getGlobalTypingStats,
   getLocalStore,
   getPreferredTranslation,
-  getChapterProgressSummary
-} from '../api.js?v=20261104_v6';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v6';
-import { trackEvent } from '../analytics.js?v=20261104_v6';
-import { navigate } from '../app.js?v=20261104_v6';
+  getChapterProgressSummary,
+  toggleChapterRead,
+  toggleVerseRead
+} from '../api.js?v=20261104_v7';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v7';
+import { trackEvent } from '../analytics.js?v=20261104_v7';
+import { navigate } from '../app.js?v=20261104_v7';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -115,88 +117,172 @@ export function renderLandingScreen(container) {
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
   const votd = VERSE_OF_THE_DAY_POOL[dayOfYear % VERSE_OF_THE_DAY_POOL.length];
 
-  container.innerHTML = `
-    <div class="hero-wrapper">
-      <div class="hero-badge">
-        <span>✨</span>
-        <span>66 Books · 1,189 Chapters · 31,103 Verses</span>
-      </div>
+  function getVotdStatusHtml() {
+    const chSum = getChapterProgressSummary(votd.bookId, votd.chapter);
+    const vStat = chSum.record?.completedVerses?.[String(votd.verse)];
+    const isVerseRead = Boolean(chSum.isFullyRead || vStat?.isRead);
+    const isVerseTyped = Boolean(chSum.isFullyTyped || vStat?.isTyped || (vStat?.count && vStat.count > 0));
+    const isChRead = Boolean(chSum.isFullyRead);
 
-      <h1 class="hero-title">bible</h1>
-      <p class="hero-subtitle">
-        Internalize Scripture at your keyboard. Type through any chapter or verse of the Bible, track your WPM &amp; CPM speed, and map your reach across all 1,189 chapters and 31,103 verses.
-      </p>
+    const badges = [];
+    if (isVerseRead && isVerseTyped) {
+      badges.push('<span class="votd-read-badge is-both">✓ Read &amp; Typed</span>');
+    } else if (isVerseTyped) {
+      badges.push('<span class="votd-read-badge is-done">✓ Typed</span>');
+    } else if (isVerseRead) {
+      badges.push('<span class="votd-read-badge is-read">📖 Verse Read</span>');
+    }
 
-      <div class="hero-actions">
-        <button class="btn btn-primary btn-lg" id="home-start-btn">
-          <span>Start Typing</span>
-          <span style="font-size: 1.15rem;">→</span>
-        </button>
-      </div>
+    if (isChRead && !badges.some(b => b.includes('Ch. Read'))) {
+      badges.push('<span class="votd-read-badge is-read">📖 Chapter Read</span>');
+    }
 
-      <!-- Single Verse of the Day Card (No Flipping) -->
-      <div class="votd-card-wrapper">
-        <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${votd.bookName} ${votd.chapter}:${votd.verse}">
-          <div class="votd-top-row">
-            <span class="votd-tag">☀️ Verse of the Day · ${votd.theme}</span>
-            <span class="votd-action-hint">Click card to type verse →</span>
+    return {
+      badgesHtml: badges.join(' '),
+      isVerseRead,
+      isChRead
+    };
+  }
+
+  function renderCard() {
+    const stats = getGlobalTypingStats();
+    const { badgesHtml, isVerseRead, isChRead } = getVotdStatusHtml();
+
+    container.innerHTML = `
+      <div class="hero-wrapper">
+        <div class="hero-badge">
+          <span>✨</span>
+          <span>66 Books · 1,189 Chapters · 31,103 Verses</span>
+        </div>
+
+        <h1 class="hero-title">bible</h1>
+        <p class="hero-subtitle">
+          Internalize Scripture at your keyboard. Type through any chapter or verse of the Bible, track your WPM &amp; CPM speed, and map your reach across all 1,189 chapters and 31,103 verses.
+        </p>
+
+        ${stats.overallCoveredChapters > 0 || stats.overallCoveredVerses > 0 ? `
+          <div class="hero-progress-banner">
+            <span>📊 Your Scripture Reach:</span>
+            <strong>${stats.overallCoveredChapters} / 1,189 Chapters (${stats.overallCoveredPercentage}%)</strong> ·
+            <span>${stats.overallCoveredVerses.toLocaleString()} verses</span> ·
+            <a href="#/progress" class="hero-progress-link">View Completeness Map →</a>
           </div>
+        ` : ''}
 
-          <div class="votd-quote">
-            <sup class="verse-num">${votd.verse}</sup>“${votd.text}”
-          </div>
+        <div class="hero-actions">
+          <button class="btn btn-primary btn-lg" id="home-start-btn">
+            <span>Start Typing</span>
+            <span style="font-size: 1.15rem;">→</span>
+          </button>
+        </div>
 
-          <div class="votd-ref-row">
-            <div class="votd-ref-info">
-              <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
-              <span class="votd-ref-sub">ESV · Tap below to practice this single verse or the full chapter</span>
+        <!-- Single Verse of the Day Card with Direct Read & Type Controls -->
+        <div class="votd-card-wrapper">
+          <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${votd.bookName} ${votd.chapter}:${votd.verse}">
+            <div class="votd-top-row">
+              <span class="votd-tag">☀️ Verse of the Day · ${votd.theme}</span>
+              <div class="votd-top-right">
+                ${badgesHtml}
+                <span class="votd-action-hint">Click card to type verse →</span>
+              </div>
             </div>
 
-            <div class="votd-ctas">
-              <a
-                href="#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}"
-                class="btn btn-primary btn-sm"
-                data-stop-card-nav="true"
-                title="Practice only this single verse"
-              >
-                🎯 Type This Verse →
-              </a>
-              <a
-                href="#/typing/${votd.bookId}/${votd.chapter}"
-                class="btn btn-secondary btn-sm"
-                data-stop-card-nav="true"
-                title="Open and type the full chapter"
-              >
-                📖 Type Whole Chapter (${votd.bookName} ${votd.chapter}) →
-              </a>
+            <div class="votd-quote">
+              <sup class="verse-num ${isVerseRead ? 'is-read' : ''}">${votd.verse}</sup>“${votd.text}”
+            </div>
+
+            <div class="votd-ref-row">
+              <div class="votd-ref-info">
+                <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
+                <span class="votd-ref-sub">ESV · Read or type this verse, or study the full chapter</span>
+              </div>
+
+              <div class="votd-ctas">
+                <button
+                  type="button"
+                  class="btn ${isVerseRead ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
+                  id="votd-mark-verse-btn"
+                  data-stop-card-nav="true"
+                  title="Mark verse ${votd.verse} as read to count toward your Bible completeness"
+                >
+                  ${isVerseRead ? '✓ Verse Read' : '📖 Mark Verse Read'}
+                </button>
+                <button
+                  type="button"
+                  class="btn ${isChRead ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
+                  id="votd-mark-ch-btn"
+                  data-stop-card-nav="true"
+                  title="Mark all of ${votd.bookName} ${votd.chapter} as read"
+                >
+                  ${isChRead ? '✓ Ch. Read' : '📖 Mark Ch. Read'}
+                </button>
+                <a
+                  href="#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}"
+                  class="btn btn-primary btn-sm"
+                  data-stop-card-nav="true"
+                  title="Practice typing only this single verse"
+                >
+                  🎯 Type Verse →
+                </a>
+                <a
+                  href="#/typing/${votd.bookId}/${votd.chapter}"
+                  class="btn btn-secondary btn-sm"
+                  data-stop-card-nav="true"
+                  title="Open and type the full chapter"
+                >
+                  📖 Type Whole Ch. →
+                </a>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  `;
+    `;
 
-  const votdCard = container.querySelector('#votd-card');
-  if (votdCard) {
-    votdCard.addEventListener('click', (e) => {
-      if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a')) return;
-      trackEvent('votd_card_click', { ref: `${votd.bookName} ${votd.chapter}:${votd.verse}` });
-      navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
-    });
-    votdCard.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target === votdCard) {
+    const votdCard = container.querySelector('#votd-card');
+    if (votdCard) {
+      votdCard.addEventListener('click', (e) => {
+        if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;
+        trackEvent('votd_card_click', { ref: `${votd.bookName} ${votd.chapter}:${votd.verse}` });
         navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
-      }
-    });
+      });
+      votdCard.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target === votdCard) {
+          navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
+        }
+      });
+    }
+
+    const markVerseBtn = container.querySelector('#votd-mark-verse-btn');
+    if (markVerseBtn) {
+      markVerseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nowRead = toggleVerseRead(votd.bookId, votd.chapter, votd.verse);
+        trackEvent('votd_mark_verse_read', { verse: `${votd.bookName} ${votd.chapter}:${votd.verse}`, nowRead });
+        renderCard();
+      });
+    }
+
+    const markChBtn = container.querySelector('#votd-mark-ch-btn');
+    if (markChBtn) {
+      markChBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nowRead = toggleChapterRead(votd.bookId, votd.chapter);
+        trackEvent('votd_mark_ch_read', { chapter: `${votd.bookName} ${votd.chapter}`, nowRead });
+        renderCard();
+      });
+    }
+
+    const startBtn = container.querySelector('#home-start-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
+        navigate('#/typing');
+      });
+    }
   }
 
-  const startBtn = container.querySelector('#home-start-btn');
-  if (startBtn) {
-    startBtn.addEventListener('click', () => {
-      trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
-      navigate('#/typing');
-    });
-  }
+  renderCard();
 }
 
 /** Legacy route fallback — Hub removed per user request: redirect directly to typing */

@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v6';
+} from '../bible-data.js?v=20261104_v7';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -19,10 +19,14 @@ import {
   recordCompletedChapter,
   getGlobalTypingStats,
   getChapterProgressSummary,
-  isVerseCompletedInRecord
-} from '../api.js?v=20261104_v6';
-import { trackEvent } from '../analytics.js?v=20261104_v6';
-import { navigate } from '../app.js?v=20261104_v6';
+  isVerseCompletedInRecord,
+  isVerseRead,
+  isVerseTyped,
+  toggleChapterRead,
+  toggleVerseRead
+} from '../api.js?v=20261104_v7';
+import { trackEvent } from '../analytics.js?v=20261104_v7';
+import { navigate } from '../app.js?v=20261104_v7';
 
 function escapeHtml(str) {
   return String(str)
@@ -102,12 +106,17 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   let onWindowKeydown = null;
+  let onStatsUpdated = null;
   function cleanup() {
     clearTimer();
     document.body.classList.remove('typing-active-view');
     if (onWindowKeydown) {
       window.removeEventListener('keydown', onWindowKeydown);
       onWindowKeydown = null;
+    }
+    if (onStatsUpdated) {
+      window.removeEventListener('bible:stats-updated', onStatsUpdated);
+      onStatsUpdated = null;
     }
   }
   window.__bibleTypingCleanup = cleanup;
@@ -127,33 +136,63 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function getProgressBadgeHtml() {
-    const totalV = allChapterVerses.length || 0;
-    const doneV = completedVerseSet.size;
-    const latestRec = getLocalStore().chapters?.[chapterKey] || null;
-    const trList = Object.keys(latestRec?.translations || {});
-    const trText = trList.length > 0 ? ` (${trList.join(', ')})` : '';
+    const summary = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
+    const totalV = summary.totalVerses || allChapterVerses.length || 0;
+    const doneV = summary.completedVersesCount;
+    const trText = activeTranslation ? ` · ${getTranslationByCode(activeTranslation).shortName}` : '';
 
     if (singleVerseMode && targetSingleVerseNum) {
-      const vDone = completedVerseSet.has(targetSingleVerseNum);
-      const vStat = latestRec?.completedVerses?.[String(targetSingleVerseNum)];
-      if (vDone) {
+      const vRec = summary.record?.completedVerses?.[String(targetSingleVerseNum)];
+      const vIsRead = Boolean(summary.isFullyRead || vRec?.isRead);
+      const vIsTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (vRec?.count && vRec.count > 0));
+      if (vIsRead && vIsTyped) {
         return `
-          <span class="chapter-completed-pill" title="Verse ${targetSingleVerseNum} completed!">
-            ✓ Verse ${targetSingleVerseNum} Completed${vStat?.bestWpm ? ` · Best ${vStat.bestWpm} WPM` : ''}
+          <span class="chapter-completed-pill is-both" title="Verse ${targetSingleVerseNum} read and typed!">
+            ✓ Verse ${targetSingleVerseNum} Read &amp; Typed${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
+          </span>
+        `;
+      }
+      if (vIsTyped) {
+        return `
+          <span class="chapter-completed-pill is-done" title="Verse ${targetSingleVerseNum} completed in typing engine!">
+            ✓ Verse ${targetSingleVerseNum} Typed${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
+          </span>
+        `;
+      }
+      if (vIsRead) {
+        return `
+          <span class="chapter-completed-pill is-read" title="Verse ${targetSingleVerseNum} marked as read!">
+            📖 Verse ${targetSingleVerseNum} Read
           </span>
         `;
       }
       return `
-        <span class="chapter-partial-pill" title="Chapter progress: ${doneV}/${totalV || '?'} verses completed">
+        <span class="chapter-partial-pill" title="Chapter reach: ${doneV}/${totalV || '?'} verses covered">
           🎯 Single Verse · Ch. Reach: ${doneV}/${totalV || '?'}v
         </span>
       `;
     }
 
-    if (totalV > 0 && doneV >= totalV) {
+    if (summary.isBoth) {
       return `
-        <span class="chapter-completed-pill" title="All ${totalV} verses in this chapter completed!">
-          ✓ Completed (${totalV}/${totalV}v)${trText}${latestRec?.bestWpm ? ` · Best ${latestRec.bestWpm} WPM` : ''}
+        <span class="chapter-completed-pill is-both" title="All ${totalV} verses read and typed!">
+          ✓ Read &amp; Typed (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
+        </span>
+      `;
+    }
+
+    if (summary.isTypedOnly || (summary.isFullyTyped && !summary.isFullyRead)) {
+      return `
+        <span class="chapter-completed-pill is-done" title="All ${totalV} verses typed!">
+          ✓ Typed (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
+        </span>
+      `;
+    }
+
+    if (summary.isReadOnly || (summary.isFullyRead && !summary.isFullyTyped)) {
+      return `
+        <span class="chapter-completed-pill is-read" title="All ${totalV} verses marked as read!">
+          📖 Read (${totalV}/${totalV}v)
         </span>
       `;
     }
@@ -161,7 +200,7 @@ export function renderTypingScreen(container, params = {}) {
     if (doneV > 0) {
       const pct = totalV > 0 ? Math.round((doneV / totalV) * 100) : 0;
       return `
-        <span class="chapter-partial-pill" title="${doneV} of ${totalV} verses completed (${pct}%)">
+        <span class="chapter-partial-pill" title="${doneV} of ${totalV} verses covered (${pct}%) — ${summary.readVersesCount} read, ${summary.typedVersesCount} typed">
           ⏳ In Progress: ${doneV}/${totalV || '?'} verses (${pct}%)
         </span>
       `;
@@ -188,9 +227,18 @@ export function renderTypingScreen(container, params = {}) {
             <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="open-full-chapter-top-btn" title="Open the entire chapter (${book.name} ${initialChapter})">
               📖 Full Chapter (${book.abbr} ${initialChapter})
             </button>
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-verse-read-btn" title="Toggle marked as read for verse ${targetSingleVerseNum}">
+              <span id="mark-verse-read-label">📖 Mark Verse Read</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for whole chapter (${book.name} ${initialChapter})">
+              <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
+            </button>
           ` : `
             <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="focus-single-verse-top-btn" title="Practice only the currently active verse">
               🎯 Single Verse
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for ${book.name} ${initialChapter}">
+              <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
             </button>
           `}
         </div>
@@ -387,6 +435,71 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
+  // ── Mark Chapter & Verse as Read Controls ─────────────────────
+  function updateReadButtons() {
+    const sum = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
+    const isChRead = sum.isFullyRead;
+    const markChBtn = container.querySelector('#mark-ch-read-btn');
+    const markChLbl = container.querySelector('#mark-ch-read-label');
+    if (markChBtn && markChLbl) {
+      if (isChRead) {
+        markChBtn.classList.add('is-read-active');
+        markChLbl.textContent = '✓ Ch. Read';
+        markChBtn.title = `Chapter ${initialChapter} is marked as read. Click to unmark.`;
+      } else {
+        markChBtn.classList.remove('is-read-active');
+        markChLbl.textContent = '📖 Mark Ch. Read';
+        markChBtn.title = `Mark all of ${book.name} ${initialChapter} as read`;
+      }
+    }
+
+    if (singleVerseMode && targetSingleVerseNum) {
+      const vRec = sum.record?.completedVerses?.[String(targetSingleVerseNum)];
+      const isVRead = Boolean(isChRead || vRec?.isRead);
+      const markVBtn = container.querySelector('#mark-verse-read-btn');
+      const markVLbl = container.querySelector('#mark-verse-read-label');
+      if (markVBtn && markVLbl) {
+        if (isVRead) {
+          markVBtn.classList.add('is-read-active');
+          markVLbl.textContent = '✓ Verse Read';
+          markVBtn.title = `Verse ${targetSingleVerseNum} is marked as read. Click to unmark.`;
+        } else {
+          markVBtn.classList.remove('is-read-active');
+          markVLbl.textContent = '📖 Mark Verse Read';
+          markVBtn.title = `Mark verse ${targetSingleVerseNum} as read`;
+        }
+      }
+    }
+  }
+
+  const markChBtn = container.querySelector('#mark-ch-read-btn');
+  if (markChBtn) {
+    markChBtn.addEventListener('click', () => {
+      toggleChapterRead(book.id, initialChapter, activeTranslation);
+      trackEvent('toggle_chapter_read', { bookId: book.id, chapter: initialChapter });
+    });
+  }
+
+  const markVerseBtn = container.querySelector('#mark-verse-read-btn');
+  if (markVerseBtn && targetSingleVerseNum) {
+    markVerseBtn.addEventListener('click', () => {
+      toggleVerseRead(book.id, initialChapter, targetSingleVerseNum, activeTranslation);
+      trackEvent('toggle_verse_read', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+    });
+  }
+
+  updateReadButtons();
+
+  onStatsUpdated = () => {
+    const badgeEl = container.querySelector('#telemetry-completed-badge');
+    if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+    updateReadButtons();
+    for (const vr of verseRanges) {
+      if (vr.supEl) updateVerseSup(vr.supEl, vr.verse);
+    }
+  };
+  window.addEventListener('bible:stats-updated', onStatsUpdated);
+
   // ── 3. Prev / Next Chapter Stepper & Restart Button ────────────
   function navigatePrevStep() {
     if (singleVerseMode && targetSingleVerseNum) {
@@ -529,6 +642,35 @@ export function renderTypingScreen(container, params = {}) {
     resetActiveVerseTelemetry();
     clearTimer();
 
+    function updateVerseSup(supEl, vNum) {
+      if (!supEl) return;
+      const summary = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
+      const vRec = summary.record?.completedVerses?.[String(vNum)];
+      const isVRead = Boolean(summary.isFullyRead || vRec?.isRead);
+      const isVTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (vRec?.count && vRec.count > 0));
+      let cls = 'verse-num';
+      let txt = String(vNum);
+      let tip = `Verse ${vNum}`;
+      if (isVRead && isVTyped) {
+        cls += ' is-both';
+        txt = `✓ ${vNum}`;
+        tip = `Verse ${vNum} — Read & Typed! Click to toggle read status.`;
+      } else if (isVTyped) {
+        cls += ' is-done';
+        txt = `✓ ${vNum}`;
+        tip = `Verse ${vNum} — Typed in typing engine. Click to toggle read status.`;
+      } else if (isVRead) {
+        cls += ' is-read';
+        txt = `📖 ${vNum}`;
+        tip = `Verse ${vNum} — Marked as read. Click to toggle read status.`;
+      } else {
+        tip = `Verse ${vNum} — Click to mark as read.`;
+      }
+      supEl.className = cls;
+      supEl.textContent = txt;
+      supEl.title = tip;
+    }
+
     const fragment = document.createDocumentFragment();
     let globalCharIdx = 0;
 
@@ -552,9 +694,13 @@ export function renderTypingScreen(container, params = {}) {
         // Attach visible (non-typed) verse number superscript right before the first word of the verse
         if (wIdx === 0) {
           const sup = document.createElement('sup');
-          sup.className = `verse-num ${isVDone ? 'is-done' : ''}`;
           sup.setAttribute('aria-hidden', 'true');
-          sup.textContent = isVDone ? `✓ ${v.verse}` : String(v.verse);
+          sup.style.cursor = 'pointer';
+          updateVerseSup(sup, v.verse);
+          sup.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleVerseRead(book.id, initialChapter, v.verse, activeTranslation);
+          });
           wordSpan.appendChild(sup);
           supElement = sup;
         }

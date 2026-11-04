@@ -1852,6 +1852,21 @@ body.typing-active-view .main-content {
   font-weight: 700;
 }
 
+.reach-ch-cell.is-read {
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.reach-ch-cell.is-both {
+  background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+  border-color: #10b981;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.25);
+}
+
 .reach-ch-cell.is-partial {
   background: rgba(245, 158, 11, 0.16);
   border-color: rgba(245, 158, 11, 0.55);
@@ -1859,10 +1874,227 @@ body.typing-active-view .main-content {
   font-weight: 600;
 }
 
+[data-theme="dark"] .reach-ch-cell.is-read {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .reach-ch-cell.is-both {
+  background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
+  border-color: #10b981;
+  color: #ffffff;
+}
+
 [data-theme="dark"] .reach-ch-cell.is-partial {
   background: rgba(245, 158, 11, 0.22);
   border-color: rgba(245, 158, 11, 0.65);
   color: #fbbf24;
+}
+
+/* ── Completeness Legend Bar ───────────────────────────────────── */
+.completeness-legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.55rem 0.85rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--border-color);
+}
+
+.legend-swatch.is-done {
+  background: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+}
+
+.legend-swatch.is-read {
+  background: #3b82f6;
+  border-color: #2563eb;
+}
+
+.legend-swatch.is-both {
+  background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+  border-color: #10b981;
+}
+
+.legend-swatch.is-partial {
+  background: rgba(245, 158, 11, 0.4);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+/* ── KPI Read & Both Cards ─────────────────────────────────────── */
+.kpi-card.is-primary-kpi {
+  background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(59, 130, 246, 0.04) 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.kpi-breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.kpi-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-full);
+}
+
+.kpi-badge.is-read {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.kpi-badge.is-done {
+  background: var(--accent-emerald-light);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.kpi-badge.is-both {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.kpi-note-text {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Read Status Badges & Buttons ──────────────────────────────── */
+.mark-read-btn.is-read-active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: #3b82f6 !important;
+  color: #2563eb !important;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .mark-read-btn.is-read-active {
+  background: rgba(59, 130, 246, 0.22) !important;
+  border-color: #60a5fa !important;
+  color: #93c5fd !important;
+}
+
+.votd-mark-btn.is-read-active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: #3b82f6 !important;
+  color: #2563eb !important;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .votd-mark-btn.is-read-active {
+  background: rgba(59, 130, 246, 0.22) !important;
+  border-color: #60a5fa !important;
+  color: #93c5fd !important;
+}
+
+.votd-top-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.votd-read-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--radius-full);
+}
+
+.votd-read-badge.is-read {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.votd-read-badge.is-done {
+  background: var(--accent-emerald-light);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.votd-read-badge.is-both {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.hero-progress-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.9rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  margin-top: 0.2rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hero-progress-banner strong {
+  color: var(--text-primary);
+}
+
+.hero-progress-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 0.3rem;
+}
+
+.hero-progress-link:hover {
+  text-decoration: underline;
+}
+
+sup.verse-num.is-read {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+sup.verse-num.is-both {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+.chapter-completed-pill.is-read {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.chapter-completed-pill.is-both {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 /* ── Speed Chart & Historic Sessions Table ─────────────────────── */
