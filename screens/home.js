@@ -6,10 +6,10 @@ import {
   getChapterProgressSummary,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v9';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v9';
-import { trackEvent } from '../analytics.js?v=20261104_v9';
-import { navigate } from '../app.js?v=20261104_v9';
+} from '../api.js?v=20261104_v10';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v10';
+import { trackEvent } from '../analytics.js?v=20261104_v10';
+import { navigate } from '../app.js?v=20261104_v10';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -157,7 +157,7 @@ export function renderLandingScreen(container) {
 
         <h1 class="hero-title">bible</h1>
         <p class="hero-subtitle">
-          Internalize Scripture at your keyboard. Type through any chapter or verse of the Bible, track your WPM &amp; CPM speed, and map your reach across all 1,189 chapters and 31,103 verses.
+          Track your bible progress
         </p>
 
         ${stats.overallCoveredChapters > 0 || stats.overallCoveredVerses > 0 ? `
