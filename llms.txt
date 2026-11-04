@@ -1,0 +1,6 @@
+# bible — Scripture Typing & Reach Suite
+
+> Type through all 1,189 chapters of the Bible across 22 translations (defaulting to ESV), with real-time WPM/CPM speed tracking and Scripture completeness analytics.
+
+- Authentication: Google Identity Services OAuth 2.0
+- Backend: AWS Lambda Function URLs + DynamoDB (`BibleApp`) + S3 Automated Daily Backups

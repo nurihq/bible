@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+
+  <!-- Enforce HTTPS -->
+  <script>
+    if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      location.replace(location.href.replace('http:', 'https:'));
+    }
+  </script>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-M5WYQQQWVV"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-M5WYQQQWVV', {
+      send_page_view: false
+    });
+  </script>
+
+  <!-- Primary Meta Tags -->
+  <title>bible — Scripture Typing &amp; Reach Suite</title>
+  <meta name="title" content="bible — Scripture Typing &amp; Reach Suite">
+  <meta name="description" content="Type through all 1,189 chapters of the Bible across 22 translations (defaulting to ESV). Track your WPM, CPM, historic verses typed, and overall Scripture reach.">
+  <meta name="keywords" content="bible typing, scripture typing, ESV bible typing, bible reach tracker, WPM, CPM, bible study">
+  <meta name="author" content="Nuri">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="bible — Scripture Typing &amp; Reach Suite">
+  <meta property="og:description" content="Type through all 1,189 chapters of the Bible across 22 translations with real-time WPM, CPM, and Scripture reach tracking.">
+  <meta property="og:site_name" content="bible">
+  <meta property="og:image" content="favicon.svg">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css?v=20261104_1">
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <!-- Global Navigation Header -->
+  <div id="nav-container"></div>
+
+  <!-- SPA Router Screen Outlet -->
+  <main id="app" class="main-content"></main>
+
+  <!-- Main JavaScript App Entry -->
+  <script type="module" src="app.js?v=20261104_1"></script>
+</body>
+</html>
