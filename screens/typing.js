@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v7';
+} from '../bible-data.js?v=20261104_v8';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -24,9 +24,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v7';
-import { trackEvent } from '../analytics.js?v=20261104_v7';
-import { navigate } from '../app.js?v=20261104_v7';
+} from '../api.js?v=20261104_v8';
+import { trackEvent } from '../analytics.js?v=20261104_v8';
+import { navigate } from '../app.js?v=20261104_v8';
 
 function escapeHtml(str) {
   return String(str)
@@ -615,8 +615,6 @@ export function renderTypingScreen(container, params = {}) {
     const { set: storedDoneSet } = loadCompletedVersesFromStore();
     completedVerseSet = storedDoneSet;
 
-    populateGranularitySelect();
-
     if (singleVerseMode && targetSingleVerseNum) {
       const matchedVerse = allChapterVerses.find(v => v.verse === targetSingleVerseNum) || allChapterVerses[0];
       verses = matchedVerse ? [matchedVerse] : [];
@@ -956,7 +954,6 @@ export function renderTypingScreen(container, params = {}) {
 
     const badgeEl = container.querySelector('#telemetry-completed-badge');
     if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
-    populateGranularitySelect();
     resetActiveVerseTelemetry();
 
     return { recordPromise, vWpm, vCpm, vAcc, vDurMs };
