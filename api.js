@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG } from './config.js?v=20261104_v3';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -6,7 +6,7 @@ import {
   TOTAL_OT_CHAPTERS,
   TOTAL_NT_CHAPTERS,
   getBookById
-} from './bible-data.js';
+} from './bible-data.js?v=20261104_v3';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;

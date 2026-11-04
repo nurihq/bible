@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js';
+} from '../bible-data.js?v=20261104_v3';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -15,9 +15,9 @@ import {
   setLastSelectedChapter,
   recordCompletedChapter,
   getGlobalTypingStats
-} from '../api.js';
-import { trackEvent } from '../analytics.js';
-import { navigate } from '../app.js';
+} from '../api.js?v=20261104_v3';
+import { trackEvent } from '../analytics.js?v=20261104_v3';
+import { navigate } from '../app.js?v=20261104_v3';
 
 function escapeHtml(str) {
   return String(str)
@@ -66,15 +66,24 @@ export function renderTypingScreen(container, params = {}) {
   let drawerTestamentFilter = 'ALL';
   let drawerSelectedBookId = book.id;
 
-  // Cleanup any previous intervals when navigating away
+  // Cleanup any previous intervals/listeners when navigating away
   if (window.__bibleTypingCleanup) {
     window.__bibleTypingCleanup();
   }
 
-  function cleanup() {
+  function clearTimer() {
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
+    }
+  }
+
+  let onWindowKeydown = null;
+  function cleanup() {
+    clearTimer();
+    if (onWindowKeydown) {
+      window.removeEventListener('keydown', onWindowKeydown);
+      onWindowKeydown = null;
     }
   }
   window.__bibleTypingCleanup = cleanup;
@@ -523,7 +532,7 @@ export function renderTypingScreen(container, params = {}) {
     correctKeystrokes = 0;
     mistakes = 0;
     isCompleted = false;
-    cleanup();
+    clearTimer();
 
     const fragment = document.createDocumentFragment();
     let globalCharIdx = 0;
@@ -693,7 +702,7 @@ export function renderTypingScreen(container, params = {}) {
 
   async function handleChapterCompleted() {
     isCompleted = true;
-    cleanup();
+    clearTimer();
     elapsedMs = startTime ? performance.now() - startTime : 1000;
     const minutes = Math.max(elapsedMs / 60000, 1 / 600);
     const finalCpm = Math.round(targetChars.length / minutes);
@@ -839,8 +848,7 @@ export function renderTypingScreen(container, params = {}) {
     }
   }
 
-  // Keyboard event listener on hidden input
-  hiddenInput.addEventListener('keydown', (e) => {
+  function handleTypingKeydown(e) {
     if (isCompleted) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -870,7 +878,33 @@ export function renderTypingScreen(container, params = {}) {
       hiddenInput.value = '';
       processTypedChar(e.key);
     }
-  });
+  }
+
+  // Keyboard event listener on hidden input
+  hiddenInput.addEventListener('keydown', handleTypingKeydown);
+
+  // Global window keydown fallback so pressing any key on the page immediately resumes typing
+  onWindowKeydown = (e) => {
+    if (!document.body.contains(container)) {
+      cleanup();
+      return;
+    }
+    if (e.target === hiddenInput) return;
+    if (e.target && e.target.closest && e.target.closest('input, textarea, select')) return;
+    if (isDrawerOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        toggleDrawer(false);
+      }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'Enter' || e.key.length === 1) {
+      focusTypingInput();
+      handleTypingKeydown(e);
+    }
+  };
+  window.addEventListener('keydown', onWindowKeydown);
 
   // Mobile virtual keyboard fallback via input event
   hiddenInput.addEventListener('input', (e) => {
@@ -934,7 +968,7 @@ export function renderTypingScreen(container, params = {}) {
 
   // ── 5. Fetch & Initialize Chapter Verses ───────────────────────
   async function loadAndRenderPassage() {
-    cleanup();
+    clearTimer();
     const trObj = getTranslationByCode(activeTranslation);
     passageContent.innerHTML = `
       <div class="typing-loading-state">

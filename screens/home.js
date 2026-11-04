@@ -1,7 +1,9 @@
-import { Auth, getGlobalTypingStats, getLocalStore, getPreferredTranslation } from '../api.js';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js';
-import { trackEvent } from '../analytics.js';
-import { navigate } from '../app.js';
+import { Auth, getGlobalTypingStats, getLocalStore, getPreferredTranslation } from '../api.js?v=20261104_v3';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v3';
+import { trackEvent } from '../analytics.js?v=20261104_v3';
+import { navigate } from '../app.js?v=20261104_v3';
+
+export { renderLandingScreen as renderHomeScreen };
 
 export function renderLandingScreen(container) {
   const PREVIEW_CARDS = [

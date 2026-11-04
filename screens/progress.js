@@ -2,10 +2,10 @@ import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getTranslationByCode
-} from '../bible-data.js';
-import { getGlobalTypingStats } from '../api.js';
-import { trackEvent } from '../analytics.js';
-import { navigate } from '../app.js';
+} from '../bible-data.js?v=20261104_v3';
+import { getGlobalTypingStats } from '../api.js?v=20261104_v3';
+import { trackEvent } from '../analytics.js?v=20261104_v3';
+import { navigate } from '../app.js?v=20261104_v3';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));

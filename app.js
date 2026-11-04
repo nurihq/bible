@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js';
-import { Auth, syncLocalToCloud } from './api.js';
-import { initGA, trackPageView } from './analytics.js';
-import { getBookById } from './bible-data.js';
+import { Navbar } from './components/navbar.js?v=20261104_v3';
+import { Auth, syncLocalToCloud } from './api.js?v=20261104_v3';
+import { initGA, trackPageView } from './analytics.js?v=20261104_v3';
+import { getBookById } from './bible-data.js?v=20261104_v3';
 
-import { renderSignInScreen } from './screens/signin.js';
-import { renderLandingScreen, renderHubScreen } from './screens/home.js';
-import { renderTypingScreen } from './screens/typing.js';
-import { renderProgressScreen } from './screens/progress.js';
+import { renderSignInScreen } from './screens/signin.js?v=20261104_v3';
+import { renderLandingScreen, renderHubScreen } from './screens/home.js?v=20261104_v3';
+import { renderTypingScreen } from './screens/typing.js?v=20261104_v3';
+import { renderProgressScreen } from './screens/progress.js?v=20261104_v3';
 
 function getActiveRoutePath() {
   const rawHash = window.location.hash || '';
@@ -53,6 +53,28 @@ class App {
 
     window.addEventListener('hashchange', () => this.handleRoute());
     window.addEventListener('popstate', () => this.handleRoute());
+
+    // Intercept internal #/... links for instant SPA navigation
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a');
+      if (link && link.getAttribute('href')) {
+        if (
+          link.getAttribute('target') === '_blank' ||
+          e.metaKey ||
+          e.ctrlKey ||
+          e.shiftKey ||
+          e.altKey ||
+          (typeof e.button === 'number' && e.button !== 0)
+        ) {
+          return;
+        }
+        const href = link.getAttribute('href');
+        if (href.startsWith('#/')) {
+          e.preventDefault();
+          navigate(href);
+        }
+      }
+    });
 
     // Initial cloud sync if authenticated
     if (Auth.isAuthenticated()) {
@@ -158,7 +180,15 @@ class App {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function bootApp() {
+  if (window.__bibleAppBooted) return;
+  window.__bibleAppBooted = true;
   const app = new App();
   app.init();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootApp);
+} else {
+  bootApp();
+}

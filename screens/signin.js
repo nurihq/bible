@@ -1,7 +1,7 @@
-import { CONFIG } from '../config.js';
-import { Auth, Api } from '../api.js';
-import { trackEvent } from '../analytics.js';
-import { navigate } from '../app.js';
+import { CONFIG } from '../config.js?v=20261104_v3';
+import { Auth, Api } from '../api.js?v=20261104_v3';
+import { trackEvent } from '../analytics.js?v=20261104_v3';
+import { navigate } from '../app.js?v=20261104_v3';
 
 export function renderSignInScreen(container) {
   container.innerHTML = `
