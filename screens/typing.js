@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v14';
+} from '../bible-data.js?v=20261104_v15';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -24,9 +24,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v14';
-import { trackEvent } from '../analytics.js?v=20261104_v14';
-import { navigate } from '../app.js?v=20261104_v14';
+} from '../api.js?v=20261104_v15';
+import { trackEvent } from '../analytics.js?v=20261104_v15';
+import { navigate } from '../app.js?v=20261104_v15';
 
 function escapeHtml(str) {
   return String(str)
@@ -545,9 +545,45 @@ export function renderTypingScreen(container, params = {}) {
   if (prevStepBtn) prevStepBtn.addEventListener('click', navigatePrevStep);
   if (nextStepBtn) nextStepBtn.addEventListener('click', navigateNextStep);
 
+  function restartTyping() {
+    clearTimer();
+    startTime = null;
+    elapsedMs = 0;
+    totalKeystrokes = 0;
+    correctKeystrokes = 0;
+    mistakes = 0;
+    errorBuffer = [];
+    isCompleted = false;
+    resetActiveVerseTelemetry();
+
+    if (liveWpmEl) liveWpmEl.textContent = '0';
+    if (liveCpmEl) liveCpmEl.textContent = '0';
+    if (liveAccEl) liveAccEl.textContent = '100%';
+    if (liveTimeEl) liveTimeEl.textContent = '0:00';
+    if (errorAlert) errorAlert.hidden = true;
+    if (completionBackdrop) completionBackdrop.hidden = true;
+    if (viewportWrapper) viewportWrapper.classList.remove('has-active-error');
+
+    // Move cursor to start without clearing completed verses
+    const startVerseNum = singleVerseMode
+      ? (targetSingleVerseNum || 1)
+      : (verseRanges[0]?.verse || 1);
+
+    jumpToVerse(startVerseNum, {
+      manualClick: true,
+      statusMessage: `↺ Cursor moved to start of ${singleVerseMode ? `Verse ${startVerseNum}` : `${book.name} ${initialChapter}`}. Completed verses are preserved.`
+    });
+
+    if (passageScroll) {
+      passageScroll.scrollTop = 0;
+    }
+    focusTypingInput();
+  }
+
   if (restartBtn) {
     restartBtn.addEventListener('click', () => {
-      buildPassageDOM(allChapterVerses);
+      trackEvent('restart_bible_chapter', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+      restartTyping();
     });
   }
 
@@ -1226,7 +1262,7 @@ export function renderTypingScreen(container, params = {}) {
 
     if (e.key === 'Escape') {
       e.preventDefault();
-      buildPassageDOM(allChapterVerses);
+      restartTyping();
       return;
     }
 
@@ -1308,17 +1344,10 @@ export function renderTypingScreen(container, params = {}) {
     focusTypingInput();
   });
 
-  restartBtn.addEventListener('click', () => {
-    if (allChapterVerses.length > 0) {
-      trackEvent('restart_bible_chapter', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-      buildPassageDOM(allChapterVerses);
-    }
-  });
-
   // Completion modal buttons
   container.querySelector('#comp-retry-btn').addEventListener('click', () => {
     completionBackdrop.hidden = true;
-    buildPassageDOM(allChapterVerses);
+    restartTyping();
   });
 
   const compOpenChapterBtn = container.querySelector('#comp-open-chapter-btn');
