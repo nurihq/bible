@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v25';
+import { CONFIG } from './config.js?v=20261104_v26';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v25';
+} from './bible-data.js?v=20261104_v26';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -150,11 +150,6 @@ export async function initFirebaseAuthObserver() {
             window.dispatchEvent(new CustomEvent('bible:auth-changed', { detail: { authenticated: true } }));
           }
         } catch (e) {}
-      } else {
-        // Firebase reports user is no longer signed in
-        if (Auth.getUser() || Auth.getToken()) {
-          Auth.signOut();
-        }
       }
     });
   } catch (e) {}
@@ -1532,16 +1527,15 @@ export function getGlobalTypingStats() {
 
 // ── Cloud Sync Helpers ──────────────────────────────────────────
 async function fetchWithAuth(url, options = {}) {
+  if (!Auth.isAuthenticated()) {
+    throw new Error('Not authenticated');
+  }
+
   if (!Auth.isTokenValid()) {
-    const refreshed = await attemptSilentGoogleRefresh();
-    if (!refreshed && !Auth.isTokenValid()) {
-      Auth.signOut();
-      throw new Error('Not authenticated - Firebase session expired');
-    }
+    await attemptSilentGoogleRefresh();
   }
   const token = Auth.getToken();
   if (!token) {
-    Auth.signOut();
     throw new Error('Not authenticated');
   }
 
@@ -1552,9 +1546,20 @@ async function fetchWithAuth(url, options = {}) {
   };
 
   const res = await fetch(url, { ...options, headers });
-  if (res.status === 401 || res.status === 403) {
-    Auth.signOut();
-    throw new Error(`Authentication expired (HTTP ${res.status}). Please sign in again.`);
+  if (res.status === 401) {
+    const refreshed = await attemptSilentGoogleRefresh();
+    if (refreshed) {
+      const retryToken = Auth.getToken();
+      const retryRes = await fetch(url, {
+        ...options,
+        headers: { ...headers, Authorization: `Bearer ${retryToken}` }
+      });
+      if (retryRes.ok) return retryRes.json();
+    }
+    if (!Auth.isAuthenticated()) {
+      Auth.signOut();
+      throw new Error('Authentication expired. Please sign in again.');
+    }
   }
 
   if (!res.ok) {

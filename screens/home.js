@@ -6,10 +6,10 @@ import {
   getChapterProgressSummary,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v25';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v25';
-import { trackEvent } from '../analytics.js?v=20261104_v25';
-import { navigate } from '../app.js?v=20261104_v25';
+} from '../api.js?v=20261104_v26';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v26';
+import { trackEvent } from '../analytics.js?v=20261104_v26';
+import { navigate } from '../app.js?v=20261104_v26';
 
 export { renderLandingScreen as renderHomeScreen };
 
