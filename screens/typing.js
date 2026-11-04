@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v19';
+} from '../bible-data.js?v=20261104_v20';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -32,9 +32,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v19';
-import { trackEvent } from '../analytics.js?v=20261104_v19';
-import { navigate } from '../app.js?v=20261104_v19';
+} from '../api.js?v=20261104_v20';
+import { trackEvent } from '../analytics.js?v=20261104_v20';
+import { navigate } from '../app.js?v=20261104_v20';
 
 function escapeHtml(str) {
   return String(str)
@@ -377,10 +377,10 @@ export function renderTypingScreen(container, params = {}) {
               <input type="checkbox" id="toggle-single-verse-checkbox" class="option-switch" ${singleVerseMode ? 'checked' : ''} />
             </label>
 
-            <!-- Toggle: Shuffle Verses -->
-            <label class="typing-option-row" for="toggle-shuffle-checkbox">
-              <span class="option-title">Shuffle Next Verses</span>
-              <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
+            <!-- Toggle: Shuffle Verses (only available if single verse mode is on) -->
+            <label class="typing-option-row typing-option-subrow" id="toggle-shuffle-row" for="toggle-shuffle-checkbox" ${singleVerseMode ? '' : 'hidden'}>
+              <span class="option-title">↳ Shuffle Next Verses</span>
+              <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} ${singleVerseMode ? '' : 'disabled'} />
             </label>
 
             <!-- Toggle: Auto-Advance -->
@@ -442,6 +442,7 @@ export function renderTypingScreen(container, params = {}) {
   const optionsCloseBtn = container.querySelector('#options-close-btn');
   const optionsDoneBtn = container.querySelector('#options-done-btn');
   const toggleSingleVerseCheckbox = container.querySelector('#toggle-single-verse-checkbox');
+  const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
   const toggleSkipCelebrationCheckbox = container.querySelector('#toggle-skip-celebration-checkbox');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
@@ -470,8 +471,13 @@ export function renderTypingScreen(container, params = {}) {
   // ── 1. Typing Options Modal Controls ───────────────────────────
   function openOptionsModal() {
     pendingSingleVerseSwitch = null;
-    if (toggleSingleVerseCheckbox) toggleSingleVerseCheckbox.checked = singleVerseMode;
-    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
+    const isSingle = singleVerseMode;
+    if (toggleSingleVerseCheckbox) toggleSingleVerseCheckbox.checked = isSingle;
+    if (toggleShuffleRow) toggleShuffleRow.hidden = !isSingle;
+    if (toggleShuffleCheckbox) {
+      toggleShuffleCheckbox.checked = shuffleVerses;
+      toggleShuffleCheckbox.disabled = !isSingle;
+    }
     if (toggleSkipCelebrationCheckbox) toggleSkipCelebrationCheckbox.checked = skipCelebrationModal;
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
     if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
@@ -528,6 +534,12 @@ export function renderTypingScreen(container, params = {}) {
       const isSingle = toggleSingleVerseCheckbox.checked;
       setSingleVerseModePref(isSingle);
       pendingSingleVerseSwitch = isSingle;
+      if (toggleShuffleRow) {
+        toggleShuffleRow.hidden = !isSingle;
+      }
+      if (toggleShuffleCheckbox) {
+        toggleShuffleCheckbox.disabled = !isSingle;
+      }
     });
   }
 

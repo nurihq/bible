@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js?v=20261104_v19';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getLocalStore } from './api.js?v=20261104_v19';
-import { initGA, trackPageView } from './analytics.js?v=20261104_v19';
-import { getBookById } from './bible-data.js?v=20261104_v19';
+import { Navbar } from './components/navbar.js?v=20261104_v20';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getLocalStore } from './api.js?v=20261104_v20';
+import { initGA, trackPageView } from './analytics.js?v=20261104_v20';
+import { getBookById } from './bible-data.js?v=20261104_v20';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261104_v19';
-import { renderLandingScreen } from './screens/home.js?v=20261104_v19';
-import { renderTypingScreen } from './screens/typing.js?v=20261104_v19';
-import { renderProgressScreen } from './screens/progress.js?v=20261104_v19';
+import { renderSignInScreen } from './screens/signin.js?v=20261104_v20';
+import { renderLandingScreen } from './screens/home.js?v=20261104_v20';
+import { renderTypingScreen } from './screens/typing.js?v=20261104_v20';
+import { renderProgressScreen } from './screens/progress.js?v=20261104_v20';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';

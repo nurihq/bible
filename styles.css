@@ -1337,6 +1337,12 @@ body.typing-active-view .main-content {
   cursor: default;
 }
 
+.typing-option-row.typing-option-subrow {
+  margin-left: 0.75rem;
+  padding-left: 0.65rem;
+  border-left: 2px solid var(--accent-emerald);
+}
+
 .typing-option-row .option-title {
   font-size: 0.86rem;
   font-weight: 600;
@@ -1363,6 +1369,11 @@ body.typing-active-view .main-content {
 .option-switch:checked {
   background: var(--accent-emerald);
   border-color: var(--accent-emerald);
+}
+
+.option-switch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .option-switch::after {
