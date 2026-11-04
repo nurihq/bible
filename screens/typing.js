@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v20';
+} from '../bible-data.js?v=20261104_v21';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -22,6 +22,13 @@ import {
   setSkipCelebrationModalPref,
   getShuffleVersesPref,
   setShuffleVersesPref,
+  getAdvanceButtonPref,
+  setAdvanceButtonPref,
+  pushRandomVerseHistory,
+  popRandomVerseHistory,
+  pushRandomVerseForward,
+  popRandomVerseForward,
+  clearRandomVerseForward,
   setLastSelectedChapter,
   recordCompletedVerse,
   recordCompletedChapter,
@@ -32,9 +39,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v20';
-import { trackEvent } from '../analytics.js?v=20261104_v20';
-import { navigate } from '../app.js?v=20261104_v20';
+} from '../api.js?v=20261104_v21';
+import { trackEvent } from '../analytics.js?v=20261104_v21';
+import { navigate } from '../app.js?v=20261104_v21';
 
 function escapeHtml(str) {
   return String(str)
@@ -65,6 +72,7 @@ export function renderTypingScreen(container, params = {}) {
   let showTypingStats = getShowTypingStatsPref();
   let skipCelebrationModal = getSkipCelebrationModalPref();
   let shuffleVerses = getShuffleVersesPref();
+  let advanceButtonPref = getAdvanceButtonPref();
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
 
@@ -219,14 +227,17 @@ export function renderTypingScreen(container, params = {}) {
         <!-- Line 1: Chapter Nav, Title, Mode & Action Controls -->
         <div class="summary-line summary-line-top">
           <div class="summary-nav-group">
-            <button class="btn btn-secondary btn-sm summary-step-btn" id="prev-step-btn" title="Previous Chapter (${prevChapterRef.bookName} ${prevChapterRef.chapter})">‹</button>
+            <button class="btn btn-secondary btn-sm summary-step-btn" id="prev-step-btn" title="Previous ${singleVerseMode ? 'Verse' : 'Chapter'}">‹</button>
             <div class="summary-heading">
               <h1 class="summary-title" id="telemetry-heading-title">
                 ${singleVerseMode ? `${book.name} ${initialChapter}:${targetSingleVerseNum}` : `${book.name} ${initialChapter}`}
               </h1>
               <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
             </div>
-            <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next Chapter (${nextChapterRef.bookName} ${nextChapterRef.chapter})">›</button>
+            <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next ${singleVerseMode ? 'Verse' : 'Chapter'}">›</button>
+            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && advanceButtonPref ? '' : 'hidden'}>
+              ${(singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›'}
+            </button>
             <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
           </div>
 
@@ -383,6 +394,12 @@ export function renderTypingScreen(container, params = {}) {
               <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} ${singleVerseMode ? '' : 'disabled'} />
             </label>
 
+            <!-- Toggle: Wait for Advance Button (only available if single verse mode is on) -->
+            <label class="typing-option-row typing-option-subrow" id="toggle-advance-btn-row" for="toggle-advance-btn-checkbox" ${singleVerseMode ? '' : 'hidden'}>
+              <span class="option-title">↳ Wait for Advance Button</span>
+              <input type="checkbox" id="toggle-advance-btn-checkbox" class="option-switch" ${advanceButtonPref ? 'checked' : ''} ${singleVerseMode ? '' : 'disabled'} />
+            </label>
+
             <!-- Toggle: Auto-Advance -->
             <label class="typing-option-row" for="toggle-skip-celebration-checkbox">
               <span class="option-title">Auto-Advance (Skip Popup)</span>
@@ -437,6 +454,7 @@ export function renderTypingScreen(container, params = {}) {
   // DOM Elements
   const prevStepBtn = container.querySelector('#prev-step-btn');
   const nextStepBtn = container.querySelector('#next-step-btn');
+  const advanceStepBtn = container.querySelector('#advance-step-btn');
   const optionsBtn = container.querySelector('#typing-options-btn');
   const optionsBackdrop = container.querySelector('#typing-options-backdrop');
   const optionsCloseBtn = container.querySelector('#options-close-btn');
@@ -444,6 +462,8 @@ export function renderTypingScreen(container, params = {}) {
   const toggleSingleVerseCheckbox = container.querySelector('#toggle-single-verse-checkbox');
   const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
+  const toggleAdvanceBtnRow = container.querySelector('#toggle-advance-btn-row');
+  const toggleAdvanceBtnCheckbox = container.querySelector('#toggle-advance-btn-checkbox');
   const toggleSkipCelebrationCheckbox = container.querySelector('#toggle-skip-celebration-checkbox');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
   const toggleSkipDoneCheckbox = container.querySelector('#toggle-skip-done-checkbox');
@@ -477,6 +497,11 @@ export function renderTypingScreen(container, params = {}) {
     if (toggleShuffleCheckbox) {
       toggleShuffleCheckbox.checked = shuffleVerses;
       toggleShuffleCheckbox.disabled = !isSingle;
+    }
+    if (toggleAdvanceBtnRow) toggleAdvanceBtnRow.hidden = !isSingle;
+    if (toggleAdvanceBtnCheckbox) {
+      toggleAdvanceBtnCheckbox.checked = advanceButtonPref;
+      toggleAdvanceBtnCheckbox.disabled = !isSingle;
     }
     if (toggleSkipCelebrationCheckbox) toggleSkipCelebrationCheckbox.checked = skipCelebrationModal;
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
@@ -540,6 +565,15 @@ export function renderTypingScreen(container, params = {}) {
       if (toggleShuffleCheckbox) {
         toggleShuffleCheckbox.disabled = !isSingle;
       }
+      if (toggleAdvanceBtnRow) {
+        toggleAdvanceBtnRow.hidden = !isSingle;
+      }
+      if (toggleAdvanceBtnCheckbox) {
+        toggleAdvanceBtnCheckbox.disabled = !isSingle;
+      }
+      if (advanceStepBtn) {
+        advanceStepBtn.hidden = !isSingle || !advanceButtonPref;
+      }
     });
   }
 
@@ -547,6 +581,22 @@ export function renderTypingScreen(container, params = {}) {
     toggleShuffleCheckbox.addEventListener('change', () => {
       shuffleVerses = toggleShuffleCheckbox.checked;
       setShuffleVersesPref(shuffleVerses);
+    });
+  }
+
+  if (toggleAdvanceBtnCheckbox) {
+    toggleAdvanceBtnCheckbox.addEventListener('change', () => {
+      advanceButtonPref = toggleAdvanceBtnCheckbox.checked;
+      setAdvanceButtonPref(advanceButtonPref);
+      if (advanceStepBtn) {
+        advanceStepBtn.hidden = !singleVerseMode || !advanceButtonPref;
+      }
+    });
+  }
+
+  if (advanceStepBtn) {
+    advanceStepBtn.addEventListener('click', () => {
+      navigateNextStep();
     });
   }
 
@@ -648,6 +698,14 @@ export function renderTypingScreen(container, params = {}) {
   // ── 3. Prev / Next Chapter Stepper & Restart Button ────────────
   function navigatePrevStep() {
     if (singleVerseMode && targetSingleVerseNum) {
+      if (shuffleVerses) {
+        const prev = popRandomVerseHistory();
+        if (prev) {
+          pushRandomVerseForward({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+          navigate(`#/typing/${prev.bookId}/${prev.chapter}/${prev.verse}`);
+          return;
+        }
+      }
       if (targetSingleVerseNum > 1) {
         navigate(`#/typing/${book.id}/${initialChapter}/${targetSingleVerseNum - 1}`);
       } else {
@@ -660,26 +718,38 @@ export function renderTypingScreen(container, params = {}) {
 
   function navigateNextStep() {
     if (singleVerseMode && targetSingleVerseNum) {
-      if (shuffleVerses && allChapterVerses.length > 1) {
-        // Find incomplete verses in this chapter (excluding current)
-        const incompleteVerses = allChapterVerses
-          .map(v => v.verse)
-          .filter(vNum => vNum !== targetSingleVerseNum && !completedVerseSet.has(vNum));
-
-        let nextV;
-        if (incompleteVerses.length > 0) {
-          nextV = incompleteVerses[Math.floor(Math.random() * incompleteVerses.length)];
-        } else {
-          // All other verses in chapter are completed; pick any other verse randomly
-          const otherVerses = allChapterVerses
-            .map(v => v.verse)
-            .filter(vNum => vNum !== targetSingleVerseNum);
-          nextV = otherVerses.length > 0
-            ? otherVerses[Math.floor(Math.random() * otherVerses.length)]
-            : 1;
+      if (shuffleVerses) {
+        const fwd = popRandomVerseForward();
+        if (fwd) {
+          pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+          navigate(`#/typing/${fwd.bookId}/${fwd.chapter}/${fwd.verse}`);
+          return;
         }
-        navigate(`#/typing/${book.id}/${initialChapter}/${nextV}`);
-        return;
+
+        if (allChapterVerses.length > 1) {
+          pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+          clearRandomVerseForward();
+
+          // Find incomplete verses in this chapter (excluding current)
+          const incompleteVerses = allChapterVerses
+            .map(v => v.verse)
+            .filter(vNum => vNum !== targetSingleVerseNum && !completedVerseSet.has(vNum));
+
+          let nextV;
+          if (incompleteVerses.length > 0) {
+            nextV = incompleteVerses[Math.floor(Math.random() * incompleteVerses.length)];
+          } else {
+            // All other verses in chapter are completed; pick any other verse randomly
+            const otherVerses = allChapterVerses
+              .map(v => v.verse)
+              .filter(vNum => vNum !== targetSingleVerseNum);
+            nextV = otherVerses.length > 0
+              ? otherVerses[Math.floor(Math.random() * otherVerses.length)]
+              : 1;
+          }
+          navigate(`#/typing/${book.id}/${initialChapter}/${nextV}`);
+          return;
+        }
       }
 
       const maxV = allChapterVerses.length || targetSingleVerseNum;
@@ -714,6 +784,12 @@ export function renderTypingScreen(container, params = {}) {
     if (errorAlert) errorAlert.hidden = true;
     if (completionBackdrop) completionBackdrop.hidden = true;
     if (viewportWrapper) viewportWrapper.classList.remove('has-active-error');
+    if (advanceStepBtn) {
+      advanceStepBtn.classList.remove('btn-primary', 'is-ready');
+      advanceStepBtn.classList.add('btn-secondary');
+      advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+      advanceStepBtn.title = 'Advance to next verse (or press Enter)';
+    }
 
     // Move cursor to start without clearing completed verses
     const startVerseNum = singleVerseMode
@@ -1216,6 +1292,17 @@ export function renderTypingScreen(container, params = {}) {
 
     const badgeEl = container.querySelector('#telemetry-completed-badge');
     if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+
+    if (singleVerseMode && advanceButtonPref) {
+      if (advanceStepBtn) {
+        advanceStepBtn.hidden = false;
+        advanceStepBtn.classList.remove('btn-secondary');
+        advanceStepBtn.classList.add('btn-primary', 'is-ready');
+        advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+        advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
+      }
+      return;
+    }
 
     if (singleVerseMode && skipCelebrationModal) {
       navigateNextStep();

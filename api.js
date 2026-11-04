@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261104_v20';
+import { CONFIG } from './config.js?v=20261104_v21';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261104_v20';
+} from './bible-data.js?v=20261104_v21';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -197,6 +197,71 @@ export function setShuffleVersesPref(shuffle) {
   const store = getLocalStore();
   store.shuffleVerses = Boolean(shuffle);
   saveLocalStore(store);
+}
+
+export function getAdvanceButtonPref() {
+  const store = getLocalStore();
+  if (store.advanceButton === undefined) {
+    return true; // default on
+  }
+  return Boolean(store.advanceButton);
+}
+
+export function setAdvanceButtonPref(advance) {
+  const store = getLocalStore();
+  store.advanceButton = Boolean(advance);
+  saveLocalStore(store);
+}
+
+const RANDOM_HISTORY_KEY = 'bible_random_verse_history';
+const RANDOM_FORWARD_KEY = 'bible_random_verse_forward';
+
+export function pushRandomVerseHistory(ref) {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(RANDOM_HISTORY_KEY) || '[]');
+    list.push(ref);
+    if (list.length > 50) list.shift();
+    sessionStorage.setItem(RANDOM_HISTORY_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+export function popRandomVerseHistory() {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(RANDOM_HISTORY_KEY) || '[]');
+    if (list.length === 0) return null;
+    const item = list.pop();
+    sessionStorage.setItem(RANDOM_HISTORY_KEY, JSON.stringify(list));
+    return item;
+  } catch {
+    return null;
+  }
+}
+
+export function pushRandomVerseForward(ref) {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(RANDOM_FORWARD_KEY) || '[]');
+    list.push(ref);
+    if (list.length > 50) list.shift();
+    sessionStorage.setItem(RANDOM_FORWARD_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+export function popRandomVerseForward() {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(RANDOM_FORWARD_KEY) || '[]');
+    if (list.length === 0) return null;
+    const item = list.pop();
+    sessionStorage.setItem(RANDOM_FORWARD_KEY, JSON.stringify(list));
+    return item;
+  } catch {
+    return null;
+  }
+}
+
+export function clearRandomVerseForward() {
+  try {
+    sessionStorage.removeItem(RANDOM_FORWARD_KEY);
+  } catch {}
 }
 
 export function setLastSelectedChapter(bookId, chapter, verse = null) {
