@@ -1344,15 +1344,8 @@ body.typing-active-view .main-content {
   gap: 0.4rem;
 }
 
-/* Mode Switcher Segmented Control */
-.typing-mode-switcher-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.15rem;
-}
-
-.mode-segmented-control {
+/* Mode Tabs inside Options Modal */
+.modal-mode-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   background: var(--bg-subtle);
@@ -1360,32 +1353,32 @@ body.typing-active-view .main-content {
   border-radius: var(--radius-md);
   padding: 3px;
   gap: 4px;
+  margin-bottom: 0.35rem;
 }
 
-.mode-segment-btn {
+.modal-mode-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  padding: 0.48rem 0.75rem;
+  padding: 0.52rem 0.85rem;
   font-family: var(--font-sans);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-secondary);
   background: transparent;
   border: 1px solid transparent;
   border-radius: calc(var(--radius-md) - 3px);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.18s ease;
   user-select: none;
 }
 
-.mode-segment-btn:hover:not(.active) {
+.modal-mode-tab:hover:not(.active) {
   color: var(--text-primary);
   background: var(--bg-hover);
 }
 
-.mode-segment-btn.active {
+.modal-mode-tab.active {
   background: var(--bg-surface);
   color: var(--text-primary);
   border-color: var(--border-color);
@@ -1393,16 +1386,17 @@ body.typing-active-view .main-content {
   font-weight: 700;
 }
 
-[data-theme="dark"] .mode-segment-btn.active {
+[data-theme="dark"] .modal-mode-tab.active {
   background: var(--bg-surface);
   color: var(--accent-emerald);
   border-color: var(--accent-emerald);
 }
 
-.typing-mode-group {
+.modal-tab-panel {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  min-height: 95px;
 }
 
 .typing-options-section-divider {
