@@ -6,10 +6,10 @@ import {
   getChapterProgressSummary,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v10';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v10';
-import { trackEvent } from '../analytics.js?v=20261104_v10';
-import { navigate } from '../app.js?v=20261104_v10';
+} from '../api.js?v=20261104_v11';
+import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261104_v11';
+import { trackEvent } from '../analytics.js?v=20261104_v11';
+import { navigate } from '../app.js?v=20261104_v11';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -180,11 +180,10 @@ export function renderLandingScreen(container) {
         <div class="votd-card-wrapper">
           <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${votd.bookName} ${votd.chapter}:${votd.verse}">
             <div class="votd-top-row">
-              <span class="votd-tag">☀️ Verse of the Day · ${votd.theme}</span>
-              <div class="votd-top-right">
+              <div class="votd-top-badges">
                 ${badgesHtml}
-                <span class="votd-action-hint">Click card to type verse →</span>
               </div>
+              <span class="votd-action-hint">Type verse →</span>
             </div>
 
             <div class="votd-quote">
@@ -194,7 +193,7 @@ export function renderLandingScreen(container) {
             <div class="votd-ref-row">
               <div class="votd-ref-info">
                 <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
-                <span class="votd-ref-sub">ESV · Read or type this verse, or study the full chapter</span>
+                <span class="votd-ref-sub">ESV</span>
               </div>
 
               <div class="votd-ctas">
@@ -207,26 +206,9 @@ export function renderLandingScreen(container) {
                 >
                   ${isVerseRead ? '✓ Verse Read' : '📖 Mark Verse Read'}
                 </button>
-                <button
-                  type="button"
-                  class="btn ${isChRead ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
-                  id="votd-mark-ch-btn"
-                  data-stop-card-nav="true"
-                  title="Mark all of ${votd.bookName} ${votd.chapter} as read"
-                >
-                  ${isChRead ? '✓ Ch. Read' : '📖 Mark Ch. Read'}
-                </button>
-                <a
-                  href="#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}"
-                  class="btn btn-primary btn-sm"
-                  data-stop-card-nav="true"
-                  title="Practice typing only this single verse"
-                >
-                  🎯 Type Verse →
-                </a>
                 <a
                   href="#/typing/${votd.bookId}/${votd.chapter}"
-                  class="btn btn-secondary btn-sm"
+                  class="btn btn-primary btn-sm"
                   data-stop-card-nav="true"
                   title="Open and type the full chapter"
                 >

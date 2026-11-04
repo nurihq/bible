@@ -2317,20 +2317,25 @@ sup.verse-num.is-both {
 }
 
 .votd-action-hint {
-  font-size: 0.76rem;
-  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--primary);
+  margin-left: auto;
 }
 
 .votd-quote {
-  font-family: var(--font-serif);
-  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
-  line-height: 1.62;
+  font-family: var(--font-sans);
+  font-size: clamp(1.08rem, 2.2vw, 1.25rem);
+  line-height: 1.65;
   color: var(--text-primary);
-  font-style: italic;
+  font-style: normal;
+  letter-spacing: -0.01em;
 }
 
 .votd-quote .verse-num {
   font-style: normal;
+  font-weight: 600;
+  color: var(--primary);
   vertical-align: baseline;
   margin-right: 0.45rem;
 }
@@ -2352,10 +2357,11 @@ sup.verse-num.is-both {
 }
 
 .votd-ref-title {
-  font-family: var(--font-serif);
-  font-size: 1.15rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .votd-ref-sub {
