@@ -13,7 +13,6 @@ export class Navbar {
     this.currentContainer = null;
     this.currentRoute = '#/';
 
-    // Automatically refresh top bar WPM/CPM averages when stats update
     window.addEventListener('bible:stats-updated', () => {
       if (this.currentContainer) {
         this.updateStatsPills(this.currentContainer);
@@ -24,6 +23,12 @@ export class Navbar {
   getNavBackInfo(route) {
     const cleanRoute = (route || '').replace(/^#/, '');
     if (cleanRoute.startsWith('/typing') || cleanRoute.startsWith('/progress')) {
+      return {
+        label: 'Hub',
+        target: '#/hub'
+      };
+    }
+    if (cleanRoute === '/hub' || cleanRoute === '/signin') {
       return {
         label: 'Home',
         target: '#/'
@@ -52,29 +57,33 @@ export class Navbar {
     const user = Auth.getUser();
     const backInfo = this.getNavBackInfo(currentRoute);
     const cleanPath = (currentRoute || '').replace(/^#/, '') || '/';
+    const isHomeScreen = cleanPath === '/' || cleanPath === '';
+    const isSignInScreen = cleanPath === '/signin';
     const isTypingActive = cleanPath === '/typing' || cleanPath.startsWith('/typing/');
     const isProgressActive = cleanPath === '/progress';
-    const stats = isAuthed ? getGlobalTypingStats() : null;
+    const showUnauthBanner = !isAuthed && !isHomeScreen && !isSignInScreen;
+    const showTopStats = !isSignInScreen && (!isHomeScreen || isAuthed);
+    const stats = showTopStats ? getGlobalTypingStats() : null;
 
     container.innerHTML = `
       <header class="navbar">
         <div class="nav-left">
-          ${isAuthed && backInfo ? `
+          ${backInfo ? `
             <button class="nav-back-btn" id="nav-back-btn" data-target="${backInfo.target}">
               ← <span>${backInfo.label}</span>
             </button>
           ` : ''}
 
-          <a href="${isAuthed ? '#/' : '#/signin'}" class="nav-brand" title="bible">
+          <a href="#/" class="nav-brand" title="bible">
             <svg class="nav-home-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
             <span class="nav-brand-text">bible</span>
           </a>
         </div>
 
-        ${isAuthed && stats ? `
+        ${showTopStats && stats ? `
           <div class="nav-center-stats">
             <a href="#/progress" class="nav-stat-pill" title="Average Words & Characters Per Minute (Click for full stats)">
               <span class="nav-stat-icon">⚡</span>
@@ -93,7 +102,7 @@ export class Navbar {
         ` : ''}
 
         <div class="nav-right">
-          ${isAuthed ? `
+          ${!isHomeScreen && !isSignInScreen ? `
             <a href="#/typing" class="nav-about-btn ${isTypingActive ? 'active' : ''}" title="Bible Typing App">
               <span>⌨️</span>
               <span class="nav-about-text">Typing</span>
@@ -117,9 +126,24 @@ export class Navbar {
             <button class="btn-signout" id="nav-signout-btn">
               Sign Out
             </button>
-          ` : ''}
+          ` : `
+            <a href="#/signin" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; text-decoration: none;">
+              Sign In
+            </a>
+          `}
         </div>
       </header>
+      ${showUnauthBanner ? `
+        <div class="unauth-warning-banner" role="alert">
+          <div class="unauth-warning-content">
+            <span class="unauth-warning-icon">⚠️</span>
+            <span class="unauth-warning-text">
+              <strong>You are not signed in.</strong> Any completed chapters or typing stats you record are not synced to your account and will be lost.
+            </span>
+          </div>
+          <a href="#/signin" class="unauth-warning-cta">Sign In to Save →</a>
+        </div>
+      ` : ''}
     `;
 
     const backBtn = container.querySelector('#nav-back-btn');
@@ -153,7 +177,7 @@ export class Navbar {
         trackEvent('sign_out');
         Auth.signOut();
         if (this.onSignOut) this.onSignOut();
-        navigate('#/signin');
+        navigate('#/');
       });
     }
   }

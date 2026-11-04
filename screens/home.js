@@ -3,14 +3,115 @@ import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-d
 import { trackEvent } from '../analytics.js';
 import { navigate } from '../app.js';
 
-export function renderHomeScreen(container) {
+export function renderLandingScreen(container) {
+  const PREVIEW_CARDS = [
+    {
+      ref: 'Genesis 1:1',
+      translation: 'ESV',
+      verseNum: '1',
+      frontText: 'In the beginning, God created the heavens and the earth.',
+      backTitle: 'Chapter 1 · 31 Verses',
+      backMeta: '798 words · ~4,120 chars · Law'
+    },
+    {
+      ref: 'Psalm 23:1',
+      translation: 'ESV',
+      verseNum: '1',
+      frontText: 'The LORD is my shepherd; I shall not want.',
+      backTitle: 'Psalm 23 · 6 Verses',
+      backMeta: '115 words · ~570 chars · Poetry'
+    },
+    {
+      ref: 'John 1:1',
+      translation: 'ESV',
+      verseNum: '1',
+      frontText: 'In the beginning was the Word, and the Word was with God...',
+      backTitle: 'Chapter 1 · 51 Verses',
+      backMeta: '1,032 words · ~5,180 chars · Gospels'
+    }
+  ];
+
+  container.innerHTML = `
+    <div class="hero-wrapper">
+      <div class="hero-badge">
+        <span>✨</span>
+        <span>66 Books · 1,189 Chapters · 22 Translations</span>
+      </div>
+
+      <h1 class="hero-title">bible</h1>
+      <p class="hero-subtitle">
+        Internalize Scripture at your keyboard. Type through any chapter of the Bible, track your WPM &amp; CPM speed, and map your reach across all 1,189 chapters.
+      </p>
+
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" id="home-start-btn">
+          <span>Start Typing</span>
+          <span style="font-size: 1.15rem;">→</span>
+        </button>
+      </div>
+
+      <!-- Interactive 3D Flippable Preview Cards -->
+      <div class="hero-preview-cards" id="hero-cards-container">
+        ${PREVIEW_CARDS.map((card, idx) => `
+          <div class="home-card-stage" data-card-idx="${idx}" data-ref="${card.ref}" title="Click to flip">
+            <div class="home-card-inner">
+              <!-- Front Side: Verse Text Preview -->
+              <div class="home-card-face home-card-front">
+                <div class="home-card-top-tag">
+                  <span>📖</span>
+                  <span>${card.ref} (${card.translation})</span>
+                </div>
+                <div class="home-card-verse-preview">
+                  <sup class="verse-num">${card.verseNum}</sup>${card.frontText}
+                </div>
+                <div class="home-card-hint">Tap to flip</div>
+              </div>
+
+              <!-- Back Side: Chapter Typing Info -->
+              <div class="home-card-face home-card-back">
+                <div class="home-card-top-tag">
+                  <span>⌨️</span>
+                  <span>Typing Specs</span>
+                </div>
+                <div class="home-card-word">${card.backTitle}</div>
+                <div class="home-card-pronunciation">${card.backMeta}</div>
+                <div class="home-card-hint">Tap to flip back</div>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll('.home-card-stage').forEach(stage => {
+    stage.addEventListener('click', () => {
+      stage.classList.toggle('is-flipped');
+      trackEvent('home_card_flip', { ref: stage.getAttribute('data-ref') });
+    });
+  });
+
+  const startBtn = container.querySelector('#home-start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
+      if (Auth.isAuthenticated()) {
+        navigate('#/hub');
+      } else {
+        navigate('#/signin');
+      }
+    });
+  }
+}
+
+export function renderHubScreen(container) {
   const user = Auth.getUser();
-  const firstName = (user?.name || 'Friend').split(' ')[0];
+  const isAuthed = Auth.isAuthenticated();
+  const firstName = isAuthed ? (user?.name || 'Friend').split(' ')[0] : null;
   const stats = getGlobalTypingStats();
   const store = getLocalStore();
   const prefTr = getTranslationByCode(getPreferredTranslation());
 
-  // Determine suggested chapter (next chapter after most recently typed, or last viewed, or Genesis 1)
   let suggestedRef = { bookId: 1, bookName: 'Genesis', chapter: 1 };
   if (stats.sessions.length > 0) {
     const latest = stats.sessions[0];
@@ -31,7 +132,7 @@ export function renderHomeScreen(container) {
         <div class="screen-title-group">
           <div class="screen-lang-tag">
             <span>✨</span>
-            <span>Welcome back, ${firstName}</span>
+            <span>${firstName ? `Welcome back, ${firstName}` : 'Scripture Study Hub'}</span>
           </div>
           <h1 class="screen-title">Scripture Suite</h1>
           <p class="screen-subtitle">
@@ -117,7 +218,6 @@ export function renderHomeScreen(container) {
     </div>
   `;
 
-  // Make the entire card clickable to go to #/typing unless clicking a specific sub-button
   const card = container.querySelector('#bible-typing-feature-card');
   if (card) {
     card.addEventListener('click', (e) => {

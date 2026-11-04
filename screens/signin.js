@@ -7,28 +7,37 @@ export function renderSignInScreen(container) {
   container.innerHTML = `
     <div class="signin-wrapper">
       <div class="signin-card">
-        <div class="signin-logo">📖</div>
-        <h1 class="signin-title">bible</h1>
+        <div class="signin-logo">✨</div>
+        <h2 class="signin-title">bible</h2>
         <p class="signin-subtitle">
-          Sign in to access the Bible Typing suite, track your WPM &amp; CPM speed, and record your reach across all 1,189 chapters of Scripture.
+          Sign in with Google to save your completed Bible chapters, WPM &amp; CPM speed history, and Scripture reach across devices.
         </p>
 
         <div class="signin-btn-container">
+          <!-- Render Google One Tap / Button Container -->
           <div id="google-signin-btn"></div>
         </div>
 
-        <div class="signin-features-mini">
-          <div class="signin-feature-pill">⌨️ 22 Translations (ESV Default)</div>
-          <div class="signin-feature-pill">📊 Live WPM &amp; CPM Tracking</div>
-          <div class="signin-feature-pill">☁️ Nuri AWS Cloud Sync &amp; Backups</div>
-        </div>
-
-        <div class="signin-footer">
-          <p>Protected with Google Identity Services &amp; AWS DynamoDB.</p>
+        <div class="signin-unauth-section">
+          <div class="signin-divider"><span>or</span></div>
+          <button type="button" class="btn btn-secondary signin-unauth-btn" id="continue-unauth-btn">
+            Continue Unauthenticated →
+          </button>
+          <p class="signin-unauth-warning">
+            ⚠️ <strong>Warning:</strong> All completed chapters and typing progress will be lost if you do not sign in.
+          </p>
         </div>
       </div>
     </div>
   `;
+
+  const unauthBtn = container.querySelector('#continue-unauth-btn');
+  if (unauthBtn) {
+    unauthBtn.addEventListener('click', () => {
+      trackEvent('continue_unauthenticated');
+      navigate('#/hub');
+    });
+  }
 
   function initGoogleBtn() {
     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
@@ -77,10 +86,10 @@ export function renderSignInScreen(container) {
           window.dispatchEvent(new CustomEvent('bible:stats-updated'));
         }).catch(() => {});
 
-        navigate('#/');
+        navigate('#/hub');
       } catch (err) {
         console.error('Failed to parse JWT payload:', err);
-        navigate('#/');
+        navigate('#/hub');
       }
     }
   }

@@ -4,7 +4,7 @@ import { initGA, trackPageView } from './analytics.js';
 import { getBookById } from './bible-data.js';
 
 import { renderSignInScreen } from './screens/signin.js';
-import { renderHomeScreen } from './screens/home.js';
+import { renderLandingScreen, renderHubScreen } from './screens/home.js';
 import { renderTypingScreen } from './screens/typing.js';
 import { renderProgressScreen } from './screens/progress.js';
 
@@ -88,7 +88,7 @@ class App {
     if (window.__bibleTypingCleanup) {
       window.__bibleTypingCleanup();
     }
-    navigate('#/signin');
+    navigate('#/');
   }
 
   handleRoute() {
@@ -100,18 +100,19 @@ class App {
       window.__bibleTypingCleanup();
     }
 
-    // Strict Login Requirement: Can only access any screen if logged in
-    if (!Auth.isAuthenticated() && path !== '/signin') {
-      this.navbar.render(this.navContainer, '#/signin');
-      navigate('#/signin');
+    // Re-render navbar (and global unauthenticated warning banner on non-landing/non-signin screens)
+    this.navbar.render(this.navContainer, routeToken);
+
+    if (path === '/' || path === '') {
+      document.title = 'bible — Scripture Typing & Reach Suite';
+      trackPageView('/', document.title);
+      renderLandingScreen(this.mainContainer);
       return;
     }
 
-    this.navbar.render(this.navContainer, routeToken);
-
     if (path === '/signin') {
       if (Auth.isAuthenticated()) {
-        navigate('#/');
+        navigate('#/hub');
         return;
       }
       document.title = 'Sign In | bible';
@@ -120,10 +121,10 @@ class App {
       return;
     }
 
-    if (path === '/' || path === '') {
-      document.title = 'bible — Scripture Typing & Reach Suite';
-      trackPageView('/', document.title);
-      renderHomeScreen(this.mainContainer);
+    if (path === '/hub') {
+      document.title = 'Scripture Suite | bible';
+      trackPageView('/hub', document.title);
+      renderHubScreen(this.mainContainer);
       return;
     }
 
@@ -152,7 +153,7 @@ class App {
       return;
     }
 
-    // Fallback to home
+    // Fallback to landing screen
     navigate('#/');
   }
 }
