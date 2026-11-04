@@ -7,7 +7,7 @@ import {
   getPrevChapterRef,
   searchBibleChapters,
   fetchChapterVerses
-} from '../bible-data.js?v=20261104_v12';
+} from '../bible-data.js?v=20261104_v13';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -24,9 +24,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261104_v12';
-import { trackEvent } from '../analytics.js?v=20261104_v12';
-import { navigate } from '../app.js?v=20261104_v12';
+} from '../api.js?v=20261104_v13';
+import { trackEvent } from '../analytics.js?v=20261104_v13';
+import { navigate } from '../app.js?v=20261104_v13';
 
 function escapeHtml(str) {
   return String(str)
@@ -62,6 +62,7 @@ export function renderTypingScreen(container, params = {}) {
   const chapterKey = `${book.id}:${initialChapter}`;
 
   // Ensure window does not scroll while typing; typing card fills remaining viewport height
+  document.documentElement.classList.add('typing-active-view');
   document.body.classList.add('typing-active-view');
 
   // Active typing session state
@@ -109,6 +110,7 @@ export function renderTypingScreen(container, params = {}) {
   let onStatsUpdated = null;
   function cleanup() {
     clearTimer();
+    document.documentElement.classList.remove('typing-active-view');
     document.body.classList.remove('typing-active-view');
     if (onWindowKeydown) {
       window.removeEventListener('keydown', onWindowKeydown);
@@ -211,75 +213,89 @@ export function renderTypingScreen(container, params = {}) {
 
   container.innerHTML = `
     <div class="typing-screen-container">
-      <!-- Very short single line summary: Chapter Nav, Title, Progress Badge, Stats & Skip Toggle -->
+      <!-- Two-Line Summary Bar: Line 1 Navigation & Actions, Line 2 Live Telemetry -->
       <div class="typing-summary-bar">
-        <div class="summary-left">
-          <button class="btn btn-secondary btn-sm summary-step-btn" id="prev-step-btn" title="Previous Chapter (${prevChapterRef.bookName} ${prevChapterRef.chapter})">‹</button>
-          <div class="summary-heading">
-            <h1 class="summary-title" id="telemetry-heading-title">
-              ${singleVerseMode ? `${book.name} ${initialChapter}:${targetSingleVerseNum}` : `${book.name} ${initialChapter}`}
-            </h1>
-            <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
+        <!-- Line 1: Chapter Nav, Title, Mode & Action Controls -->
+        <div class="summary-line summary-line-top">
+          <div class="summary-nav-group">
+            <button class="btn btn-secondary btn-sm summary-step-btn" id="prev-step-btn" title="Previous Chapter (${prevChapterRef.bookName} ${prevChapterRef.chapter})">‹</button>
+            <div class="summary-heading">
+              <h1 class="summary-title" id="telemetry-heading-title">
+                ${singleVerseMode ? `${book.name} ${initialChapter}:${targetSingleVerseNum}` : `${book.name} ${initialChapter}`}
+              </h1>
+              <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
+            </div>
+            <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next Chapter (${nextChapterRef.bookName} ${nextChapterRef.chapter})">›</button>
+            <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
           </div>
-          <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next Chapter (${nextChapterRef.bookName} ${nextChapterRef.chapter})">›</button>
-          <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
-          ${singleVerseMode ? `
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="open-full-chapter-top-btn" title="Open the entire chapter (${book.name} ${initialChapter})">
-              📖 Full Chapter (${book.abbr} ${initialChapter})
+
+          <div class="summary-actions-group">
+            ${singleVerseMode ? `
+              <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="open-full-chapter-top-btn" title="Open the entire chapter (${book.name} ${initialChapter})">
+                📖 Full Chapter (${book.abbr} ${initialChapter})
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-verse-read-btn" title="Toggle marked as read for verse ${targetSingleVerseNum}">
+                <span id="mark-verse-read-label">📖 Mark Verse Read</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for whole chapter (${book.name} ${initialChapter})">
+                <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
+              </button>
+            ` : `
+              <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="focus-single-verse-top-btn" title="Practice only the currently active verse">
+                🎯 Single Verse
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for ${book.name} ${initialChapter}">
+                <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
+              </button>
+            `}
+            ${!singleVerseMode ? `
+              <button
+                type="button"
+                class="skip-completed-toggle-pill ${skipCompletedVerses ? 'is-on' : 'is-off'}"
+                id="skip-completed-toggle-btn"
+                title="When enabled (default), typing skips past already-completed verses to the next incomplete verse in this chapter."
+              >
+                <span>⏭️ Skip Done:</span>
+                <strong id="skip-completed-state-label">${skipCompletedVerses ? 'ON' : 'OFF'}</strong>
+              </button>
+            ` : ''}
+            <button class="btn btn-secondary btn-sm summary-restart-btn" id="restart-chapter-btn" title="Restart passage (Esc)">
+              ↺ Restart
             </button>
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-verse-read-btn" title="Toggle marked as read for verse ${targetSingleVerseNum}">
-              <span id="mark-verse-read-label">📖 Mark Verse Read</span>
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for whole chapter (${book.name} ${initialChapter})">
-              <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
-            </button>
-          ` : `
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn" id="focus-single-verse-top-btn" title="Practice only the currently active verse">
-              🎯 Single Verse
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn mark-read-btn" id="mark-ch-read-btn" title="Toggle marked as read for ${book.name} ${initialChapter}">
-              <span id="mark-ch-read-label">📖 Mark Ch. Read</span>
-            </button>
-          `}
+          </div>
         </div>
 
-        <div class="summary-right">
-          ${!singleVerseMode ? `
-            <button
-              type="button"
-              class="skip-completed-toggle-pill ${skipCompletedVerses ? 'is-on' : 'is-off'}"
-              id="skip-completed-toggle-btn"
-              title="When enabled (default), typing skips past already-completed verses to the next incomplete verse in this chapter."
-            >
-              <span>⏭️ Skip Done:</span>
-              <strong id="skip-completed-state-label">${skipCompletedVerses ? 'ON' : 'OFF'}</strong>
-            </button>
-          ` : ''}
-
-          <div class="summary-stat-box">
-            <span class="stat-lbl">WPM</span>
-            <span class="stat-num" id="live-wpm">0</span>
+        <!-- Line 2: Live Metrics / Telemetry -->
+        <div class="summary-line summary-line-bottom">
+          <div class="summary-metrics-group">
+            <div class="summary-stat-box">
+              <span class="stat-lbl">WPM</span>
+              <span class="stat-num" id="live-wpm">0</span>
+            </div>
+            <div class="summary-stat-divider">·</div>
+            <div class="summary-stat-box">
+              <span class="stat-lbl">CPM</span>
+              <span class="stat-num" id="live-cpm">0</span>
+            </div>
+            <div class="summary-stat-divider">·</div>
+            <div class="summary-stat-box">
+              <span class="stat-lbl">Accuracy</span>
+              <span class="stat-num" id="live-acc">100%</span>
+            </div>
+            <div class="summary-stat-divider">·</div>
+            <div class="summary-stat-box">
+              <span class="stat-lbl">Verse</span>
+              <span class="stat-num" id="live-verse">-/-</span>
+            </div>
+            <div class="summary-stat-divider">·</div>
+            <div class="summary-stat-box">
+              <span class="stat-lbl">Time</span>
+              <span class="stat-num" id="live-time">0:00</span>
+            </div>
           </div>
-          <div class="summary-stat-box">
-            <span class="stat-lbl">CPM</span>
-            <span class="stat-num" id="live-cpm">0</span>
+          <div class="summary-metrics-hint">
+            <span>Click any verse to jump cursor · Backspace to correct mistakes</span>
           </div>
-          <div class="summary-stat-box">
-            <span class="stat-lbl">Acc</span>
-            <span class="stat-num" id="live-acc">100%</span>
-          </div>
-          <div class="summary-stat-box">
-            <span class="stat-lbl">Verse</span>
-            <span class="stat-num" id="live-verse">-/-</span>
-          </div>
-          <div class="summary-stat-box">
-            <span class="stat-lbl">Time</span>
-            <span class="stat-num" id="live-time">0:00</span>
-          </div>
-
-          <button class="btn btn-secondary btn-sm summary-restart-btn" id="restart-chapter-btn" title="Restart passage (Esc)">
-            ↺ Restart
-          </button>
         </div>
       </div>
 

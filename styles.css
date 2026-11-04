@@ -1027,18 +1027,35 @@ body {
 
 /* ══════════════════════════════════════════════════════════════════════════
 /* ── No-Scroll Screen Fitting for Typing Screen ──────────────── */
+html.typing-active-view,
 body.typing-active-view {
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
   overflow: hidden !important;
-  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+body.typing-active-view {
+  display: flex;
+  flex-direction: column;
+}
+
+body.typing-active-view #nav-container {
+  flex-shrink: 0;
 }
 
 body.typing-active-view .main-content {
-  padding: 0.45rem 1.25rem 0.6rem;
-  height: calc(100vh - 62px);
-  max-height: calc(100vh - 62px);
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  padding: 0.4rem 1.25rem 1rem; /* Full screen height with dedicated padding at the bottom */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .typing-screen-container {
@@ -1048,61 +1065,101 @@ body.typing-active-view .main-content {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  box-sizing: border-box;
 }
 
-/* ── Very Short Single-Line Summary Bar ────────────────────────── */
+/* ── Expanded Two-Line Summary Bar ─────────────────────────────── */
 .typing-summary-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.35rem 0.85rem;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  min-height: 42px;
-  flex-wrap: nowrap;
   box-shadow: var(--shadow-sm);
   flex-shrink: 0;
 }
 
-.summary-left {
+.summary-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.summary-line-top {
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.summary-line-bottom {
+  padding-top: 0.15rem;
+}
+
+.summary-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.summary-actions-group {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  min-width: 0;
-  flex-shrink: 1;
+  flex-wrap: wrap;
+}
+
+.summary-metrics-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.summary-metrics-hint {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.summary-stat-divider {
+  color: var(--border-color);
+  font-weight: 700;
+  user-select: none;
 }
 
 .summary-step-btn {
-  width: 26px;
-  height: 26px;
-  min-height: 26px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
   border-radius: var(--radius-sm);
 }
 
 .summary-heading {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   white-space: nowrap;
 }
 
 .summary-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 1.05rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .summary-tr-tag {
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 0.1rem 0.42rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
   border-radius: var(--radius-full);
   background: var(--accent-zen-light);
   color: var(--primary);
@@ -1110,39 +1167,32 @@ body.typing-active-view .main-content {
 }
 
 .summary-action-btn {
-  font-size: 0.74rem;
-  padding: 0.22rem 0.55rem;
-  min-height: 26px;
+  font-size: 0.76rem;
+  padding: 0.25rem 0.6rem;
+  min-height: 28px;
   white-space: nowrap;
-}
-
-.summary-right {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex-shrink: 0;
 }
 
 .summary-stat-box {
   display: flex;
   align-items: baseline;
-  gap: 0.25rem;
-  font-size: 0.74rem;
+  gap: 0.35rem;
+  font-size: 0.78rem;
 }
 
 .summary-stat-box .stat-lbl {
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
   color: var(--text-muted);
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .summary-stat-box .stat-num {
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1247,9 +1297,10 @@ body.typing-active-view .main-content {
   box-shadow: var(--shadow-md);
   cursor: text;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  overflow: hidden;
+  overflow: hidden !important;
   flex: 1;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -1292,9 +1343,11 @@ body.typing-active-view .main-content {
   flex: 1;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto !important;
+  overflow-x: hidden;
   padding: 1.6rem 2.25rem 2.5rem;
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .typing-passage-content {
