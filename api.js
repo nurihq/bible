@@ -201,17 +201,30 @@ export function getPreferredTranslation() {
   return store.preferredTranslation || 'ESV';
 }
 
+export function syncPreferencesToCloud() {
+  if (!Auth.isAuthenticated() || !CONFIG.API_ENDPOINTS.profile) return;
+  const store = getLocalStore();
+  fetchWithAuth(CONFIG.API_ENDPOINTS.profile, {
+    method: 'POST',
+    body: JSON.stringify({
+      preferredTranslation: store.preferredTranslation || 'ESV',
+      singleVerseMode: Boolean(store.singleVerseMode),
+      autoAdvance: Boolean(store.autoAdvance),
+      advanceButton: store.advanceButton !== undefined ? Boolean(store.advanceButton) : true,
+      skipCompletedVerses: store.skipCompletedVerses !== false,
+      showTypingStats: Boolean(store.showTypingStats),
+      shuffleVerses: Boolean(store.shuffleVerses),
+      shuffleScope: store.shuffleScope || 'bible'
+    })
+  }).catch(() => {});
+}
+
 export function setPreferredTranslation(translationCode) {
   const code = String(translationCode || 'ESV').toUpperCase();
   const store = getLocalStore();
   store.preferredTranslation = code;
   saveLocalStore(store);
-  if (Auth.isAuthenticated() && CONFIG.API_ENDPOINTS.profile) {
-    fetchWithAuth(CONFIG.API_ENDPOINTS.profile, {
-      method: 'POST',
-      body: JSON.stringify({ preferredTranslation: code })
-    }).catch(() => {});
-  }
+  syncPreferencesToCloud();
 }
 
 export function getSkipCompletedVersesPref() {
@@ -223,6 +236,7 @@ export function setSkipCompletedVersesPref(skip) {
   const store = getLocalStore();
   store.skipCompletedVerses = Boolean(skip);
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getShowTypingStatsPref() {
@@ -234,6 +248,7 @@ export function setShowTypingStatsPref(show) {
   const store = getLocalStore();
   store.showTypingStats = Boolean(show);
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getSingleVerseModePref() {
@@ -245,6 +260,7 @@ export function setSingleVerseModePref(enabled) {
   const store = getLocalStore();
   store.singleVerseMode = Boolean(enabled);
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getAutoAdvancePref() {
@@ -268,6 +284,7 @@ export function setAutoAdvancePref(autoAdvance) {
   store.advanceButton = !val;
   store.skipCelebrationModal = val;
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getSkipCelebrationModalPref() {
@@ -287,6 +304,7 @@ export function setShuffleVersesPref(shuffle) {
   const store = getLocalStore();
   store.shuffleVerses = Boolean(shuffle);
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getShuffleScopePref() {
@@ -298,6 +316,7 @@ export function setShuffleScopePref(scope) {
   const store = getLocalStore();
   store.shuffleScope = scope === 'chapter' ? 'chapter' : 'bible';
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getAdvanceButtonPref() {
@@ -312,6 +331,7 @@ export function setAdvanceButtonPref(advance) {
   const store = getLocalStore();
   store.advanceButton = Boolean(advance);
   saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 const RANDOM_HISTORY_KEY = 'bible_random_verse_history';
@@ -1694,8 +1714,16 @@ export async function syncLocalToCloud() {
 
     const latestStore = getLocalStore();
 
-    if (profileData && profileData.profile && profileData.profile.preferredTranslation) {
-      latestStore.preferredTranslation = profileData.profile.preferredTranslation;
+    if (profileData && profileData.profile) {
+      const cp = profileData.profile;
+      if (cp.preferredTranslation) latestStore.preferredTranslation = cp.preferredTranslation;
+      if (cp.singleVerseMode !== undefined) latestStore.singleVerseMode = Boolean(cp.singleVerseMode);
+      if (cp.autoAdvance !== undefined) latestStore.autoAdvance = Boolean(cp.autoAdvance);
+      if (cp.advanceButton !== undefined) latestStore.advanceButton = Boolean(cp.advanceButton);
+      if (cp.skipCompletedVerses !== undefined) latestStore.skipCompletedVerses = Boolean(cp.skipCompletedVerses);
+      if (cp.showTypingStats !== undefined) latestStore.showTypingStats = Boolean(cp.showTypingStats);
+      if (cp.shuffleVerses !== undefined) latestStore.shuffleVerses = Boolean(cp.shuffleVerses);
+      if (cp.shuffleScope) latestStore.shuffleScope = cp.shuffleScope;
     }
 
     if (progressData) {
@@ -1737,6 +1765,7 @@ export async function syncLocalToCloud() {
     }
 
     saveLocalStore(latestStore);
+    syncPreferencesToCloud();
   } catch (err) {
     console.warn('Cloud sync warning:', err);
   } finally {
