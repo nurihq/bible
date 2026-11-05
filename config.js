@@ -1,17 +1,14 @@
 // Configuration for Google/Firebase Auth, Google Analytics 4, and AWS Lambda Endpoints
 
 export const CONFIG = {
-  // Google OAuth 2.0 Web Client ID (from existing authorized Firebase project hiragana-1394f)
-  GOOGLE_CLIENT_ID: '711379868720-vklubpkqbdevj8a528jteeu8nfbhvgq6.apps.googleusercontent.com',
-
-  // Existing Firebase Auth Config (with nurihq.github.io authorized via Identity Toolkit API)
+  // Dedicated Firebase Auth Config for Promises to Creation (promisestocreation)
   FIREBASE_CONFIG: {
-    apiKey: 'AIzaSyBKgUerYYOQrUQVWymFrbhYsBW18cHaIuI',
-    authDomain: 'hiragana-1394f.firebaseapp.com',
-    projectId: 'hiragana-1394f',
-    storageBucket: 'hiragana-1394f.firebasestorage.app',
-    messagingSenderId: '711379868720',
-    appId: '1:711379868720:web:18dc90ff849bb0843961f5'
+    apiKey: "AIzaSyCVfBZ4ksEg-qpbOkf4G4TMyZ7JgKji4xQ",
+    authDomain: "promisestocreation.firebaseapp.com",
+    projectId: "promisestocreation",
+    storageBucket: "promisestocreation.firebasestorage.app",
+    messagingSenderId: "567729724898",
+    appId: "1:567729724898:web:e61bb96edd7f6e6a38edbb"
   },
 
   // Google Analytics 4 Measurement ID (Property: bible, properties/562336985)

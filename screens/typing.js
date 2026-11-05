@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261105_v1';
+} from '../bible-data.js?v=20261106_v1';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -42,9 +42,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261105_v1';
-import { trackEvent } from '../analytics.js?v=20261105_v1';
-import { navigate } from '../app.js?v=20261105_v1';
+} from '../api.js?v=20261106_v1';
+import { trackEvent } from '../analytics.js?v=20261106_v1';
+import { navigate } from '../app.js?v=20261106_v1';
 
 function escapeHtml(str) {
   return String(str)
