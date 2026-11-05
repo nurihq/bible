@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js?v=20261104_v29';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261104_v29';
-import { initGA, trackPageView } from './analytics.js?v=20261104_v29';
-import { getBookById, replenishRandomVersePreloads } from './bible-data.js?v=20261104_v29';
+import { Navbar } from './components/navbar.js?v=20261105_v1';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261105_v1';
+import { initGA, trackPageView } from './analytics.js?v=20261105_v1';
+import { getBookById, replenishRandomVersePreloads } from './bible-data.js?v=20261105_v1';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261104_v29';
-import { renderLandingScreen } from './screens/home.js?v=20261104_v29';
-import { renderTypingScreen } from './screens/typing.js?v=20261104_v29';
-import { renderProgressScreen } from './screens/progress.js?v=20261104_v29';
+import { renderSignInScreen } from './screens/signin.js?v=20261105_v1';
+import { renderLandingScreen } from './screens/home.js?v=20261105_v1';
+import { renderTypingScreen } from './screens/typing.js?v=20261105_v1';
+import { renderProgressScreen } from './screens/progress.js?v=20261105_v1';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';
@@ -144,7 +144,7 @@ class App {
     this.navbar.render(this.navContainer, routeToken);
 
     if (path === '/' || path === '') {
-      document.title = 'bible — Scripture Typing & Reach Suite';
+      document.title = 'Promises to Creation — Bible Typing App & Scripture Reading Tracker';
       trackPageView('/', document.title);
       renderLandingScreen(this.mainContainer);
       return;
@@ -155,7 +155,7 @@ class App {
         navigate('#/typing');
         return;
       }
-      document.title = 'Sign In | bible';
+      document.title = 'Sign In | Promises to Creation';
       trackPageView('/signin', document.title);
       renderSignInScreen(this.mainContainer);
       return;
@@ -175,7 +175,7 @@ class App {
         navigate(`#/typing/${bId}/${ch}/${vr}`);
         return;
       }
-      document.title = 'Bible Typing | bible';
+      document.title = 'Bible Typing | Promises to Creation';
       trackPageView('/typing', document.title);
       renderTypingScreen(this.mainContainer, {});
       return;
@@ -188,7 +188,7 @@ class App {
       const chapter = Number(typingVerseMatch[2]);
       const verse = Number(typingVerseMatch[3]);
       const book = getBookById(bookId);
-      document.title = `${book.name} ${chapter}:${verse} — Single Verse Typing | bible`;
+      document.title = `${book.name} ${chapter}:${verse} — Single Verse Typing | Promises to Creation`;
       trackPageView(path, document.title);
       renderTypingScreen(this.mainContainer, {
         bookId,
@@ -206,7 +206,7 @@ class App {
       const chapter = Number(typingChapterMatch[2]);
       const startVerse = query.get('verse') ? Number(query.get('verse')) : null;
       const book = getBookById(bookId);
-      document.title = `${book.name} ${chapter}${startVerse ? ` (v. ${startVerse})` : ''} — Bible Typing | bible`;
+      document.title = `${book.name} ${chapter}${startVerse ? ` (v. ${startVerse})` : ''} — Bible Typing | Promises to Creation`;
       trackPageView(path, document.title);
       renderTypingScreen(this.mainContainer, {
         bookId,
@@ -218,7 +218,7 @@ class App {
     }
 
     if (path === '/progress') {
-      document.title = 'Typing Progress & Bible Reach | bible';
+      document.title = 'Typing Progress & Bible Tracking | Promises to Creation';
       trackPageView('/progress', document.title);
       renderProgressScreen(this.mainContainer);
       return;

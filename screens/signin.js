@@ -1,7 +1,7 @@
-import { CONFIG } from '../config.js?v=20261104_v29';
-import { Auth, Api } from '../api.js?v=20261104_v29';
-import { trackEvent } from '../analytics.js?v=20261104_v29';
-import { navigate } from '../app.js?v=20261104_v29';
+import { CONFIG } from '../config.js?v=20261105_v1';
+import { Auth, Api } from '../api.js?v=20261105_v1';
+import { trackEvent } from '../analytics.js?v=20261105_v1';
+import { navigate } from '../app.js?v=20261105_v1';
 
 let firebaseAuthInstance = null;
 let googleProviderInstance = null;
@@ -44,7 +44,7 @@ export function renderSignInScreen(container) {
     <div class="signin-wrapper">
       <div class="signin-card">
         <div class="signin-logo">✨</div>
-        <h2 class="signin-title">bible</h2>
+        <h2 class="signin-title">Promises to Creation</h2>
         <p class="signin-subtitle">
           Sign in with Google to save your completed Bible chapters, WPM &amp; CPM speed history, and Scripture reach across devices.
         </p>

@@ -1,6 +1,50 @@
-# bible — Scripture Typing & Reach Suite
+# Promises to Creation — Bible Typing App & Scripture Reading Tracker
 
-> Type through all 1,189 chapters of the Bible across 22 translations (defaulting to ESV), with real-time WPM/CPM speed tracking and Scripture completeness analytics.
+> Promises to Creation (https://promisestocreation.org) is an online Bible typing application and Scripture reading progress tracker designed to help believers engage deeply with God's Word through typing, speed practice, and systematic Scripture coverage across all 66 books and 1,189 chapters of the Bible.
 
-- Authentication: Google Identity Services OAuth 2.0
-- Backend: AWS Lambda Function URLs + DynamoDB (`BibleApp`) + S3 Automated Daily Backups
+## Core Capabilities
+
+### 1. Bible Typing Practice
+- **Full Chapter Mode**: Type sequentially through entire chapters of the Bible, verse by verse, with real-time cursor navigation and strict error checking.
+- **Single Verse Mode**: Focus on typing individual verses with instant transitions, meditation pauses, and seamless navigation.
+- **Random Verse Shuffle**: Practice typing random verses selected uniformly across all 31,102 verses in the Old and New Testaments.
+- **Auto-Advance & Meditation Controls**: Toggle between instant auto-advance upon completing a verse or pausing with an active Advance button to meditate on the text without affecting typing speed.
+- **Background Preloading**: Zero-latency verse transitions powered by multi-layer in-memory caching and background prefetching.
+
+### 2. Bible Reading & Typing Progress Tracker
+- **Bible Completeness Matrix**: Visual progress tracker across all 1,189 chapters and 66 books of the Bible (929 Old Testament, 260 New Testament).
+- **Dual Tracking**: Independently tracks both chapters/verses that have been read and chapters/verses that have been typed.
+- **Per-Translation Tracking**: Support for filtering progress across 22 Bible translations, defaulting to the English Standard Version (ESV).
+- **Speed & Accuracy Analytics**: Live Words Per Minute (WPM), Characters Per Minute (CPM), accuracy percentages, and historic speed progression charts.
+
+### 3. Supported Bible Translations
+Supports 22 translations including:
+- ESV (English Standard Version) — Default
+- KJV (King James Version)
+- BSB (Berean Standard Bible)
+- NASB (New American Standard Bible)
+- NLT (New Living Translation)
+- CSB17 (Christian Standard Bible)
+- LSB (Legacy Standard Bible)
+- NKJV (New King James Version)
+- NET (New English Translation)
+- WEB (World English Bible)
+- RSV (Revised Standard Version)
+- And additional historical and modern translations.
+
+## Navigation & URL Routes
+
+- `https://promisestocreation.org/#/`: Home dashboard featuring Scripture reach overview, Verse of the Day, and quick-start links.
+- `https://promisestocreation.org/#/typing`: Interactive Bible typing interface.
+- `https://promisestocreation.org/#/typing/:bookId/:chapter`: Typing screen for a specific book and chapter (e.g. `#/typing/19/23` for Psalm 23).
+- `https://promisestocreation.org/#/typing/:bookId/:chapter/:verse`: Single-verse typing focus mode (e.g. `#/typing/43/3/16` for John 3:16).
+- `https://promisestocreation.org/#/progress`: Scripture completeness analytics, WPM/CPM speed charts, and historic session logs.
+- `https://promisestocreation.org/#/signin`: User sign-in with Google authentication.
+
+## Technical Architecture
+
+- **Domain**: https://promisestocreation.org
+- **Frontend**: Vanilla JavaScript Single Page Application (SPA), CSS Grid/Flexbox design, Google Fonts (Inter, JetBrains Mono, Playfair Display).
+- **Authentication**: Google Identity Services OAuth 2.0 & Firebase Auth.
+- **Backend**: AWS Lambda Function URLs with DynamoDB storage (`BibleApp` table) and automated daily S3 backups.
+- **Text Sources**: Bolls Life Bible API with bible-api.com fallback, cached client-side in IndexedDB/localStorage/sessionStorage.
