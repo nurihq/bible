@@ -4,16 +4,37 @@ import {
   getLocalStore,
   getPreferredTranslation,
   getChapterProgressSummary,
+  isVerseCovered,
+  markVerseAsRead,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261106_v1';
-import { getBookById, getNextChapterRef, getTranslationByCode } from '../bible-data.js?v=20261106_v1';
-import { trackEvent } from '../analytics.js?v=20261106_v1';
-import { navigate } from '../app.js?v=20261106_v1';
+} from '../api.js?v=20261106_v2';
+import {
+  getBookById,
+  getNextChapterRef,
+  getTranslationByCode,
+  getRandomVerseRef,
+  fetchChapterVerses,
+  getCachedChapterVerses,
+  prefetchChapterVerses
+} from '../bible-data.js?v=20261106_v2';
+import { trackEvent } from '../analytics.js?v=20261106_v2';
+import { navigate } from '../app.js?v=20261106_v2';
 
 export { renderLandingScreen as renderHomeScreen };
 
-const VERSE_OF_THE_DAY_POOL = [
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const HOME_DAILY_VERSE_KEY = 'bible_home_daily_verse_v2';
+
+const DAILY_VERSE_POOL = [
   {
     bookId: 24,
     bookName: 'Jeremiah',
@@ -109,23 +130,606 @@ const VERSE_OF_THE_DAY_POOL = [
     verse: 1,
     text: 'God is our refuge and strength, a very present help in trouble.',
     theme: 'Refuge & Deliverance'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 3,
+    verse: 16,
+    text: 'For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.',
+    theme: 'Salvation & Love'
+  },
+  {
+    bookId: 20,
+    bookName: 'Proverbs',
+    chapter: 4,
+    verse: 23,
+    text: 'Keep your heart with all vigilance, for from it flow the springs of life.',
+    theme: 'Wisdom & Vigilance'
+  },
+  {
+    bookId: 23,
+    bookName: 'Isaiah',
+    chapter: 41,
+    verse: 10,
+    text: 'fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you, I will uphold you with my righteous right hand.',
+    theme: 'Encouragement & Strength'
+  },
+  {
+    bookId: 45,
+    bookName: 'Romans',
+    chapter: 12,
+    verse: 2,
+    text: 'Do not be conformed to this world, but be transformed by the renewal of your mind, that by testing you may discern what is the will of God, what is good and acceptable and perfect.',
+    theme: 'Renewal & Discernment'
+  },
+  {
+    bookId: 48,
+    bookName: 'Galatians',
+    chapter: 5,
+    verse: 22,
+    text: 'But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control; against such things there is no law.',
+    theme: 'Fruit of the Spirit'
+  },
+  {
+    bookId: 49,
+    bookName: 'Ephesians',
+    chapter: 2,
+    verse: 8,
+    text: 'For by grace you have been saved through faith. And this is not your own doing; it is the gift of God.',
+    theme: 'Grace & Faith'
+  },
+  {
+    bookId: 50,
+    bookName: 'Philippians',
+    chapter: 4,
+    verse: 6,
+    text: 'do not be anxious about anything, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.',
+    theme: 'Peace & Prayer'
+  },
+  {
+    bookId: 58,
+    bookName: 'Hebrews',
+    chapter: 11,
+    verse: 1,
+    text: 'Now faith is the assurance of things hoped for, the conviction of things not seen.',
+    theme: 'Faith'
+  },
+  {
+    bookId: 46,
+    bookName: '1 Corinthians',
+    chapter: 13,
+    verse: 4,
+    text: 'Love is patient and kind; love does not envy or boast; it is not arrogant or rude.',
+    theme: 'Love'
+  },
+  {
+    bookId: 46,
+    bookName: '1 Corinthians',
+    chapter: 13,
+    verse: 13,
+    text: 'So now faith, hope, and love abide, these three; but the greatest of these is love.',
+    theme: 'The Greatest Gift'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 119,
+    verse: 105,
+    text: 'Your word is a lamp to my feet and a light to my path.',
+    theme: 'God’s Word'
+  },
+  {
+    bookId: 40,
+    bookName: 'Matthew',
+    chapter: 6,
+    verse: 33,
+    text: 'But seek first the kingdom of God and his righteousness, and all these things will be added to you.',
+    theme: 'Kingdom Priorities'
+  },
+  {
+    bookId: 60,
+    bookName: '1 Peter',
+    chapter: 5,
+    verse: 7,
+    text: 'casting all your anxieties on him, because he cares for you.',
+    theme: 'Care & Peace'
+  },
+  {
+    bookId: 45,
+    bookName: 'Romans',
+    chapter: 8,
+    verse: 38,
+    text: 'For I am sure that neither death nor life, nor angels nor rulers, nor things present nor things to come, nor powers, nor height nor depth, nor anything else in all creation, will be able to separate us from the love of God in Christ Jesus our Lord.',
+    theme: 'Inseparable Love'
+  },
+  {
+    bookId: 59,
+    bookName: 'James',
+    chapter: 1,
+    verse: 5,
+    text: 'If any of you lacks wisdom, you should ask God, who gives generously to all without finding fault, and it will be given to you.',
+    theme: 'Asking for Wisdom'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 121,
+    verse: 1,
+    text: 'I lift up my eyes to the hills. From where does my help come? My help comes from the LORD, who made heaven and earth.',
+    theme: 'Help from the Lord'
+  },
+  {
+    bookId: 23,
+    bookName: 'Isaiah',
+    chapter: 53,
+    verse: 5,
+    text: 'But he was pierced for our transgressions; he was crushed for our iniquities; upon him was the chastisement that brought us peace, and with his wounds we are healed.',
+    theme: 'Atonement & Healing'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 14,
+    verse: 6,
+    text: 'Jesus said to him, “I am the way, and the truth, and the life. No one comes to the Father except through me.”',
+    theme: 'The Way & Truth'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 14,
+    verse: 27,
+    text: 'Peace I leave with you; my peace I give to you. Not as the world gives do I give to you. Let not your hearts be troubled, neither let them be afraid.',
+    theme: 'True Peace'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 1,
+    verse: 1,
+    text: 'In the beginning was the Word, and the Word was with God, and the Word was God.',
+    theme: 'The Living Word'
+  },
+  {
+    bookId: 40,
+    bookName: 'Matthew',
+    chapter: 28,
+    verse: 19,
+    text: 'Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit.',
+    theme: 'The Great Commission'
+  },
+  {
+    bookId: 25,
+    bookName: 'Lamentations',
+    chapter: 3,
+    verse: 22,
+    text: 'The steadfast love of the LORD never ceases; his mercies never come to an end; they are new every morning; great is your faithfulness.',
+    theme: 'Faithfulness & Mercy'
+  },
+  {
+    bookId: 36,
+    bookName: 'Zephaniah',
+    chapter: 3,
+    verse: 17,
+    text: 'The LORD your God is in your midst, a mighty one who will save; he will rejoice over you with gladness; he will quiet you by his love; he will exult over you with loud singing.',
+    theme: 'God Rejoicing'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 139,
+    verse: 14,
+    text: 'I praise you, for I am fearfully and wonderfully made. Wonderful are your works; my soul knows it very well.',
+    theme: 'Wonderfully Made'
+  },
+  {
+    bookId: 5,
+    bookName: 'Deuteronomy',
+    chapter: 31,
+    verse: 6,
+    text: 'Be strong and courageous. Do not fear or be in dread of them, for it is the LORD your God who goes with you. He will not leave you or forsake you.',
+    theme: 'Courage & Presence'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 27,
+    verse: 1,
+    text: 'The LORD is my light and my salvation; whom shall I fear? The LORD is the stronghold of my life; of whom shall I be afraid?',
+    theme: 'Light & Salvation'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 34,
+    verse: 8,
+    text: 'Oh, taste and see that the LORD is good! Blessed is the man who takes refuge in him!',
+    theme: 'Taste & See'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 37,
+    verse: 4,
+    text: 'Delight yourself in the LORD, and he will give you the desires of your heart.',
+    theme: 'Delight in God'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 46,
+    verse: 10,
+    text: '“Be still, and know that I am God. I will be exalted among the nations, I will be exalted in the earth!”',
+    theme: 'Be Still'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 91,
+    verse: 1,
+    text: 'He who dwells in the shelter of the Most High will abide in the shadow of the Almighty.',
+    theme: 'Protection'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 103,
+    verse: 2,
+    text: 'Bless the LORD, O my soul, and forget not all his benefits, who forgives all your iniquity, who heals all your diseases.',
+    theme: 'Blessing the Lord'
+  },
+  {
+    bookId: 19,
+    bookName: 'Psalms',
+    chapter: 118,
+    verse: 24,
+    text: 'This is the day that the LORD has made; let us rejoice and be glad in it.',
+    theme: 'Rejoice Today'
+  },
+  {
+    bookId: 20,
+    bookName: 'Proverbs',
+    chapter: 16,
+    verse: 3,
+    text: 'Commit your work to the LORD, and your plans will be established.',
+    theme: 'Committing Your Work'
+  },
+  {
+    bookId: 20,
+    bookName: 'Proverbs',
+    chapter: 18,
+    verse: 10,
+    text: 'The name of the LORD is a strong tower; the righteous man runs into it and is safe.',
+    theme: 'Strong Tower'
+  },
+  {
+    bookId: 23,
+    bookName: 'Isaiah',
+    chapter: 9,
+    verse: 6,
+    text: 'For to us a child is born, to us a son is given; and the government shall be upon his shoulder, and his name shall be called Wonderful Counselor, Mighty God, Everlasting Father, Prince of Peace.',
+    theme: 'Prince of Peace'
+  },
+  {
+    bookId: 23,
+    bookName: 'Isaiah',
+    chapter: 26,
+    verse: 3,
+    text: 'You keep him in perfect peace whose mind is stayed on you, because he trusts in you.',
+    theme: 'Perfect Peace'
+  },
+  {
+    bookId: 23,
+    bookName: 'Isaiah',
+    chapter: 43,
+    verse: 2,
+    text: 'When you pass through the waters, I will be with you; and through the rivers, they shall not overwhelm you; when you walk through fire you shall not be burned, and the flame shall not consume you.',
+    theme: 'God with Us'
+  },
+  {
+    bookId: 40,
+    bookName: 'Matthew',
+    chapter: 5,
+    verse: 14,
+    text: '“You are the light of the world. A city set on a hill cannot be hidden.”',
+    theme: 'Light of the World'
+  },
+  {
+    bookId: 40,
+    bookName: 'Matthew',
+    chapter: 5,
+    verse: 16,
+    text: 'In the same way, let your light shine before others, so that they may see your good works and give glory to your Father who is in heaven.',
+    theme: 'Shining Light'
+  },
+  {
+    bookId: 41,
+    bookName: 'Mark',
+    chapter: 10,
+    verse: 27,
+    text: 'Jesus looked at them and said, “With man it is impossible, but not with God. For all things are possible with God.”',
+    theme: 'All Things Possible'
+  },
+  {
+    bookId: 42,
+    bookName: 'Luke',
+    chapter: 1,
+    verse: 37,
+    text: 'For nothing will be impossible with God.',
+    theme: 'God’s Power'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 8,
+    verse: 12,
+    text: 'Again Jesus spoke to them, saying, “I am the light of the world. Whoever follows me will not walk in darkness, but will have the light of life.”',
+    theme: 'Light of Life'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 10,
+    verse: 10,
+    text: 'The thief comes only to steal and kill and destroy. I came that they may have life and have it abundantly.',
+    theme: 'Abundant Life'
+  },
+  {
+    bookId: 43,
+    bookName: 'John',
+    chapter: 15,
+    verse: 5,
+    text: 'I am the vine; you are the branches. Whoever abides in me and I in him, he it is that bears much fruit, for apart from me you can do nothing.',
+    theme: 'Abiding in Christ'
+  },
+  {
+    bookId: 45,
+    bookName: 'Romans',
+    chapter: 1,
+    verse: 16,
+    text: 'For I am not ashamed of the gospel, for it is the power of God for salvation to everyone who believes, to the Jew first and also to the Greek.',
+    theme: 'The Gospel'
+  },
+  {
+    bookId: 45,
+    bookName: 'Romans',
+    chapter: 5,
+    verse: 8,
+    text: 'but God shows his love for us in that while we were still sinners, Christ died for us.',
+    theme: 'God’s Love Demonstrated'
+  },
+  {
+    bookId: 45,
+    bookName: 'Romans',
+    chapter: 8,
+    verse: 31,
+    text: 'What then shall we say to these things? If God is for us, who can be against us?',
+    theme: 'God Is For Us'
+  },
+  {
+    bookId: 47,
+    bookName: '2 Corinthians',
+    chapter: 5,
+    verse: 17,
+    text: 'Therefore, if anyone is in Christ, he is a new creation. The old has passed away; behold, the new has come.',
+    theme: 'New Creation'
+  },
+  {
+    bookId: 47,
+    bookName: '2 Corinthians',
+    chapter: 12,
+    verse: 9,
+    text: 'But he said to me, “My grace is sufficient for you, for my power is made perfect in weakness.” Therefore I will boast all the more gladly of my weaknesses, so that the power of Christ may rest upon me.',
+    theme: 'Grace Sufficient'
+  },
+  {
+    bookId: 48,
+    bookName: 'Galatians',
+    chapter: 2,
+    verse: 20,
+    text: 'I have been crucified with Christ. It is no longer I who live, but Christ who lives in me. And the life I now live in the flesh I live by faith in the Son of God, who loved me and gave himself for me.',
+    theme: 'Christ in Me'
+  },
+  {
+    bookId: 49,
+    bookName: 'Ephesians',
+    chapter: 6,
+    verse: 10,
+    text: 'Finally, be strong in the Lord and in the strength of his might. Put on the whole armor of God.',
+    theme: 'Armor of God'
+  },
+  {
+    bookId: 51,
+    bookName: 'Colossians',
+    chapter: 3,
+    verse: 12,
+    text: 'Put on then, as God’s chosen ones, holy and beloved, compassionate hearts, kindness, humility, meekness, and patience.',
+    theme: 'Compassion & Kindness'
+  },
+  {
+    bookId: 51,
+    bookName: 'Colossians',
+    chapter: 3,
+    verse: 23,
+    text: 'Whatever you do, work heartily, as for the Lord and not for men.',
+    theme: 'Hearty Service'
+  },
+  {
+    bookId: 52,
+    bookName: '1 Thessalonians',
+    chapter: 5,
+    verse: 16,
+    text: 'Rejoice always, pray without ceasing, give thanks in all circumstances; for this is the will of God in Christ Jesus for you.',
+    theme: 'Rejoicing & Thanksgiving'
+  },
+  {
+    bookId: 58,
+    bookName: 'Hebrews',
+    chapter: 4,
+    verse: 12,
+    text: 'For the word of God is living and active, sharper than any two-edged sword, piercing to the division of soul and of spirit, of joints and of marrow, and discerning the thoughts and intentions of the heart.',
+    theme: 'The Living Word'
+  },
+  {
+    bookId: 58,
+    bookName: 'Hebrews',
+    chapter: 12,
+    verse: 2,
+    text: 'looking to Jesus, the founder and perfecter of our faith, who for the joy that was set before him endured the cross, despising the shame, and is seated at the right hand of the throne of God.',
+    theme: 'Looking to Jesus'
+  },
+  {
+    bookId: 66,
+    bookName: 'Revelation',
+    chapter: 21,
+    verse: 4,
+    text: 'He will wipe away every tear from their eyes, and death shall be no more, neither shall there be mourning, nor crying, nor pain anymore, for the former things have passed away.',
+    theme: 'Eternal Hope'
   }
 ];
 
-export function renderLandingScreen(container) {
-  // Deterministic daily verse of the day based on day of the year
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-  const votd = VERSE_OF_THE_DAY_POOL[dayOfYear % VERSE_OF_THE_DAY_POOL.length];
+function getTodayDateKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
-  function getVotdStatus() {
-    const chSum = getChapterProgressSummary(votd.bookId, votd.chapter);
-    const vStat = chSum.record?.completedVerses?.[String(votd.verse)];
-    const isVerseRead = Boolean(chSum.isFullyRead || vStat?.isRead);
-    return { isVerseRead };
+function isVerseCompletedForUser(bookId, chapter, verseNum) {
+  const chSum = getChapterProgressSummary(bookId, chapter);
+  return isVerseCovered(chSum.record, verseNum);
+}
+
+function getStoredDailyVerse() {
+  try {
+    const raw = localStorage.getItem(HOME_DAILY_VERSE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveStoredDailyVerse(verseObj) {
+  try {
+    localStorage.setItem(HOME_DAILY_VERSE_KEY, JSON.stringify(verseObj));
+  } catch {}
+}
+
+function pickFreshDailyVerse(excludeRef = null) {
+  // 1. Filter curated pool for verses that are NOT yet read and NOT yet typed
+  const availableCurated = DAILY_VERSE_POOL.filter(v => {
+    if (excludeRef && v.bookId === excludeRef.bookId && v.chapter === excludeRef.chapter && v.verse === excludeRef.verse) {
+      return false;
+    }
+    return !isVerseCompletedForUser(v.bookId, v.chapter, v.verse);
+  });
+
+  if (availableCurated.length > 0) {
+    const idx = Math.floor(Math.random() * availableCurated.length);
+    return availableCurated[idx];
   }
 
+  // 2. If user completed all curated verses, pick a random unread/untyped verse from the full Bible
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const ref = getRandomVerseRef(excludeRef);
+    if (!isVerseCompletedForUser(ref.bookId, ref.chapter, ref.verse)) {
+      const book = getBookById(ref.bookId);
+      return {
+        bookId: ref.bookId,
+        bookName: book.name,
+        chapter: ref.chapter,
+        verse: ref.verse,
+        text: '',
+        theme: 'Scripture'
+      };
+    }
+  }
+
+  return DAILY_VERSE_POOL[0];
+}
+
+function getSyncDailyVerse(activeTranslation = 'ESV') {
+  const todayKey = getTodayDateKey();
+  const stored = getStoredDailyVerse();
+
+  const isCurrentCompleted = stored && isVerseCompletedForUser(stored.bookId, stored.chapter, stored.verse);
+  const isExpired = !stored || stored.dateKey !== todayKey;
+
+  if (stored && !isExpired && !isCurrentCompleted) {
+    return stored;
+  }
+
+  const fresh = pickFreshDailyVerse(stored ? { bookId: stored.bookId, chapter: stored.chapter, verse: stored.verse } : null);
+  const result = {
+    ...fresh,
+    dateKey: todayKey,
+    translation: activeTranslation
+  };
+  saveStoredDailyVerse(result);
+  return result;
+}
+
+async function resolveDailyVerse(activeTranslation = 'ESV', forceNew = false) {
+  const todayKey = getTodayDateKey();
+  let stored = getStoredDailyVerse();
+
+  const isCurrentCompleted = stored && isVerseCompletedForUser(stored.bookId, stored.chapter, stored.verse);
+  const isExpired = !stored || stored.dateKey !== todayKey;
+
+  let selected = stored;
+
+  if (forceNew || isExpired || isCurrentCompleted) {
+    const fresh = pickFreshDailyVerse(stored ? { bookId: stored.bookId, chapter: stored.chapter, verse: stored.verse } : null);
+    selected = {
+      ...fresh,
+      dateKey: todayKey,
+      translation: activeTranslation
+    };
+    saveStoredDailyVerse(selected);
+  }
+
+  // Fetch or retrieve actual text for the user's active translation
+  try {
+    const cached = getCachedChapterVerses(activeTranslation, selected.bookId, selected.chapter);
+    if (cached && cached.length > 0) {
+      const match = cached.find(v => Number(v.verse) === Number(selected.verse));
+      if (match && match.text) {
+        selected.text = match.text;
+      }
+    } else {
+      const loaded = await fetchChapterVerses(activeTranslation, selected.bookId, selected.chapter);
+      if (loaded && loaded.length > 0) {
+        const match = loaded.find(v => Number(v.verse) === Number(selected.verse));
+        if (match && match.text) {
+          selected.text = match.text;
+        }
+      }
+    }
+  } catch (e) {
+    // Keep fallback text if network unavailable
+  }
+
+  saveStoredDailyVerse(selected);
+  return selected;
+}
+
+export function renderLandingScreen(container) {
+  const activeTranslation = getPreferredTranslation() || 'ESV';
+
+  // Synchronously resolve current valid daily verse
+  let currentVerse = getSyncDailyVerse(activeTranslation);
+
+  // Background check to verify translation text & prefetch
+  resolveDailyVerse(activeTranslation).then(verified => {
+    if (verified && (verified.text !== currentVerse.text || verified.verse !== currentVerse.verse || verified.bookId !== currentVerse.bookId)) {
+      currentVerse = verified;
+      renderCard();
+    }
+  }).catch(() => {});
+
   function renderCard() {
-    const { isVerseRead } = getVotdStatus();
+    const isCompleted = isVerseCompletedForUser(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
 
     container.innerHTML = `
       <div class="hero-wrapper">
@@ -146,33 +750,34 @@ export function renderLandingScreen(container) {
           </button>
         </div>
 
-        <!-- Single Verse of the Day Card with Direct Read & Type Controls -->
+        <!-- Daily Random Verse Card with Direct Read & Type Controls -->
         <div class="votd-card-wrapper">
-          <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${votd.bookName} ${votd.chapter}:${votd.verse}">
+          <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
             <div class="votd-top-row">
               <div class="votd-ref-header">
-                <strong class="votd-ref-title">${votd.bookName} ${votd.chapter}:${votd.verse}</strong>
-                <span class="votd-ref-sub">ESV</span>
+                <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
+                <span class="votd-ref-sub">${escapeHtml(activeTranslation)}</span>
+                ${currentVerse.theme ? `<span class="votd-tag">${escapeHtml(currentVerse.theme)}</span>` : ''}
               </div>
               <span class="votd-action-hint">Type verse →</span>
             </div>
 
             <div class="votd-quote">
-              “${votd.text}”
+              “${escapeHtml(currentVerse.text || 'Loading verse text...')}”
             </div>
 
             <div class="votd-bottom-row">
               <button
                 type="button"
-                class="btn ${isVerseRead ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
+                class="btn ${isCompleted ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
                 id="votd-mark-verse-btn"
                 data-stop-card-nav="true"
-                title="Mark verse ${votd.verse} as read to count toward your Bible completeness"
+                title="Mark verse ${currentVerse.verse} as read and load a new daily verse"
               >
-                ${isVerseRead ? '✓ Verse Read' : '📖 Mark Verse Read'}
+                ${isCompleted ? '✓ Marked Read' : '📖 Mark Verse Read'}
               </button>
               <a
-                href="#/typing/${votd.bookId}/${votd.chapter}"
+                href="#/typing/${currentVerse.bookId}/${currentVerse.chapter}"
                 class="btn btn-secondary btn-sm"
                 data-stop-card-nav="true"
                 title="Open and type the full chapter"
@@ -189,33 +794,33 @@ export function renderLandingScreen(container) {
     if (votdCard) {
       votdCard.addEventListener('click', (e) => {
         if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;
-        trackEvent('votd_card_click', { ref: `${votd.bookName} ${votd.chapter}:${votd.verse}` });
-        navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
+        trackEvent('votd_card_click', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
+        navigate(`#/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
       });
       votdCard.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.target === votdCard) {
-          navigate(`#/typing/${votd.bookId}/${votd.chapter}/${votd.verse}`);
+          navigate(`#/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
         }
       });
     }
 
     const markVerseBtn = container.querySelector('#votd-mark-verse-btn');
     if (markVerseBtn) {
-      markVerseBtn.addEventListener('click', (e) => {
+      markVerseBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const nowRead = toggleVerseRead(votd.bookId, votd.chapter, votd.verse);
-        trackEvent('votd_mark_verse_read', { verse: `${votd.bookName} ${votd.chapter}:${votd.verse}`, nowRead });
-        renderCard();
-      });
-    }
+        markVerseAsRead(currentVerse.bookId, currentVerse.chapter, currentVerse.verse, activeTranslation);
+        trackEvent('votd_mark_verse_read', { verse: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
 
-    const markChBtn = container.querySelector('#votd-mark-ch-btn');
-    if (markChBtn) {
-      markChBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const nowRead = toggleChapterRead(votd.bookId, votd.chapter);
-        trackEvent('votd_mark_ch_read', { chapter: `${votd.bookName} ${votd.chapter}`, nowRead });
-        renderCard();
+        markVerseBtn.disabled = true;
+        markVerseBtn.textContent = '✓ Marked Read!';
+        markVerseBtn.classList.add('is-read-active');
+
+        // Immediately rotate to a new unread/untyped verse for the user
+        setTimeout(async () => {
+          const fresh = await resolveDailyVerse(activeTranslation, true);
+          currentVerse = fresh;
+          renderCard();
+        }, 320);
       });
     }
 
