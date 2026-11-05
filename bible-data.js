@@ -16,30 +16,31 @@ export function getBookVerseCount(bookId) {
   return book ? book.reduce((a, b) => a + b, 0) : 0;
 }
 
-export function getRandomVerseRef(exclude = null) {
-  let attempts = 0;
-  while (attempts < 20) {
-    attempts++;
-    const targetIdx = Math.floor(Math.random() * TOTAL_BIBLE_VERSES);
-    let curIdx = 0;
-    for (let b = 0; b < VERSE_COUNTS.length; b++) {
-      const bookVerses = VERSE_COUNTS[b];
-      let found = false;
-      for (let c = 0; c < bookVerses.length; c++) {
-        const count = bookVerses[c];
-        if (targetIdx < curIdx + count) {
-          const bookId = b + 1;
-          const chapter = c + 1;
-          const verse = (targetIdx - curIdx) + 1;
-          if (exclude && exclude.bookId === bookId && exclude.chapter === chapter && exclude.verse === verse) {
-            found = true;
-            break;
-          }
-          return { bookId, chapter, verse };
-        }
-        curIdx += count;
+export function getVerseRefByIndex(targetIdx = 0) {
+  const normIdx = ((Math.floor(Number(targetIdx) || 0) % TOTAL_BIBLE_VERSES) + TOTAL_BIBLE_VERSES) % TOTAL_BIBLE_VERSES;
+  let curIdx = 0;
+  for (let b = 0; b < VERSE_COUNTS.length; b++) {
+    const bookVerses = VERSE_COUNTS[b];
+    for (let c = 0; c < bookVerses.length; c++) {
+      const count = bookVerses[c];
+      if (normIdx < curIdx + count) {
+        const bookId = b + 1;
+        const chapter = c + 1;
+        const verse = (normIdx - curIdx) + 1;
+        return { bookId, chapter, verse };
       }
-      if (found) break;
+      curIdx += count;
+    }
+  }
+  return { bookId: 43, chapter: 3, verse: 16 };
+}
+
+export function getRandomVerseRef(exclude = null) {
+  for (let attempts = 0; attempts < 20; attempts++) {
+    const targetIdx = Math.floor(Math.random() * TOTAL_BIBLE_VERSES);
+    const ref = getVerseRefByIndex(targetIdx);
+    if (!exclude || exclude.bookId !== ref.bookId || exclude.chapter !== ref.chapter || exclude.verse !== ref.verse) {
+      return ref;
     }
   }
   return { bookId: 43, chapter: 3, verse: 16 };

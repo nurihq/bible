@@ -1,12 +1,12 @@
-import { Navbar } from './components/navbar.js?v=20261106_v2';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261106_v2';
-import { initGA, trackPageView } from './analytics.js?v=20261106_v2';
-import { getBookById, replenishRandomVersePreloads } from './bible-data.js?v=20261106_v2';
+import { Navbar } from './components/navbar.js?v=20261106_v3';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261106_v3';
+import { initGA, trackPageView } from './analytics.js?v=20261106_v3';
+import { getBookById, replenishRandomVersePreloads } from './bible-data.js?v=20261106_v3';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261106_v2';
-import { renderLandingScreen } from './screens/home.js?v=20261106_v2';
-import { renderTypingScreen } from './screens/typing.js?v=20261106_v2';
-import { renderProgressScreen } from './screens/progress.js?v=20261106_v2';
+import { renderSignInScreen } from './screens/signin.js?v=20261106_v3';
+import { renderLandingScreen } from './screens/home.js?v=20261106_v3';
+import { renderTypingScreen } from './screens/typing.js?v=20261106_v3';
+import { renderProgressScreen } from './screens/progress.js?v=20261106_v3';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';

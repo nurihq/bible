@@ -8,18 +8,20 @@ import {
   markVerseAsRead,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261106_v2';
+} from '../api.js?v=20261106_v3';
 import {
   getBookById,
   getNextChapterRef,
   getTranslationByCode,
   getRandomVerseRef,
+  getVerseRefByIndex,
+  TOTAL_BIBLE_VERSES,
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261106_v2';
-import { trackEvent } from '../analytics.js?v=20261106_v2';
-import { navigate } from '../app.js?v=20261106_v2';
+} from '../bible-data.js?v=20261106_v3';
+import { trackEvent } from '../analytics.js?v=20261106_v3';
+import { navigate } from '../app.js?v=20261106_v3';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -32,7 +34,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-const HOME_DAILY_VERSE_KEY = 'bible_home_daily_verse_v2';
+const HOME_DAILY_VERSE_KEY = 'bible_home_daily_verse_v3';
 
 const DAILY_VERSE_POOL = [
   {
@@ -589,11 +591,14 @@ const DAILY_VERSE_POOL = [
   }
 ];
 
-function getTodayDateKey() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
+function getDayNumber(date = new Date()) {
+  return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86400000);
+}
+
+function getTodayDateKey(date = new Date()) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
@@ -616,28 +621,48 @@ function saveStoredDailyVerse(verseObj) {
   } catch {}
 }
 
+/**
+ * Deterministically picks the daily verse for the given day number.
+ * Defaults to the exact same verse across all devices and users for that day.
+ * Only if the user has already read or typed it (or if excluded) does it deterministically
+ * scan forward to the next unread verse for that user.
+ */
 function pickFreshDailyVerse(excludeRef = null) {
-  // 1. Filter curated pool for verses that are NOT yet read and NOT yet typed
-  const availableCurated = DAILY_VERSE_POOL.filter(v => {
-    if (excludeRef && v.bookId === excludeRef.bookId && v.chapter === excludeRef.chapter && v.verse === excludeRef.verse) {
-      return false;
-    }
-    return !isVerseCompletedForUser(v.bookId, v.chapter, v.verse);
-  });
+  const dayNum = getDayNumber();
+  const poolLen = DAILY_VERSE_POOL.length;
+  const baseIndex = ((dayNum % poolLen) + poolLen) % poolLen;
 
-  if (availableCurated.length > 0) {
-    const idx = Math.floor(Math.random() * availableCurated.length);
-    return availableCurated[idx];
+  // 1. Scan curated pool starting from today's deterministic baseIndex
+  for (let offset = 0; offset < poolLen; offset++) {
+    const candidate = DAILY_VERSE_POOL[(baseIndex + offset) % poolLen];
+    const isExcluded = excludeRef &&
+      candidate.bookId === excludeRef.bookId &&
+      candidate.chapter === excludeRef.chapter &&
+      candidate.verse === excludeRef.verse;
+
+    if (!isExcluded && !isVerseCompletedForUser(candidate.bookId, candidate.chapter, candidate.verse)) {
+      return candidate;
+    }
   }
 
-  // 2. If user completed all curated verses, pick a random unread/untyped verse from the full Bible
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const ref = getRandomVerseRef(excludeRef);
-    if (!isVerseCompletedForUser(ref.bookId, ref.chapter, ref.verse)) {
+  // 2. If user completed all curated pool verses, deterministically scan the full Bible canon
+  const totalVerses = TOTAL_BIBLE_VERSES || 31102;
+  const stride = 7919; // Prime coprime to ~31,102 for uniform canonical dispersion
+  const baseBibleIdx = Math.abs(dayNum * stride) % totalVerses;
+
+  for (let offset = 0; offset < totalVerses; offset++) {
+    const idx = (baseBibleIdx + offset) % totalVerses;
+    const ref = getVerseRefByIndex(idx);
+    const isExcluded = excludeRef &&
+      ref.bookId === excludeRef.bookId &&
+      ref.chapter === excludeRef.chapter &&
+      ref.verse === excludeRef.verse;
+
+    if (!isExcluded && !isVerseCompletedForUser(ref.bookId, ref.chapter, ref.verse)) {
       const book = getBookById(ref.bookId);
       return {
         bookId: ref.bookId,
-        bookName: book.name,
+        bookName: book ? book.name : `Book ${ref.bookId}`,
         chapter: ref.chapter,
         verse: ref.verse,
         text: '',
@@ -646,15 +671,16 @@ function pickFreshDailyVerse(excludeRef = null) {
     }
   }
 
-  return DAILY_VERSE_POOL[0];
+  return DAILY_VERSE_POOL[baseIndex];
 }
 
 function getSyncDailyVerse(activeTranslation = 'ESV') {
   const todayKey = getTodayDateKey();
+  const dayNum = getDayNumber();
   const stored = getStoredDailyVerse();
 
   const isCurrentCompleted = stored && isVerseCompletedForUser(stored.bookId, stored.chapter, stored.verse);
-  const isExpired = !stored || stored.dateKey !== todayKey;
+  const isExpired = !stored || stored.dayNum !== dayNum || stored.dateKey !== todayKey;
 
   if (stored && !isExpired && !isCurrentCompleted) {
     return stored;
@@ -663,6 +689,7 @@ function getSyncDailyVerse(activeTranslation = 'ESV') {
   const fresh = pickFreshDailyVerse(stored ? { bookId: stored.bookId, chapter: stored.chapter, verse: stored.verse } : null);
   const result = {
     ...fresh,
+    dayNum,
     dateKey: todayKey,
     translation: activeTranslation
   };
@@ -672,10 +699,11 @@ function getSyncDailyVerse(activeTranslation = 'ESV') {
 
 async function resolveDailyVerse(activeTranslation = 'ESV', forceNew = false) {
   const todayKey = getTodayDateKey();
+  const dayNum = getDayNumber();
   let stored = getStoredDailyVerse();
 
   const isCurrentCompleted = stored && isVerseCompletedForUser(stored.bookId, stored.chapter, stored.verse);
-  const isExpired = !stored || stored.dateKey !== todayKey;
+  const isExpired = !stored || stored.dayNum !== dayNum || stored.dateKey !== todayKey;
 
   let selected = stored;
 
@@ -683,6 +711,7 @@ async function resolveDailyVerse(activeTranslation = 'ESV', forceNew = false) {
     const fresh = pickFreshDailyVerse(stored ? { bookId: stored.bookId, chapter: stored.chapter, verse: stored.verse } : null);
     selected = {
       ...fresh,
+      dayNum,
       dateKey: todayKey,
       translation: activeTranslation
     };
