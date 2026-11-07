@@ -209,6 +209,10 @@ export function getLocalStore() {
           sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
           unsyncedSessionIds: Array.isArray(parsed.unsyncedSessionIds) ? parsed.unsyncedSessionIds : []
         };
+        if (!store.meditateFont || store.meditateFont.includes('Playfair')) {
+          store.meditateFont = DEFAULT_MEDITATE_FONT;
+        }
+        return store;
       }
     } catch (e) {}
   }
@@ -408,6 +412,10 @@ export function setMeditatePalettePref(palette) {
 
 export function getMeditateFontPref() {
   const store = getLocalStore();
+  if (!store.meditateFont || store.meditateFont.includes('Playfair')) {
+    store.meditateFont = DEFAULT_MEDITATE_FONT;
+    saveLocalStore(store);
+  }
   return store.meditateFont || DEFAULT_MEDITATE_FONT;
 }
 
@@ -516,6 +524,9 @@ export function getVerseMeditation(bookId, chapter, verse) {
   if (!med) return null;
   if (!med.fills || typeof med.fills !== 'object' || Object.keys(med.fills).length === 0) {
     return null;
+  }
+  if (!med.fontFamily || med.fontFamily.includes('Playfair')) {
+    med.fontFamily = DEFAULT_MEDITATE_FONT;
   }
   return med;
 }

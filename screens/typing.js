@@ -59,7 +59,11 @@ import {
   getMeditateFontCasePref,
   setMeditateFontCasePref,
   getMeditateBoxWidthPref,
-  setMeditateBoxWidthPref
+  setMeditateBoxWidthPref,
+  DEFAULT_MEDITATE_FONT,
+  DEFAULT_MEDITATE_FONT_SIZE,
+  DEFAULT_MEDITATE_FONT_CASE,
+  DEFAULT_MEDITATE_BOX_WIDTH
 } from '../api.js?v=20261107_v1';
 import {
   renderMeditateArtworkSvg,
@@ -1367,7 +1371,9 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     let savedFills = existingMed?.fills ? { ...existingMed.fills } : {};
-    let activeFont = existingMed?.fontFamily || getMeditateFontPref();
+    let activeFont = (existingMed?.fontFamily && !existingMed.fontFamily.includes('Playfair'))
+      ? existingMed.fontFamily
+      : getMeditateFontPref();
     let activeFontSize = typeof existingMed?.fontSize === 'number' ? existingMed.fontSize : getMeditateFontSizePref();
     let activeFontCase = existingMed?.fontCase || getMeditateFontCasePref();
     let activeBoxWidth = typeof existingMed?.boxWidth === 'number' ? existingMed.boxWidth : getMeditateBoxWidthPref();
@@ -1497,7 +1503,7 @@ export function renderTypingScreen(container, params = {}) {
               <div class="meditate-popover-row">
                 <span class="meditate-popover-label">Font Family</span>
                 <select class="meditate-font-select" id="meditate-font-select" title="Choose scripture font">
-                  <option value="Arial, -apple-system, sans-serif" ${activeFont.includes('Arial') ? 'selected' : ''}>Arial (Sans Serif)</option>
+                  <option value="Arial, -apple-system, sans-serif" ${activeFont.includes('Arial') ? 'selected' : ''}>Arial (Default)</option>
                   <option value="'Playfair Display', Georgia, serif" ${activeFont.includes('Playfair') ? 'selected' : ''}>Playfair Display (Serif)</option>
                   <option value="'Inter', -apple-system, sans-serif" ${activeFont.includes('Inter') ? 'selected' : ''}>Inter (Modern Sans)</option>
                   <option value="'Caveat', cursive, serif" ${activeFont.includes('Caveat') ? 'selected' : ''}>Caveat (Handwriting)</option>
@@ -1507,21 +1513,25 @@ export function renderTypingScreen(container, params = {}) {
                 </select>
               </div>
 
-              <!-- Text Case: Normal vs ALL CAPS -->
+              <!-- Text Style: Default (Arial, Normal Case) vs ALL CAPS -->
               <div class="meditate-popover-row">
-                <span class="meditate-popover-label">Text Case</span>
+                <span class="meditate-popover-label">Text Style</span>
                 <div class="meditate-case-toggle-group" id="meditate-case-toggle-group">
                   <button
                     type="button"
-                    class="meditate-case-btn ${activeFontCase !== 'uppercase' ? 'is-active' : ''}"
-                    data-case="normal"
+                    class="meditate-case-btn ${activeFontCase !== 'uppercase' && activeFont.includes('Arial') ? 'is-active' : ''}"
+                    data-case="default"
+                    id="meditate-case-default-btn"
+                    title="Reset to default font (Arial, normal case, 20px)"
                   >
-                    Normal
+                    Default
                   </button>
                   <button
                     type="button"
                     class="meditate-case-btn ${activeFontCase === 'uppercase' ? 'is-active' : ''}"
                     data-case="uppercase"
+                    id="meditate-case-uppercase-btn"
+                    title="Convert text to ALL CAPS"
                   >
                     ALL CAPS
                   </button>
@@ -1688,40 +1698,92 @@ export function renderTypingScreen(container, params = {}) {
         fontPopoverBtn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
       });
 
+      // Prevent clicks inside popover from closing it or propagating to canvas
+      fontPopover.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
+      fontPopover.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
       const onDocPointerDown = (e) => {
         if (fontPopover.hidden) return;
+        const path = e.composedPath ? e.composedPath() : [];
+        if (path.includes(fontPopover) || path.includes(fontPopoverBtn)) {
+          return;
+        }
         if (!fontPopover.contains(e.target) && !fontPopoverBtn.contains(e.target)) {
           fontPopover.hidden = true;
           fontPopoverBtn.setAttribute('aria-expanded', 'false');
         }
       };
-      document.addEventListener('pointerdown', onDocPointerDown, { capture: true });
+
+      if (meditateCanvasWrapper._popoverDocListener) {
+        document.removeEventListener('pointerdown', meditateCanvasWrapper._popoverDocListener);
+      }
+      meditateCanvasWrapper._popoverDocListener = onDocPointerDown;
+      document.addEventListener('pointerdown', onDocPointerDown);
     }
 
     // Attach Font Family Selector handler
     const fontSelect = meditateCanvasWrapper.querySelector('#meditate-font-select');
+    const defaultBtn = meditateCanvasWrapper.querySelector('#meditate-case-default-btn');
+    const allCapsBtn = meditateCanvasWrapper.querySelector('#meditate-case-uppercase-btn');
+    const fontSizeLbl = meditateCanvasWrapper.querySelector('#meditate-font-size-lbl');
+
     if (fontSelect) {
       fontSelect.addEventListener('change', (e) => {
         activeFont = e.target.value;
         setMeditateFontPref(activeFont);
         if (dragBox) dragBox.style.fontFamily = activeFont;
+        if (defaultBtn) {
+          defaultBtn.classList.toggle('is-active', activeFont.includes('Arial') && activeFontCase !== 'uppercase');
+        }
         persistMeditation();
       });
     }
 
-    // Attach Text Case (Normal vs ALL CAPS) handlers
-    const caseBtns = meditateCanvasWrapper.querySelectorAll('.meditate-case-btn');
-    caseBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    // Attach Default button (resets font to Arial, normal case, 20px, default width)
+    if (defaultBtn) {
+      defaultBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const selectedCase = btn.getAttribute('data-case') === 'uppercase' ? 'uppercase' : 'normal';
-        activeFontCase = selectedCase;
+        activeFont = DEFAULT_MEDITATE_FONT;
+        activeFontSize = DEFAULT_MEDITATE_FONT_SIZE;
+        activeFontCase = DEFAULT_MEDITATE_FONT_CASE;
+        activeBoxWidth = DEFAULT_MEDITATE_BOX_WIDTH;
+
+        setMeditateFontPref(activeFont);
+        setMeditateFontSizePref(activeFontSize);
         setMeditateFontCasePref(activeFontCase);
-        caseBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+        setMeditateBoxWidthPref(activeBoxWidth);
+
+        if (fontSelect) fontSelect.value = DEFAULT_MEDITATE_FONT;
+        if (fontSizeLbl) fontSizeLbl.textContent = `${activeFontSize}px`;
+        defaultBtn.classList.add('is-active');
+        if (allCapsBtn) allCapsBtn.classList.remove('is-active');
+
+        if (dragBox) {
+          dragBox.style.fontFamily = activeFont;
+          dragBox.style.fontSize = `${activeFontSize}px`;
+          dragBox.style.textTransform = activeFontCase;
+          dragBox.style.width = `${activeBoxWidth}px`;
+        }
+        persistMeditation();
+      });
+    }
+
+    // Attach ALL CAPS button
+    if (allCapsBtn) {
+      allCapsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeFontCase = 'uppercase';
+        setMeditateFontCasePref(activeFontCase);
+        allCapsBtn.classList.add('is-active');
+        if (defaultBtn) defaultBtn.classList.remove('is-active');
         if (dragBox) dragBox.style.textTransform = activeFontCase;
         persistMeditation();
       });
-    });
+    }
 
     // Attach Font Size Stepper handlers
     const fontDownBtn = meditateCanvasWrapper.querySelector('#meditate-font-down-btn');
