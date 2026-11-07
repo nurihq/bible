@@ -1,7 +1,7 @@
-import { CONFIG } from '../config.js?v=20261107_v3';
-import { Auth, Api } from '../api.js?v=20261107_v3';
-import { trackEvent } from '../analytics.js?v=20261107_v3';
-import { navigate } from '../router.js?v=20261107_v3';
+import { CONFIG } from '../config.js?v=20261107_v9';
+import { Auth, Api } from '../api.js?v=20261107_v9';
+import { trackEvent } from '../analytics.js?v=20261107_v9';
+import { navigate } from '../router.js?v=20261107_v9';
 
 let firebaseAuthInstance = null;
 let googleProviderInstance = null;

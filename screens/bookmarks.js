@@ -8,14 +8,14 @@ import {
   deleteBookmarkHistoryEntry,
   setMeditateModePref,
   getPreferredTranslation
-} from '../api.js?v=20261107_v3';
+} from '../api.js?v=20261107_v9';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById
-} from '../bible-data.js?v=20261107_v3';
-import { trackEvent } from '../analytics.js?v=20261107_v3';
-import { navigate } from '../router.js?v=20261107_v3';
+} from '../bible-data.js?v=20261107_v9';
+import { trackEvent } from '../analytics.js?v=20261107_v9';
+import { navigate } from '../router.js?v=20261107_v9';
 
 function escapeHtml(str) {
   return String(str || '')
