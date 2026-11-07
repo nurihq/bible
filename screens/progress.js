@@ -1,9 +1,9 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261107_v9';
-import { getGlobalTypingStats, getChapterProgressSummary } from '../api.js?v=20261107_v9';
-import { trackEvent } from '../analytics.js?v=20261107_v9';
+} from '../bible-data.js?v=20261107_v10';
+import { getGlobalTypingStats, getChapterProgressSummary } from '../api.js?v=20261107_v10';
+import { trackEvent } from '../analytics.js?v=20261107_v10';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));

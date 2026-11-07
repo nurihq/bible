@@ -767,12 +767,12 @@ function generateDoveOfPeaceTemplate(tIdx, rng, savedFills) {
 
   // Heavenly Cloud Billows (Base)
   const clouds = [
-    { pts: '0,520 C 150,470 300,560 450,510 C 600,470 750,550 1000,500 L 1000,700 L 0,700 Z', num: 2, id: `dove_cld1_${tIdx}` }
+    { d: 'M 0,520 C 150,470 300,560 450,510 C 600,470 750,550 1000,500 L 1000,700 L 0,700 Z', num: 2, id: `dove_cld1_${tIdx}` }
   ];
   clouds.forEach(c => {
     parts.push(`
       <path id="${c.id}" class="paint-segment" data-seg-id="${c.id}" data-seg-num="${c.num}"
-        d="${c.pts}"
+        d="${c.d}"
         fill="${getFill(c.id, savedFills)}" stroke="#1e293b" stroke-width="2.2" />
     `);
   });
