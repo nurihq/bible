@@ -124,7 +124,7 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
   const svgY = Math.round((posY / 100) * 700 - 70);
 
   return `
-    <svg viewBox="0 0 1000 700" class="meditate-svg-art" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox="0 0 1000 700" class="meditate-svg-art" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
       <defs>
         <filter id="med-glow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#ffffff" flood-opacity="0.85" />
@@ -133,7 +133,7 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
       </defs>
 
       <!-- Canvas Base Frame -->
-      <rect x="0" y="0" width="1000" height="700" fill="#f8fafc" stroke="#1e293b" stroke-width="3" />
+      <rect x="0" y="0" width="1000" height="700" fill="#f8fafc" />
 
       <!-- Coloring Segments Group -->
       <g class="meditate-segments-layer">

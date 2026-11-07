@@ -1322,6 +1322,10 @@ export function renderTypingScreen(container, params = {}) {
   function applyMeditateModeState() {
     const isMeditate = Boolean(singleVerseMode && meditateMode);
 
+    if (viewportWrapper) {
+      viewportWrapper.classList.toggle('is-meditate-active', isMeditate);
+    }
+
     if (advanceStepBtn) {
       advanceStepBtn.hidden = isMeditate || !singleVerseMode || autoAdvance;
     }
