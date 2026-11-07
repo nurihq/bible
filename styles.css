@@ -4075,6 +4075,20 @@ sup.verse-num.is-both {
   background: rgba(239, 68, 68, 0.08);
 }
 
+.single-verse-read-chapter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.single-verse-read-chapter-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(104, 94, 125, 0.08);
+}
+
 /* ── Favorited Verses Screen ─────────────────────────────────────── */
 .favorites-screen-container {
   max-width: 1200px;

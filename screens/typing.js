@@ -298,6 +298,15 @@ export function renderTypingScreen(container, params = {}) {
             >
               <span id="single-verse-fav-icon">${isSingleVerseFav ? '❤️' : '🤍'}</span>
             </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm summary-action-btn single-verse-read-chapter-btn"
+              id="single-verse-read-chapter-btn"
+              title="Open and read the full chapter (${escapeHtml(book.name)} ${initialChapter})"
+              ${singleVerseMode ? '' : 'hidden'}
+            >
+              📖 Read Full Chapter
+            </button>
             <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options & Actions">
               ⚙️ Options
             </button>
@@ -531,6 +540,7 @@ export function renderTypingScreen(container, params = {}) {
   const advanceStepBtn = container.querySelector('#advance-step-btn');
   const singleFavBtn = container.querySelector('#single-verse-fav-btn');
   const singleFavIcon = container.querySelector('#single-verse-fav-icon');
+  const readFullChapterBtn = container.querySelector('#single-verse-read-chapter-btn');
   const optionsBtn = container.querySelector('#typing-options-btn');
   const optionsBackdrop = container.querySelector('#typing-options-backdrop');
   const optionsCloseBtn = container.querySelector('#options-close-btn');
@@ -879,6 +889,19 @@ export function renderTypingScreen(container, params = {}) {
         isFavorited: nowFav,
         mode: 'single'
       });
+    });
+  }
+
+  if (readFullChapterBtn) {
+    readFullChapterBtn.addEventListener('click', () => {
+      const vNum = targetSingleVerseNum || 1;
+      setSingleVerseModePref(false);
+      trackEvent('single_verse_read_full_chapter_click', {
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: vNum
+      });
+      navigate(`#/typing/${book.id}/${initialChapter}?verse=${vNum}`);
     });
   }
 
