@@ -1375,6 +1375,10 @@ export function renderTypingScreen(container, params = {}) {
     let textY = typeof existingMed?.textY === 'number' ? existingMed.textY : 76;
 
     function persistMeditation() {
+      // First colour equals save: only save if user has started coloring
+      if (!savedFills || Object.keys(savedFills).length === 0) {
+        return;
+      }
       saveVerseMeditation({
         bookId: book.id,
         chapter: initialChapter,

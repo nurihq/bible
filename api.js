@@ -477,6 +477,13 @@ export function saveVerseMeditation({
   }
   const key = `${bookId}:${chapter}:${verse}`;
   const existing = store.meditations[key] || {};
+  const mergedFills = { ...(existing.fills || {}), ...(fills || {}) };
+
+  // First colour equals save: only persist if user has colored at least one segment
+  if (!mergedFills || Object.keys(mergedFills).length === 0) {
+    return null;
+  }
+
   const record = {
     key,
     bookId: Number(bookId),
@@ -486,7 +493,7 @@ export function saveVerseMeditation({
     verseText: String(verseText || ''),
     translation: String(translation || 'ESV'),
     templateIdx: Number(templateIdx || 0),
-    fills: { ...(existing.fills || {}), ...(fills || {}) },
+    fills: mergedFills,
     fontFamily: fontFamily || existing.fontFamily || store.meditateFont || DEFAULT_MEDITATE_FONT,
     fontSize: typeof fontSize === 'number' ? fontSize : (typeof existing.fontSize === 'number' ? existing.fontSize : (store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE)),
     fontCase: fontCase || existing.fontCase || store.meditateFontCase || DEFAULT_MEDITATE_FONT_CASE,
@@ -505,13 +512,20 @@ export function saveVerseMeditation({
 export function getVerseMeditation(bookId, chapter, verse) {
   const store = getLocalStore();
   const key = `${bookId}:${chapter}:${verse}`;
-  return store.meditations?.[key] || null;
+  const med = store.meditations?.[key] || null;
+  if (!med) return null;
+  if (!med.fills || typeof med.fills !== 'object' || Object.keys(med.fills).length === 0) {
+    return null;
+  }
+  return med;
 }
 
 export function getAllMeditations() {
   const store = getLocalStore();
   const list = Object.values(store.meditations || {});
-  return list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  return list
+    .filter(m => m && m.fills && typeof m.fills === 'object' && Object.keys(m.fills).length > 0)
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
 
 export function deleteVerseMeditation(bookId, chapter, verse) {
