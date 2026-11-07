@@ -109,7 +109,11 @@ export function renderBookmarksScreen(container) {
         <!-- Top Screen Header -->
         <div class="bookmarks-header">
           <div class="bookmarks-header-main">
-            <h1 class="bookmarks-title">🔖 Scripture Bookmarks</h1>
+            <h1 class="bookmarks-title">
+              <svg class="bookmark-screen-title-icon" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; color: var(--primary); margin-right: 6px;">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>Scripture Bookmarks
+            </h1>
             <p class="bookmarks-subtitle">
               Custom markers that remember your place across the Bible. Jump right back into reading, typing, or meditating anytime, and see complete verse history.
             </p>
@@ -162,11 +166,15 @@ export function renderBookmarksScreen(container) {
         <!-- Main Bookmarks Content -->
         ${totalCount === 0 ? `
           <div class="bookmarks-empty-state">
-            <div class="bookmarks-empty-icon">🔖</div>
+            <div class="bookmarks-empty-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
             <h2 class="bookmarks-empty-title">No Bookmarks Saved Yet</h2>
             <p class="bookmarks-empty-desc">
               Bookmarks help you keep track of where you are in personal reading plans, study topics, or daily devotionals.
-              Click the bookmark icon <strong>🔖</strong> next to favourite while typing, or create one below!
+              Click the bookmark ribbon icon next to favourite while typing, or create one below!
             </p>
             <div class="bookmarks-empty-actions">
               <button type="button" class="btn btn-primary" id="empty-add-bookmark-btn">
@@ -287,7 +295,11 @@ export function renderBookmarksScreen(container) {
         <!-- Card Header: Name & Actions -->
         <div class="bookmark-card-header">
           <div class="bookmark-card-title-group">
-            <span class="bookmark-badge-icon">🔖</span>
+            <span class="bookmark-badge-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); vertical-align: -2px;">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+            </span>
             ${isEditingName ? `
               <div class="bookmark-rename-inline">
                 <input

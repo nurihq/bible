@@ -318,7 +318,9 @@ export function renderTypingScreen(container, params = {}) {
               title="${isSingleVerseBookmarked ? 'Verse is bookmarked. Click to view, update or add bookmarks.' : 'Bookmark this verse'}"
               ${singleVerseMode ? '' : 'hidden'}
             >
-              <span id="single-verse-bookmark-icon">🔖</span>
+              <svg class="bookmark-ribbon-icon" width="16" height="16" viewBox="0 0 24 24" fill="${isSingleVerseBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
             </button>
             <button
               type="button"
@@ -559,7 +561,11 @@ export function renderTypingScreen(container, params = {}) {
         <div class="typing-options-card typing-bookmark-card" role="dialog" aria-modal="true" aria-labelledby="bookmark-modal-title">
           <div class="typing-options-header">
             <div>
-              <h2 class="typing-options-title" id="bookmark-modal-title">🔖 Bookmark Verse</h2>
+              <h2 class="typing-options-title" id="bookmark-modal-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>Bookmark Verse
+              </h2>
               <p class="bookmark-modal-subtitle" id="bookmark-modal-subtitle">
                 ${escapeHtml(book.name)} ${initialChapter}:${targetSingleVerseNum || 1} (${getTranslationByCode(activeTranslation).shortName})
               </p>
@@ -1003,6 +1009,8 @@ export function renderTypingScreen(container, params = {}) {
     const vNum = targetSingleVerseNum || 1;
     const isBookmarked = isVerseBookmarked(book.id, initialChapter, vNum);
     singleBookmarkBtn.classList.toggle('is-bookmarked', isBookmarked);
+    const svgEl = singleBookmarkBtn.querySelector('.bookmark-ribbon-icon');
+    if (svgEl) svgEl.setAttribute('fill', isBookmarked ? 'currentColor' : 'none');
     singleBookmarkBtn.title = isBookmarked
       ? `Verse ${vNum} is bookmarked. Click to view, update, or add bookmarks.`
       : `Bookmark Verse ${vNum}`;
