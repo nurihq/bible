@@ -4,6 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 
+  <!-- GitHub Pages SPA Clean URL Restoration -->
+  <script>
+    (function(l) {
+      if (l.search[1] === '/') {
+        var decoded = l.search.slice(1).split('&').map(function(s) { 
+          return s.replace(/~and~/g, '&');
+        }).join('?');
+        window.history.replaceState(null, null,
+          l.pathname.slice(0, -1) + decoded + l.hash
+        );
+      }
+    }(window.location));
+  </script>
+
   <!-- Enforce HTTPS -->
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <script>
@@ -85,7 +99,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=20261107_v6">
+  <link rel="stylesheet" href="styles.css?v=20261107_v7">
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -98,6 +112,6 @@
   <main id="app" class="main-content"></main>
 
   <!-- Main JavaScript App Entry -->
-  <script type="module" src="app.js?v=20261107_v6"></script>
+  <script type="module" src="app.js?v=20261107_v7"></script>
 </body>
 </html>

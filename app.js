@@ -1,17 +1,17 @@
-import { Navbar } from './components/navbar.js?v=20261107_v6';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getPreferredTranslation, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v6';
-import { initGA, trackPageView } from './analytics.js?v=20261107_v6';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261107_v6';
-import { navigate, parseActiveRoute } from './router.js?v=20261107_v6';
-export { navigate, parseActiveRoute } from './router.js?v=20261107_v6';
+import { Navbar } from './components/navbar.js?v=20261107_v7';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getPreferredTranslation, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v7';
+import { initGA, trackPageView } from './analytics.js?v=20261107_v7';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261107_v7';
+import { navigate, parseActiveRoute } from './router.js?v=20261107_v7';
+export { navigate, parseActiveRoute } from './router.js?v=20261107_v7';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261107_v6';
-import { renderLandingScreen } from './screens/home.js?v=20261107_v6';
-import { renderTypingScreen } from './screens/typing.js?v=20261107_v6';
-import { renderProgressScreen } from './screens/progress.js?v=20261107_v6';
-import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v6';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v6';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261107_v6';
+import { renderSignInScreen } from './screens/signin.js?v=20261107_v7';
+import { renderLandingScreen } from './screens/home.js?v=20261107_v7';
+import { renderTypingScreen } from './screens/typing.js?v=20261107_v7';
+import { renderProgressScreen } from './screens/progress.js?v=20261107_v7';
+import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v7';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v7';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261107_v7';
 
 class App {
   constructor() {
@@ -36,13 +36,15 @@ class App {
 
     window.addEventListener('hashchange', () => this.handleRoute());
     window.addEventListener('popstate', () => this.handleRoute());
+    window.addEventListener('bible:route-changed', () => this.handleRoute());
 
-    // Intercept internal #/... links for instant SPA navigation
+    // Intercept internal links for instant SPA navigation without page reload
     document.addEventListener('click', (e) => {
       const link = e.target.closest('a');
       if (link && link.getAttribute('href')) {
         if (
           link.getAttribute('target') === '_blank' ||
+          link.hasAttribute('download') ||
           e.metaKey ||
           e.ctrlKey ||
           e.shiftKey ||
@@ -52,7 +54,11 @@ class App {
           return;
         }
         const href = link.getAttribute('href');
+        // Handle both clean paths (/typing, /progress) and legacy (#/typing, #/)
         if (href.startsWith('#/')) {
+          e.preventDefault();
+          navigate(href.slice(1));
+        } else if (href.startsWith('/') && !href.startsWith('//')) {
           e.preventDefault();
           navigate(href);
         }
@@ -85,8 +91,7 @@ class App {
     // Re-render and handle sync immediately when auth state changes
     window.addEventListener('bible:auth-changed', () => {
       const { path } = parseActiveRoute();
-      const routeToken = path === '/' ? '#/' : `#${path}`;
-      this.navbar.render(this.navContainer, routeToken);
+      this.navbar.render(this.navContainer, path);
       if (Auth.isAuthenticated()) {
         syncLocalToCloud().catch(() => {});
       }
@@ -107,12 +112,11 @@ class App {
     if (window.__bibleTypingCleanup) {
       window.__bibleTypingCleanup();
     }
-    navigate('#/');
+    navigate('/');
   }
 
   handleRoute() {
     const { path, query } = parseActiveRoute();
-    const routeToken = path === '/' ? '#/' : `#${path}`;
 
     // Clean up active typing intervals when leaving the typing screen
     if (!path.startsWith('/typing') && window.__bibleTypingCleanup) {
@@ -123,7 +127,7 @@ class App {
     }
 
     // Re-render navbar (and global unauthenticated warning banner on non-landing/non-signin screens)
-    this.navbar.render(this.navContainer, routeToken);
+    this.navbar.render(this.navContainer, path);
 
     if (path === '/' || path === '') {
       document.title = 'Promises to Creation — Bible Typing App & Scripture Reading Tracker';
@@ -134,7 +138,7 @@ class App {
 
     if (path === '/signin') {
       if (Auth.isAuthenticated()) {
-        navigate('#/typing');
+        navigate('/typing');
         return;
       }
       document.title = 'Sign In | Promises to Creation';
@@ -144,7 +148,7 @@ class App {
     }
 
     if (path === '/hub') {
-      navigate('#/typing');
+      navigate('/typing');
       return;
     }
 
@@ -152,14 +156,14 @@ class App {
       if (getSingleVerseModePref()) {
         if (getShuffleVersesPref()) {
           const randRef = getNextPreloadedRandomVerse(getPreferredTranslation() || 'ESV');
-          navigate(`#/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
+          navigate(`/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
           return;
         }
         const store = getLocalStore();
         const bId = store.lastBookId || 1;
         const ch = store.lastChapter || 1;
         const vr = store.lastVerse || 1;
-        navigate(`#/typing/${bId}/${ch}/${vr}`);
+        navigate(`/typing/${bId}/${ch}/${vr}`);
         return;
       }
       document.title = 'Bible Typing | Promises to Creation';
@@ -233,7 +237,7 @@ class App {
     }
 
     // Fallback to landing screen
-    navigate('#/');
+    navigate('/');
   }
 }
 

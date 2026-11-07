@@ -180,7 +180,7 @@ export function renderBookmarksScreen(container) {
               <button type="button" class="btn btn-primary" id="empty-add-bookmark-btn">
                 + Create Your First Bookmark
               </button>
-              <a href="#/typing" class="btn btn-secondary">
+              <a href="/typing" class="btn btn-secondary">
                 Start Typing Scripture
               </a>
             </div>
@@ -580,7 +580,7 @@ export function renderBookmarksScreen(container) {
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
         trackEvent('jump_bookmark_type', { bookId, chapter: ch, verse: vr });
-        navigate(`#/typing/${bookId}/${ch}/${vr}`);
+        navigate(`/typing/${bookId}/${ch}/${vr}`);
       });
     });
 
@@ -591,7 +591,7 @@ export function renderBookmarksScreen(container) {
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
         trackEvent('jump_bookmark_chapter', { bookId, chapter: ch, verse: vr });
-        navigate(`#/typing/${bookId}/${ch}?verse=${vr}`);
+        navigate(`/typing/${bookId}/${ch}?verse=${vr}`);
       });
     });
 
@@ -603,7 +603,7 @@ export function renderBookmarksScreen(container) {
         const vr = Number(btn.getAttribute('data-vr'));
         setMeditateModePref(true);
         trackEvent('jump_bookmark_meditate', { bookId, chapter: ch, verse: vr });
-        navigate(`#/typing/${bookId}/${ch}/${vr}`);
+        navigate(`/typing/${bookId}/${ch}/${vr}`);
       });
     });
 
@@ -635,7 +635,7 @@ export function renderBookmarksScreen(container) {
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
         trackEvent('jump_bookmark_history', { bookId, chapter: ch, verse: vr });
-        navigate(`#/typing/${bookId}/${ch}/${vr}`);
+        navigate(`/typing/${bookId}/${ch}/${vr}`);
       });
     });
 

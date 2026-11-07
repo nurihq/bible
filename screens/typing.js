@@ -74,13 +74,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261107_v5';
+} from '../api.js?v=20261107_v7';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261107_v5';
-import { trackEvent } from '../analytics.js?v=20261107_v5';
-import { navigate } from '../router.js?v=20261107_v5';
+} from '../meditate-art.js?v=20261107_v7';
+import { trackEvent } from '../analytics.js?v=20261107_v7';
+import { navigate } from '../router.js?v=20261107_v7';
 
 function escapeHtml(str) {
   return String(str)
@@ -465,7 +465,7 @@ export function renderTypingScreen(container, params = {}) {
                 📖 Open Entire Chapter (${book.name} ${initialChapter})
               </button>
             ` : `
-              <a href="#/progress" class="btn btn-secondary" id="comp-progress-btn">
+              <a href="/progress" class="btn btn-secondary" id="comp-progress-btn">
                 📊 View Progress
               </a>
             `}
@@ -605,7 +605,7 @@ export function renderTypingScreen(container, params = {}) {
             <div class="bookmark-recent-section">
               <div class="bookmark-section-header">
                 <span class="bookmark-section-title" id="bookmark-section-title">Recent Bookmarks</span>
-                <a href="#/bookmarks" class="bookmark-view-all-link" id="bookmark-view-all-link">Manage All & History ›</a>
+                <a href="/bookmarks" class="bookmark-view-all-link" id="bookmark-view-all-link">Manage All & History ›</a>
               </div>
               <div class="bookmark-recent-list" id="bookmark-recent-list">
                 <!-- Rendered dynamically -->
@@ -717,15 +717,15 @@ export function renderTypingScreen(container, params = {}) {
       if (isSingle) {
         if (shuffleVerses) {
           const randRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum || 1 });
-          navigate(`#/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
+          navigate(`/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
         } else {
           const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
           const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1);
-          navigate(`#/typing/${book.id}/${initialChapter}/${vNum}`);
+          navigate(`/typing/${book.id}/${initialChapter}/${vNum}`);
         }
       } else {
         const vNum = targetSingleVerseNum || 1;
-        navigate(`#/typing/${book.id}/${initialChapter}?verse=${vNum}`);
+        navigate(`/typing/${book.id}/${initialChapter}?verse=${vNum}`);
       }
       return;
     }
@@ -1000,7 +1000,7 @@ export function renderTypingScreen(container, params = {}) {
         chapter: initialChapter,
         verse: vNum
       });
-      navigate(`#/typing/${book.id}/${initialChapter}?verse=${vNum}`);
+      navigate(`/typing/${book.id}/${initialChapter}?verse=${vNum}`);
     });
   }
 
@@ -1246,17 +1246,17 @@ export function renderTypingScreen(container, params = {}) {
         const prev = popRandomVerseHistory();
         if (prev) {
           pushRandomVerseForward({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-          navigate(`#/typing/${prev.bookId}/${prev.chapter}/${prev.verse}`);
+          navigate(`/typing/${prev.bookId}/${prev.chapter}/${prev.verse}`);
           return;
         }
       }
       if (targetSingleVerseNum > 1) {
-        navigate(`#/typing/${book.id}/${initialChapter}/${targetSingleVerseNum - 1}`);
+        navigate(`/typing/${book.id}/${initialChapter}/${targetSingleVerseNum - 1}`);
       } else {
-        navigate(`#/typing/${prevChapterRef.bookId}/${prevChapterRef.chapter}/1`);
+        navigate(`/typing/${prevChapterRef.bookId}/${prevChapterRef.chapter}/1`);
       }
     } else {
-      navigate(`#/typing/${prevChapterRef.bookId}/${prevChapterRef.chapter}`);
+      navigate(`/typing/${prevChapterRef.bookId}/${prevChapterRef.chapter}`);
     }
   }
 
@@ -1266,7 +1266,7 @@ export function renderTypingScreen(container, params = {}) {
         const fwd = popRandomVerseForward();
         if (fwd) {
           pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-          navigate(`#/typing/${fwd.bookId}/${fwd.chapter}/${fwd.verse}`);
+          navigate(`/typing/${fwd.bookId}/${fwd.chapter}/${fwd.verse}`);
           return;
         }
 
@@ -1275,18 +1275,18 @@ export function renderTypingScreen(container, params = {}) {
 
         // Use preloaded random verse for instantaneous transition
         const nextRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-        navigate(`#/typing/${nextRef.bookId}/${nextRef.chapter}/${nextRef.verse}`);
+        navigate(`/typing/${nextRef.bookId}/${nextRef.chapter}/${nextRef.verse}`);
         return;
       }
 
       const maxV = allChapterVerses.length || targetSingleVerseNum;
       if (targetSingleVerseNum < maxV) {
-        navigate(`#/typing/${book.id}/${initialChapter}/${targetSingleVerseNum + 1}`);
+        navigate(`/typing/${book.id}/${initialChapter}/${targetSingleVerseNum + 1}`);
       } else {
-        navigate(`#/typing/${nextChapterRef.bookId}/${nextChapterRef.chapter}/1`);
+        navigate(`/typing/${nextChapterRef.bookId}/${nextChapterRef.chapter}/1`);
       }
     } else {
-      navigate(`#/typing/${nextChapterRef.bookId}/${nextChapterRef.chapter}`);
+      navigate(`/typing/${nextChapterRef.bookId}/${nextChapterRef.chapter}`);
     }
   }
 
@@ -2968,7 +2968,7 @@ export function renderTypingScreen(container, params = {}) {
   if (compOpenChapterBtn) {
     compOpenChapterBtn.addEventListener('click', () => {
       completionBackdrop.hidden = true;
-      navigate(`#/typing/${book.id}/${initialChapter}`);
+      navigate(`/typing/${book.id}/${initialChapter}`);
     });
   }
 

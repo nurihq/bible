@@ -281,7 +281,7 @@ export function renderMeditationsScreen(container) {
     if (startNowBtn) {
       startNowBtn.addEventListener('click', () => {
         setMeditateModePref(true);
-        navigate('#/typing/1/1/1');
+        navigate('/typing/1/1/1');
       });
     }
 
@@ -292,7 +292,7 @@ export function renderMeditationsScreen(container) {
         setMeditateModePref(true);
         const ref = getRandomVerseRef();
         trackEvent('meditate_random_verse', { bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse });
-        navigate(`#/typing/${ref.bookId}/${ref.chapter}/${ref.verse}`);
+        navigate(`/typing/${ref.bookId}/${ref.chapter}/${ref.verse}`);
       });
     }
 
@@ -301,7 +301,7 @@ export function renderMeditationsScreen(container) {
     if (openTypingBtn) {
       openTypingBtn.addEventListener('click', () => {
         setMeditateModePref(true);
-        navigate('#/typing/1/1/1');
+        navigate('/typing/1/1/1');
       });
     }
 
@@ -321,7 +321,7 @@ export function renderMeditationsScreen(container) {
           e.stopPropagation();
           trackEvent('open_saved_meditation', { bookId, chapter, verse, templateIdx: med?.templateIdx });
           setMeditateModePref(true);
-          navigate(`#/typing/${bookId}/${chapter}/${verse}`);
+          navigate(`/typing/${bookId}/${chapter}/${verse}`);
         });
       }
 
@@ -406,7 +406,7 @@ export function renderMeditationsScreen(container) {
       modalOpenBtn.onclick = () => {
         trackEvent('edit_meditation_from_modal', { bookId: med.bookId, chapter: med.chapter, verse: med.verse });
         setMeditateModePref(true);
-        navigate(`#/typing/${med.bookId}/${med.chapter}/${med.verse}`);
+        navigate(`/typing/${med.bookId}/${med.chapter}/${med.verse}`);
       };
     }
 

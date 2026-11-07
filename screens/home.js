@@ -806,7 +806,7 @@ export function renderLandingScreen(container) {
                 ${isCompleted ? '✓ Marked Read' : '📖 Mark Verse Read'}
               </button>
               <a
-                href="#/typing/${currentVerse.bookId}/${currentVerse.chapter}"
+                href="/typing/${currentVerse.bookId}/${currentVerse.chapter}"
                 class="btn btn-secondary btn-sm"
                 id="votd-type-chapter-btn"
                 data-stop-card-nav="true"
@@ -825,11 +825,11 @@ export function renderLandingScreen(container) {
       votdCard.addEventListener('click', (e) => {
         if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;
         trackEvent('votd_card_click', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-        navigate(`#/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+        navigate(`/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
       });
       votdCard.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.target === votdCard) {
-          navigate(`#/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+          navigate(`/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
         }
       });
     }
@@ -865,7 +865,7 @@ export function renderLandingScreen(container) {
     if (startBtn) {
       startBtn.addEventListener('click', () => {
         trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
-        navigate('#/typing');
+        navigate('/typing');
       });
     }
   }
@@ -875,5 +875,5 @@ export function renderLandingScreen(container) {
 
 /** Legacy route fallback — Hub removed per user request: redirect directly to typing */
 export function renderHubScreen() {
-  navigate('#/typing');
+  navigate('/typing');
 }

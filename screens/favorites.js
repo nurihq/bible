@@ -325,14 +325,14 @@ export function renderFavoritesScreen(container) {
     const startBtn = container.querySelector('#favorites-start-typing-btn');
     if (startBtn) {
       startBtn.addEventListener('click', () => {
-        navigate('#/typing');
+        navigate('/typing');
       });
     }
 
     const openTypingBtn = container.querySelector('#favorites-open-typing-btn');
     if (openTypingBtn) {
       openTypingBtn.addEventListener('click', () => {
-        navigate('#/typing');
+        navigate('/typing');
       });
     }
 
@@ -343,7 +343,7 @@ export function renderFavoritesScreen(container) {
         if (favorites.length === 0) return;
         const rand = favorites[Math.floor(Math.random() * favorites.length)];
         trackEvent('practice_random_favorite', { bookId: rand.bookId, chapter: rand.chapter, verse: rand.verse });
-        navigate(`#/typing/${rand.bookId}/${rand.chapter}/${rand.verse}`);
+        navigate(`/typing/${rand.bookId}/${rand.chapter}/${rand.verse}`);
       });
     }
 
@@ -363,14 +363,14 @@ export function renderFavoritesScreen(container) {
 
         if (action === 'type') {
           trackEvent('open_favorite_verse_type', { bookId, chapter, verse });
-          navigate(`#/typing/${bookId}/${chapter}/${verse}`);
+          navigate(`/typing/${bookId}/${chapter}/${verse}`);
           return;
         }
 
         if (action === 'meditate') {
           setMeditateModePref(true);
           trackEvent('open_favorite_verse_meditate', { bookId, chapter, verse });
-          navigate(`#/typing/${bookId}/${chapter}/${verse}`);
+          navigate(`/typing/${bookId}/${chapter}/${verse}`);
           return;
         }
 

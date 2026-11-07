@@ -7,16 +7,16 @@ import {
   getAllMeditations,
   getAllFavorites,
   getAllBookmarks
-} from '../api.js?v=20261107_v6';
+} from '../api.js?v=20261107_v7';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261107_v6';
-import { trackEvent } from '../analytics.js?v=20261107_v6';
-import { navigate } from '../router.js?v=20261107_v6';
+} from '../bible-data.js?v=20261107_v7';
+import { trackEvent } from '../analytics.js?v=20261107_v7';
+import { navigate } from '../router.js?v=20261107_v7';
 
 function escapeHtml(str) {
   return String(str)
@@ -35,7 +35,7 @@ export class Navbar {
       (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', this.theme);
     this.currentContainer = null;
-    this.currentRoute = '#/';
+    this.currentRoute = '/';
 
     // Browse drawer state
     this.drawerOpen = false;
@@ -44,7 +44,7 @@ export class Navbar {
     // Re-render immediately when authentication state changes
     window.addEventListener('bible:auth-changed', () => {
       if (this.currentContainer) {
-        this.render(this.currentContainer, this.currentRoute || window.location.hash);
+        this.render(this.currentContainer, this.currentRoute || window.location.pathname);
       }
     });
 
@@ -86,7 +86,7 @@ export class Navbar {
   getNavBackInfo(route) {
     const cleanRoute = (route || '').replace(/^#/, '');
     if (cleanRoute === '/signin') {
-      return { label: 'Home', target: '#/' };
+      return { label: 'Home', target: '/' };
     }
     return null;
   }
@@ -284,7 +284,7 @@ export class Navbar {
         const ch = Number(btn.getAttribute('data-chapter'));
         trackEvent('drawer_select_chapter', { bookId: selBook.id, chapter: ch });
         this.closeDrawer();
-        navigate(`#/typing/${selBook.id}/${ch}`);
+        navigate(`/typing/${selBook.id}/${ch}`);
       });
     });
 
@@ -293,14 +293,14 @@ export class Navbar {
         const v = Number(btn.getAttribute('data-verse'));
         trackEvent('drawer_select_verse', { bookId: selBook.id, chapter: this.drawerChapter, verse: v });
         this.closeDrawer();
-        navigate(`#/typing/${selBook.id}/${this.drawerChapter}/${v}`);
+        navigate(`/typing/${selBook.id}/${this.drawerChapter}/${v}`);
       });
     });
 
     root.querySelector('#drawer-open-chapter-btn').addEventListener('click', () => {
       trackEvent('drawer_open_chapter', { bookId: selBook.id, chapter: this.drawerChapter });
       this.closeDrawer();
-      navigate(`#/typing/${selBook.id}/${this.drawerChapter}`);
+      navigate(`/typing/${selBook.id}/${this.drawerChapter}`);
     });
 
     // Keep the selected chapter in view
@@ -320,11 +320,11 @@ export class Navbar {
     }
     trackEvent('bible_search_select', { label: r.label, mode: r.mode || 'chapter' });
     if (r.mode === 'verse' && r.verse) {
-      navigate(`#/typing/${r.bookId}/${r.chapter}/${r.verse}`);
+      navigate(`/typing/${r.bookId}/${r.chapter}/${r.verse}`);
     } else if (r.mode === 'chapter-at-verse' && r.verse) {
-      navigate(`#/typing/${r.bookId}/${r.chapter}?verse=${r.verse}`);
+      navigate(`/typing/${r.bookId}/${r.chapter}?verse=${r.verse}`);
     } else {
-      navigate(`#/typing/${r.bookId}/${r.chapter}`);
+      navigate(`/typing/${r.bookId}/${r.chapter}`);
     }
   }
 
@@ -407,7 +407,7 @@ export class Navbar {
             </button>
           ` : ''}
 
-          <a href="#/" class="nav-brand" title="bible">
+          <a href="/" class="nav-brand" title="bible">
             <svg class="nav-home-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
               <polyline points="9 22 9 12 15 12 15 22"/>
@@ -447,12 +447,12 @@ export class Navbar {
 
         <div class="nav-right">
           ${!isHomeScreen && !isSignInScreen ? `
-            <a href="#/typing" class="nav-about-btn ${isTypingActive ? 'active' : ''}" title="Bible Typing">
+            <a href="/typing" class="nav-about-btn ${isTypingActive ? 'active' : ''}" title="Bible Typing">
               <span>⌨️</span>
               <span class="nav-about-text">Typing</span>
             </a>
 
-            <a href="#/progress" class="nav-about-btn ${isProgressActive ? 'active' : ''}" title="Typing Progress &amp; Bible Reach">
+            <a href="/progress" class="nav-about-btn ${isProgressActive ? 'active' : ''}" title="Typing Progress &amp; Bible Reach">
               <span>📊</span>
               <span class="nav-about-text">Progress</span>
             </a>
@@ -497,13 +497,13 @@ export class Navbar {
               <div class="nav-profile-dropdown-divider"></div>
 
               <div class="nav-profile-dropdown-menu">
-                <a href="#/favorites" class="nav-profile-dropdown-item ${isFavoritesActive ? 'active' : ''}" id="nav-menu-favorites-btn">
+                <a href="/favorites" class="nav-profile-dropdown-item ${isFavoritesActive ? 'active' : ''}" id="nav-menu-favorites-btn">
                   <span class="nav-item-icon">❤️</span>
                   <span class="nav-item-title">Favorites</span>
                   <span class="nav-item-badge">${favoritesCount}</span>
                 </a>
 
-                <a href="#/bookmarks" class="nav-profile-dropdown-item ${isBookmarksActive ? 'active' : ''}" id="nav-menu-bookmarks-btn">
+                <a href="/bookmarks" class="nav-profile-dropdown-item ${isBookmarksActive ? 'active' : ''}" id="nav-menu-bookmarks-btn">
                   <span class="nav-item-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px;">
                       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
@@ -513,7 +513,7 @@ export class Navbar {
                   <span class="nav-item-badge">${bookmarksCount}</span>
                 </a>
 
-                <a href="#/meditations" class="nav-profile-dropdown-item ${isMeditationsActive ? 'active' : ''}" id="nav-menu-meditations-btn">
+                <a href="/meditations" class="nav-profile-dropdown-item ${isMeditationsActive ? 'active' : ''}" id="nav-menu-meditations-btn">
                   <span class="nav-item-icon">🎨</span>
                   <span class="nav-item-title">Meditations</span>
                   <span class="nav-item-badge">${meditationCount}</span>
@@ -529,7 +529,7 @@ export class Navbar {
                     <span class="nav-item-title">Sign Out</span>
                   </button>
                 ` : `
-                  <a href="#/signin" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; text-decoration: none;">
+                  <a href="/signin" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; text-decoration: none;">
                     Sign In
                   </a>
                 `}
@@ -546,7 +546,7 @@ export class Navbar {
               <strong>You are not signed in.</strong> Any completed chapters, verses, or typing stats you record are not synced to your account and will be lost.
             </span>
           </div>
-          <a href="#/signin" class="unauth-warning-cta">Sign In to Save →</a>
+          <a href="/signin" class="unauth-warning-cta">Sign In to Save →</a>
         </div>
       ` : ''}
       <div id="browse-drawer-root" hidden></div>
@@ -631,7 +631,7 @@ export class Navbar {
         trackEvent('sign_out');
         Auth.signOut();
         if (this.onSignOut) this.onSignOut();
-        navigate('#/');
+        navigate('/');
       });
     }
 

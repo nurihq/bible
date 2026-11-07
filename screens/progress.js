@@ -38,7 +38,7 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
     return `
       <div class="chart-empty-state">
         <p>Complete your first Bible verse or chapter to see your WPM &amp; CPM speed progression chart.</p>
-        <a href="#/typing" class="btn btn-primary btn-sm">Start Typing →</a>
+        <a href="/typing" class="btn btn-primary btn-sm">Start Typing →</a>
       </div>
     `;
   }
@@ -190,7 +190,7 @@ export function renderProgressScreen(container) {
             </p>
           </div>
           <div class="screen-actions">
-            <a href="#/typing" class="btn btn-primary">
+            <a href="/typing" class="btn btn-primary">
               ⌨️ Continue Typing →
             </a>
           </div>
@@ -453,7 +453,7 @@ export function renderProgressScreen(container) {
 
                   chapterCells.push(`
                     <a
-                      href="#/typing/${b.id}/${c}"
+                      href="/typing/${b.id}/${c}"
                       class="reach-ch-cell ${cellClass}"
                       title="${cellTitle}"
                     >
@@ -507,7 +507,7 @@ export function renderProgressScreen(container) {
           ${stats.sessions.length === 0 ? `
             <div class="chart-empty-state">
               <p>No completed verses or chapters recorded yet. Type any verse or chapter to build your history!</p>
-              <a href="#/typing" class="btn btn-primary btn-sm">Open Bible Typing →</a>
+              <a href="/typing" class="btn btn-primary btn-sm">Open Bible Typing →</a>
             </div>
           ` : `
             <div class="history-table-wrapper">
@@ -543,11 +543,11 @@ export function renderProgressScreen(container) {
                         <td class="hist-date-cell">${formatDateShort(s.completedAt)}</td>
                         <td class="hist-action-cell" style="white-space: nowrap;">
                           ${singleV ? `
-                            <a href="#/typing/${s.bookId}/${s.chapter}/${singleV}" class="btn btn-secondary btn-sm" title="Practice only Verse ${singleV}">
+                            <a href="/typing/${s.bookId}/${s.chapter}/${singleV}" class="btn btn-secondary btn-sm" title="Practice only Verse ${singleV}">
                               🎯 v.${singleV}
                             </a>
                           ` : ''}
-                          <a href="#/typing/${s.bookId}/${s.chapter}" class="btn btn-secondary btn-sm" title="Open ${s.bookName} ${s.chapter}">
+                          <a href="/typing/${s.bookId}/${s.chapter}" class="btn btn-secondary btn-sm" title="Open ${s.bookName} ${s.chapter}">
                             📖 Ch. →
                           </a>
                         </td>

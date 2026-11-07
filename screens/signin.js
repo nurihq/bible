@@ -145,7 +145,7 @@ export function renderSignInScreen(container) {
           })
           .catch(() => {});
 
-        navigate('#/typing');
+        navigate('/typing');
       } catch (err) {
         if (btnLabel) btnLabel.textContent = 'Sign in with Google';
         googleBtn.disabled = false;
@@ -163,7 +163,7 @@ export function renderSignInScreen(container) {
   if (unauthBtn) {
     unauthBtn.addEventListener('click', () => {
       trackEvent('continue_unauthenticated');
-      navigate('#/typing');
+      navigate('/typing');
     });
   }
 }
