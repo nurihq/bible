@@ -260,6 +260,7 @@ export function renderMeditationsScreen(container) {
     if (templateFilter) {
       templateFilter.addEventListener('change', (e) => {
         selectedTemplateFilter = e.target.value;
+        trackEvent('filter_meditations_theme', { filter: selectedTemplateFilter });
         render();
       });
     }
@@ -317,6 +318,7 @@ export function renderMeditationsScreen(container) {
       if (openBtn) {
         openBtn.addEventListener('click', (e) => {
           e.stopPropagation();
+          trackEvent('open_saved_meditation', { bookId, chapter, verse, templateIdx: med?.templateIdx });
           setMeditateModePref(true);
           navigate(`#/typing/${bookId}/${chapter}/${verse}`);
         });
@@ -327,7 +329,10 @@ export function renderMeditationsScreen(container) {
       const expandBtn = card.querySelector('.meditation-expand-btn');
       const onExpand = (e) => {
         e.stopPropagation();
-        if (med) openModal(med);
+        if (med) {
+          trackEvent('expand_meditation_modal', { bookId, chapter, verse, templateIdx: med?.templateIdx });
+          openModal(med);
+        }
       };
       if (previewEl) previewEl.addEventListener('click', onExpand);
       if (expandBtn) expandBtn.addEventListener('click', onExpand);
@@ -339,6 +344,7 @@ export function renderMeditationsScreen(container) {
           e.stopPropagation();
           const confirmed = window.confirm(`Remove saved meditation artwork for ${med?.verseRef || 'this verse'}?`);
           if (confirmed) {
+            trackEvent('delete_saved_meditation', { bookId, chapter, verse, templateIdx: med?.templateIdx });
             deleteVerseMeditation(bookId, chapter, verse);
             meditations = getAllMeditations();
             render();
@@ -396,6 +402,7 @@ export function renderMeditationsScreen(container) {
 
     if (modalOpenBtn) {
       modalOpenBtn.onclick = () => {
+        trackEvent('edit_meditation_from_modal', { bookId: med.bookId, chapter: med.chapter, verse: med.verse });
         setMeditateModePref(true);
         navigate(`#/typing/${med.bookId}/${med.chapter}/${med.verse}`);
       };

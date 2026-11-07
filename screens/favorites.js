@@ -296,6 +296,7 @@ export function renderFavoritesScreen(container) {
     if (testFilter) {
       testFilter.addEventListener('change', (e) => {
         testamentFilter = e.target.value;
+        trackEvent('filter_favorites_testament', { testament: testamentFilter });
         render();
       });
     }
@@ -305,6 +306,7 @@ export function renderFavoritesScreen(container) {
     if (sortSelect) {
       sortSelect.addEventListener('change', (e) => {
         sortBy = e.target.value;
+        trackEvent('sort_favorites', { sortBy });
         render();
       });
     }
@@ -378,6 +380,7 @@ export function renderFavoritesScreen(container) {
           const text = textEl ? textEl.textContent.replace(/^[“"]|[”"]$/g, '') : '';
           const ref = refEl ? refEl.textContent : '';
           const fullCopy = `“${text}” — ${ref}`;
+          trackEvent('copy_favorite_verse', { bookId, chapter, verse });
           navigator.clipboard.writeText(fullCopy).then(() => {
             const orig = btn.textContent;
             btn.textContent = '✓ Copied';

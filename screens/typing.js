@@ -681,6 +681,7 @@ export function renderTypingScreen(container, params = {}) {
     toggleShuffleCheckbox.addEventListener('change', () => {
       shuffleVerses = toggleShuffleCheckbox.checked;
       setShuffleVersesPref(shuffleVerses);
+      trackEvent('toggle_shuffle', { enabled: shuffleVerses });
       if (advanceStepBtn) {
         advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
       }
@@ -691,6 +692,7 @@ export function renderTypingScreen(container, params = {}) {
     toggleAutoAdvanceCheckbox.addEventListener('change', () => {
       autoAdvance = toggleAutoAdvanceCheckbox.checked;
       setAutoAdvancePref(autoAdvance);
+      trackEvent('toggle_auto_advance', { enabled: autoAdvance });
       if (advanceStepBtn) {
         const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
         advanceStepBtn.hidden = !isSingle || autoAdvance;
@@ -700,6 +702,7 @@ export function renderTypingScreen(container, params = {}) {
 
   if (advanceStepBtn) {
     advanceStepBtn.addEventListener('click', () => {
+      trackEvent('advance_verse_step', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum || 1 });
       navigateNextStep();
     });
   }
@@ -708,6 +711,7 @@ export function renderTypingScreen(container, params = {}) {
     toggleStatsCheckbox.addEventListener('change', () => {
       showTypingStats = toggleStatsCheckbox.checked;
       setShowTypingStatsPref(showTypingStats);
+      trackEvent('toggle_typing_stats', { enabled: showTypingStats });
       if (summaryStatsLine) {
         summaryStatsLine.hidden = !showTypingStats;
       }
@@ -718,6 +722,7 @@ export function renderTypingScreen(container, params = {}) {
     toggleSkipDoneCheckbox.addEventListener('change', () => {
       skipCompletedVerses = toggleSkipDoneCheckbox.checked;
       setSkipCompletedVersesPref(skipCompletedVerses);
+      trackEvent('toggle_skip_completed', { enabled: skipCompletedVerses });
     });
   }
 
@@ -725,6 +730,7 @@ export function renderTypingScreen(container, params = {}) {
     toggleMeditateCheckbox.addEventListener('change', () => {
       meditateMode = toggleMeditateCheckbox.checked;
       setMeditateModePref(meditateMode);
+      trackEvent('toggle_meditate_mode', { enabled: meditateMode });
       applyMeditateModeState();
     });
   }
@@ -1576,6 +1582,13 @@ export function renderTypingScreen(container, params = {}) {
         seg.style.fill = currentColor;
 
         savedFills[segId] = currentColor;
+        trackEvent('paint_meditation_segment', {
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: activeVNum,
+          segId,
+          templateIdx: currentArtworkTemplateIdx
+        });
         persistMeditation();
       });
     }
@@ -1822,6 +1835,7 @@ export function renderTypingScreen(container, params = {}) {
         e.stopPropagation();
         const idx = Number(btn.getAttribute('data-idx'));
         activePaletteIndex = idx;
+        trackEvent('select_meditation_color', { index: idx, color: meditatePalette[idx] });
         updatePaletteUI();
       });
     });
@@ -2195,6 +2209,13 @@ export function renderTypingScreen(container, params = {}) {
     if (!startTime) {
       startTime = performance.now();
       timerInterval = setInterval(updateLiveMetrics, 200);
+      trackEvent('start_typing_session', {
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: targetSingleVerseNum || 1,
+        mode: singleVerseMode ? 'single' : 'chapter',
+        translation: activeTranslation
+      });
     }
     if (!verseStartTime) {
       verseStartTime = performance.now();

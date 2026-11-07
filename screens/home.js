@@ -808,6 +808,7 @@ export function renderLandingScreen(container) {
               <a
                 href="#/typing/${currentVerse.bookId}/${currentVerse.chapter}"
                 class="btn btn-secondary btn-sm"
+                id="votd-type-chapter-btn"
                 data-stop-card-nav="true"
                 title="Open and type the full chapter"
               >
@@ -850,6 +851,13 @@ export function renderLandingScreen(container) {
           currentVerse = fresh;
           renderCard();
         }, 320);
+      });
+    }
+
+    const typeChBtn = container.querySelector('#votd-type-chapter-btn');
+    if (typeChBtn) {
+      typeChBtn.addEventListener('click', () => {
+        trackEvent('votd_type_chapter_click', { bookId: currentVerse.bookId, chapter: currentVerse.chapter });
       });
     }
 

@@ -274,6 +274,7 @@ export class Navbar {
       });
       btn.addEventListener('dblclick', () => {
         const ch = Number(btn.getAttribute('data-chapter'));
+        trackEvent('drawer_select_chapter', { bookId: selBook.id, chapter: ch });
         this.closeDrawer();
         navigate(`#/typing/${selBook.id}/${ch}`);
       });
@@ -282,12 +283,14 @@ export class Navbar {
     root.querySelectorAll('.drawer-verse-pill').forEach(btn => {
       btn.addEventListener('click', () => {
         const v = Number(btn.getAttribute('data-verse'));
+        trackEvent('drawer_select_verse', { bookId: selBook.id, chapter: this.drawerChapter, verse: v });
         this.closeDrawer();
         navigate(`#/typing/${selBook.id}/${this.drawerChapter}/${v}`);
       });
     });
 
     root.querySelector('#drawer-open-chapter-btn').addEventListener('click', () => {
+      trackEvent('drawer_open_chapter', { bookId: selBook.id, chapter: this.drawerChapter });
       this.closeDrawer();
       navigate(`#/typing/${selBook.id}/${this.drawerChapter}`);
     });
@@ -621,6 +624,9 @@ export class Navbar {
         const willOpen = profileDropdown.hidden;
         profileDropdown.hidden = !willOpen;
         profileBtn.setAttribute('aria-expanded', String(willOpen));
+        if (willOpen) {
+          trackEvent('open_profile_dropdown');
+        }
       });
 
       profileDropdown.addEventListener('click', (e) => {
