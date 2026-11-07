@@ -4310,8 +4310,8 @@ sup.verse-num.is-both {
   font-size: 1.02rem;
   line-height: 1.62;
   color: var(--text-primary);
-  font-family: var(--font-serif);
-  font-style: italic;
+  font-family: var(--font-sans);
+  font-style: normal;
   letter-spacing: -0.005em;
 }
 
