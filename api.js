@@ -258,10 +258,23 @@ export function syncPreferencesToCloud() {
       shuffleScope: store.shuffleScope || 'bible',
       meditateMode: Boolean(store.meditateMode),
       meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE,
+      meditateFont: store.meditateFont || DEFAULT_MEDITATE_FONT,
+      meditateFontSize: store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE,
       meditations: store.meditations || {},
       favorites: store.favorites || {},
-      bookmarks: store.bookmarks || {}
+      bookmarks: store.bookmarks || {},
+      deletedMeditationKeys: store.deletedMeditationKeys || [],
+      deletedFavoriteKeys: store.deletedFavoriteKeys || [],
+      deletedBookmarkIds: store.deletedBookmarkIds || []
     })
+  }).then(() => {
+    const fresh = getLocalStore();
+    if (fresh.deletedMeditationKeys?.length || fresh.deletedFavoriteKeys?.length || fresh.deletedBookmarkIds?.length) {
+      delete fresh.deletedMeditationKeys;
+      delete fresh.deletedFavoriteKeys;
+      delete fresh.deletedBookmarkIds;
+      saveLocalStore(fresh);
+    }
   }).catch(() => {});
 }
 
@@ -581,6 +594,8 @@ export function deleteVerseMeditation(bookId, chapter, verse) {
   const key = `${bookId}:${chapter}:${verse}`;
   if (store.meditations && store.meditations[key]) {
     delete store.meditations[key];
+    if (!store.deletedMeditationKeys) store.deletedMeditationKeys = [];
+    if (!store.deletedMeditationKeys.includes(key)) store.deletedMeditationKeys.push(key);
     saveLocalStore(store);
     syncPreferencesToCloud();
     window.dispatchEvent(new CustomEvent('bible:meditations-updated', { detail: { key, deleted: true } }));
@@ -634,6 +649,8 @@ export function removeVerseFavorite(bookId, chapter, verse) {
   const key = `${bookId}:${chapter}:${verse}`;
   if (store.favorites && store.favorites[key]) {
     delete store.favorites[key];
+    if (!store.deletedFavoriteKeys) store.deletedFavoriteKeys = [];
+    if (!store.deletedFavoriteKeys.includes(key)) store.deletedFavoriteKeys.push(key);
     saveLocalStore(store);
     syncPreferencesToCloud();
     window.dispatchEvent(new CustomEvent('bible:favorites-updated', { detail: { key, isFavorited: false } }));
@@ -787,6 +804,8 @@ export function deleteBookmark(id) {
   const store = getLocalStore();
   if (!store.bookmarks || !store.bookmarks[id]) return false;
   delete store.bookmarks[id];
+  if (!store.deletedBookmarkIds) store.deletedBookmarkIds = [];
+  if (!store.deletedBookmarkIds.includes(id)) store.deletedBookmarkIds.push(id);
   saveLocalStore(store);
   syncPreferencesToCloud();
   window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { id, action: 'delete' } }));
@@ -2214,6 +2233,9 @@ export async function syncLocalToCloud() {
     ]);
 
     const latestStore = getLocalStore();
+    let meditationsChanged = false;
+    let favoritesChanged = false;
+    let bookmarksChanged = false;
 
     if (profileData && profileData.profile) {
       const cp = profileData.profile;
@@ -2229,23 +2251,61 @@ export async function syncLocalToCloud() {
       if (Array.isArray(cp.meditatePalette) && cp.meditatePalette.length === 10) {
         latestStore.meditatePalette = cp.meditatePalette;
       }
+      if (cp.meditateFont) latestStore.meditateFont = cp.meditateFont;
+      if (typeof cp.meditateFontSize === 'number') latestStore.meditateFontSize = cp.meditateFontSize;
+
       if (cp.meditations && typeof cp.meditations === 'object') {
-        latestStore.meditations = {
-          ...(latestStore.meditations || {}),
-          ...cp.meditations
-        };
+        const localMeds = latestStore.meditations || {};
+        const mergedMeds = { ...localMeds };
+        for (const [key, cloudMed] of Object.entries(cp.meditations)) {
+          if (!cloudMed) continue;
+          const localMed = mergedMeds[key];
+          const cloudTime = cloudMed.updatedAt || '';
+          const localTime = localMed?.updatedAt || '';
+          if (!localMed || cloudTime >= localTime) {
+            if (JSON.stringify(localMed) !== JSON.stringify(cloudMed)) {
+              mergedMeds[key] = cloudMed;
+              meditationsChanged = true;
+            }
+          }
+        }
+        latestStore.meditations = mergedMeds;
       }
+
       if (cp.favorites && typeof cp.favorites === 'object') {
-        latestStore.favorites = {
-          ...(latestStore.favorites || {}),
-          ...cp.favorites
-        };
+        const localFavs = latestStore.favorites || {};
+        const mergedFavs = { ...localFavs };
+        for (const [key, cloudFav] of Object.entries(cp.favorites)) {
+          if (!cloudFav) continue;
+          const localFav = mergedFavs[key];
+          const cloudTime = cloudFav.commentUpdatedAt || cloudFav.addedAt || '';
+          const localTime = localFav ? (localFav.commentUpdatedAt || localFav.addedAt || '') : '';
+          if (!localFav || cloudTime >= localTime) {
+            if (JSON.stringify(localFav) !== JSON.stringify(cloudFav)) {
+              mergedFavs[key] = cloudFav;
+              favoritesChanged = true;
+            }
+          }
+        }
+        latestStore.favorites = mergedFavs;
       }
+
       if (cp.bookmarks && typeof cp.bookmarks === 'object') {
-        latestStore.bookmarks = {
-          ...(latestStore.bookmarks || {}),
-          ...cp.bookmarks
-        };
+        const localBms = latestStore.bookmarks || {};
+        const mergedBms = { ...localBms };
+        for (const [key, cloudBm] of Object.entries(cp.bookmarks)) {
+          if (!cloudBm) continue;
+          const localBm = mergedBms[key];
+          const cloudTime = cloudBm.updatedAt || cloudBm.createdAt || '';
+          const localTime = localBm ? (localBm.updatedAt || localBm.createdAt || '') : '';
+          if (!localBm || cloudTime >= localTime) {
+            if (JSON.stringify(localBm) !== JSON.stringify(cloudBm)) {
+              mergedBms[key] = cloudBm;
+              bookmarksChanged = true;
+            }
+          }
+        }
+        latestStore.bookmarks = mergedBms;
       }
     }
 
@@ -2288,6 +2348,17 @@ export async function syncLocalToCloud() {
     }
 
     saveLocalStore(latestStore);
+
+    if (meditationsChanged) {
+      window.dispatchEvent(new CustomEvent('bible:meditations-updated'));
+    }
+    if (favoritesChanged) {
+      window.dispatchEvent(new CustomEvent('bible:favorites-updated'));
+    }
+    if (bookmarksChanged) {
+      window.dispatchEvent(new CustomEvent('bible:bookmarks-updated'));
+    }
+
     syncPreferencesToCloud();
   } catch (err) {
     console.warn('Cloud sync warning:', err);

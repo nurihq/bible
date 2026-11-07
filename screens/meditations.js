@@ -2,17 +2,18 @@ import {
   getAllMeditations,
   deleteVerseMeditation,
   setMeditateModePref,
-  getPreferredTranslation
-} from '../api.js?v=20261107_v3';
+  getPreferredTranslation,
+  syncLocalToCloud
+} from '../api.js?v=20261107_v8';
 import {
   renderMeditateArtworkSvg,
   getArtworkTemplateName,
   MEDITATE_ART_THEME_NAMES,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261107_v3';
-import { getBookById, getRandomVerseRef } from '../bible-data.js?v=20261107_v3';
-import { trackEvent } from '../analytics.js?v=20261107_v3';
-import { navigate } from '../router.js?v=20261107_v3';
+} from '../meditate-art.js?v=20261107_v8';
+import { getBookById, getRandomVerseRef } from '../bible-data.js?v=20261107_v8';
+import { trackEvent } from '../analytics.js?v=20261107_v8';
+import { navigate } from '../router.js?v=20261107_v8';
 
 function escapeHtml(str) {
   return String(str || '')
@@ -76,6 +77,9 @@ export function renderMeditationsScreen(container) {
           </div>
 
           <div class="meditations-header-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="meditations-sync-btn" title="Sync meditations with cloud across your devices">
+              ↻ Sync
+            </button>
             <button type="button" class="btn btn-primary btn-sm" id="meditations-random-verse-btn" title="Pick a random verse to meditate on">
               🎲 Random Verse Meditation
             </button>
@@ -293,6 +297,33 @@ export function renderMeditationsScreen(container) {
         const ref = getRandomVerseRef();
         trackEvent('meditate_random_verse', { bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse });
         navigate(`/typing/${ref.bookId}/${ref.chapter}/${ref.verse}`);
+      });
+    }
+
+    // Manual cloud sync button
+    const syncBtn = container.querySelector('#meditations-sync-btn');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', async () => {
+        syncBtn.disabled = true;
+        syncBtn.textContent = '↻ Syncing...';
+        try {
+          await syncLocalToCloud();
+          meditations = getAllMeditations();
+          render();
+          const refreshedSyncBtn = container.querySelector('#meditations-sync-btn');
+          if (refreshedSyncBtn) {
+            refreshedSyncBtn.textContent = '✓ Synced!';
+            setTimeout(() => {
+              if (refreshedSyncBtn) {
+                refreshedSyncBtn.disabled = false;
+                refreshedSyncBtn.textContent = '↻ Sync';
+              }
+            }, 1800);
+          }
+        } catch (_) {
+          syncBtn.disabled = false;
+          syncBtn.textContent = '↻ Sync';
+        }
       });
     }
 
