@@ -52,6 +52,13 @@ import {
   deleteVerseMeditation,
   toggleVerseFavorite,
   isVerseFavorited,
+  getAllBookmarks,
+  getRecentBookmarks,
+  findBookmarkByName,
+  isVerseBookmarked,
+  getBookmarksForVerse,
+  createBookmark,
+  updateBookmarkLocation,
   getMeditateFontPref,
   setMeditateFontPref,
   getMeditateFontSizePref,
@@ -163,6 +170,7 @@ export function renderTypingScreen(container, params = {}) {
   let onWindowKeydown = null;
   let onStatsUpdated = null;
   let onFavoritesUpdated = null;
+  let onBookmarksUpdated = null;
   let onWindowWheel = null;
   function cleanup() {
     clearTimer();
@@ -179,6 +187,10 @@ export function renderTypingScreen(container, params = {}) {
     if (onFavoritesUpdated) {
       window.removeEventListener('bible:favorites-updated', onFavoritesUpdated);
       onFavoritesUpdated = null;
+    }
+    if (onBookmarksUpdated) {
+      window.removeEventListener('bible:bookmarks-updated', onBookmarksUpdated);
+      onBookmarksUpdated = null;
     }
     if (onWindowWheel) {
       window.removeEventListener('wheel', onWindowWheel);
@@ -263,6 +275,7 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   const isSingleVerseFav = singleVerseMode ? isVerseFavorited(book.id, initialChapter, targetSingleVerseNum || 1) : false;
+  let isSingleVerseBookmarked = singleVerseMode ? isVerseBookmarked(book.id, initialChapter, targetSingleVerseNum || 1) : false;
 
   container.innerHTML = `
     <div class="typing-screen-container">
@@ -297,6 +310,15 @@ export function renderTypingScreen(container, params = {}) {
               ${singleVerseMode ? '' : 'hidden'}
             >
               <span id="single-verse-fav-icon">${isSingleVerseFav ? '❤️' : '🤍'}</span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm summary-action-btn single-verse-bookmark-btn ${isSingleVerseBookmarked ? 'is-bookmarked' : ''}"
+              id="single-verse-bookmark-btn"
+              title="${isSingleVerseBookmarked ? 'Verse is bookmarked. Click to view, update or add bookmarks.' : 'Bookmark this verse'}"
+              ${singleVerseMode ? '' : 'hidden'}
+            >
+              <span id="single-verse-bookmark-icon">🔖</span>
             </button>
             <button
               type="button"
@@ -528,6 +550,50 @@ export function renderTypingScreen(container, params = {}) {
 
           <div class="typing-options-footer">
             <button type="button" class="btn btn-primary btn-sm" id="options-done-btn">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bookmark Modal Backdrop -->
+      <div class="typing-options-backdrop typing-bookmark-backdrop" id="typing-bookmark-backdrop" hidden>
+        <div class="typing-options-card typing-bookmark-card" role="dialog" aria-modal="true" aria-labelledby="bookmark-modal-title">
+          <div class="typing-options-header">
+            <div>
+              <h2 class="typing-options-title" id="bookmark-modal-title">🔖 Bookmark Verse</h2>
+              <p class="bookmark-modal-subtitle" id="bookmark-modal-subtitle">
+                ${escapeHtml(book.name)} ${initialChapter}:${targetSingleVerseNum || 1} (${getTranslationByCode(activeTranslation).shortName})
+              </p>
+            </div>
+            <button type="button" class="options-close-btn" id="bookmark-close-btn" aria-label="Close bookmarks">✕</button>
+          </div>
+
+          <div class="typing-options-body">
+            <!-- Search or Add Input -->
+            <div class="bookmark-input-group">
+              <input
+                type="text"
+                id="bookmark-search-input"
+                class="bookmark-name-input"
+                placeholder="Search or enter bookmark name..."
+                autocomplete="off"
+                maxlength="60"
+              />
+              <button type="button" class="btn btn-primary btn-sm" id="bookmark-save-btn">
+                Save
+              </button>
+            </div>
+            <div class="bookmark-feedback-msg" id="bookmark-feedback-msg" hidden></div>
+
+            <!-- Recent Bookmarks Section -->
+            <div class="bookmark-recent-section">
+              <div class="bookmark-section-header">
+                <span class="bookmark-section-title" id="bookmark-section-title">Recent Bookmarks</span>
+                <a href="#/bookmarks" class="bookmark-view-all-link" id="bookmark-view-all-link">Manage All & History ›</a>
+              </div>
+              <div class="bookmark-recent-list" id="bookmark-recent-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -921,6 +987,217 @@ export function renderTypingScreen(container, params = {}) {
     }
   };
   window.addEventListener('bible:favorites-updated', onFavoritesUpdated);
+
+  // ── Scripture Bookmark Controls & Modal ───────────────────────
+  const singleBookmarkBtn = container.querySelector('#single-verse-bookmark-btn');
+  const bookmarkBackdrop = container.querySelector('#typing-bookmark-backdrop');
+  const bookmarkCloseBtn = container.querySelector('#bookmark-close-btn');
+  const bookmarkSearchInput = container.querySelector('#bookmark-search-input');
+  const bookmarkSaveBtn = container.querySelector('#bookmark-save-btn');
+  const bookmarkFeedbackMsg = container.querySelector('#bookmark-feedback-msg');
+  const bookmarkRecentList = container.querySelector('#bookmark-recent-list');
+  const bookmarkModalSubtitle = container.querySelector('#bookmark-modal-subtitle');
+
+  function updateSingleVerseBookmarkBtn() {
+    if (!singleBookmarkBtn) return;
+    const vNum = targetSingleVerseNum || 1;
+    const isBookmarked = isVerseBookmarked(book.id, initialChapter, vNum);
+    singleBookmarkBtn.classList.toggle('is-bookmarked', isBookmarked);
+    singleBookmarkBtn.title = isBookmarked
+      ? `Verse ${vNum} is bookmarked. Click to view, update, or add bookmarks.`
+      : `Bookmark Verse ${vNum}`;
+  }
+
+  function getCurrentVerseInfo() {
+    const vNum = targetSingleVerseNum || 1;
+    const matched = (allChapterVerses && allChapterVerses.find(v => v.verse === vNum)) || (verses && verses[0]);
+    const vText = matched ? matched.text : '';
+    const vRef = `${book.name} ${initialChapter}:${vNum}`;
+    return { vNum, vText, vRef };
+  }
+
+  function showBookmarkFeedback(msg, isError = false) {
+    if (!bookmarkFeedbackMsg) return;
+    bookmarkFeedbackMsg.textContent = msg;
+    bookmarkFeedbackMsg.classList.toggle('is-error', isError);
+    bookmarkFeedbackMsg.hidden = false;
+    setTimeout(() => {
+      if (bookmarkFeedbackMsg) bookmarkFeedbackMsg.hidden = true;
+    }, 4000);
+  }
+
+  function renderBookmarkRecentList(filterText = '') {
+    if (!bookmarkRecentList) return;
+    const all = getAllBookmarks();
+    const { vNum, vRef, vText } = getCurrentVerseInfo();
+    const cleanFilter = filterText.trim().toLowerCase();
+
+    let itemsToShow = [];
+    if (cleanFilter) {
+      itemsToShow = all.filter(b => (b.name || '').toLowerCase().includes(cleanFilter)).slice(0, 5);
+    } else {
+      itemsToShow = all.slice(0, 5);
+    }
+
+    if (itemsToShow.length === 0) {
+      if (cleanFilter) {
+        bookmarkRecentList.innerHTML = `
+          <div class="bookmark-empty-hint">
+            No existing bookmark matches "<strong>${escapeHtml(filterText)}</strong>".<br />
+            Click <strong>Save</strong> or press Enter to create it!
+          </div>
+        `;
+      } else {
+        bookmarkRecentList.innerHTML = `
+          <div class="bookmark-empty-hint">
+            No bookmarks yet. Type a name above to create your first bookmark!
+          </div>
+        `;
+      }
+      return;
+    }
+
+    bookmarkRecentList.innerHTML = itemsToShow.map(bm => {
+      const isCurrentVerse = bm.bookId === book.id && bm.chapter === initialChapter && bm.verse === vNum;
+      const bmRef = bm.verseRef || `${bm.bookId}:${bm.chapter}:${bm.verse || 1}`;
+      return `
+        <div class="bookmark-recent-item" data-id="${escapeHtml(bm.id)}">
+          <div class="bookmark-item-main">
+            <span class="bookmark-item-name" title="${escapeHtml(bm.name)}">${escapeHtml(bm.name)}</span>
+            <span class="bookmark-item-ref">${escapeHtml(bmRef)} (${escapeHtml(bm.translation || 'ESV')})</span>
+          </div>
+          ${isCurrentVerse ? `
+            <span class="bookmark-item-badge is-current">✓ Current verse</span>
+          ` : `
+            <button type="button" class="bookmark-item-action-btn bm-update-to-here-btn" data-id="${escapeHtml(bm.id)}" title="Update '${escapeHtml(bm.name)}' to ${escapeHtml(vRef)}">
+              Update to here ›
+            </button>
+          `}
+        </div>
+      `;
+    }).join('');
+
+    bookmarkRecentList.querySelectorAll('.bookmark-recent-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.getAttribute('data-id');
+        const bm = all.find(b => b.id === id);
+        if (!bm) return;
+        const isCurrentVerse = bm.bookId === book.id && bm.chapter === initialChapter && bm.verse === vNum;
+        if (isCurrentVerse) {
+          showBookmarkFeedback(`"${bm.name}" is already pointing to ${vRef}.`);
+          return;
+        }
+        updateBookmarkLocation(id, {
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: vNum,
+          verseRef: vRef,
+          verseText: vText,
+          translation: activeTranslation
+        });
+        showBookmarkFeedback(`✓ Updated "${bm.name}" to ${vRef}`);
+        updateSingleVerseBookmarkBtn();
+        renderBookmarkRecentList(bookmarkSearchInput ? bookmarkSearchInput.value : '');
+      });
+    });
+  }
+
+  function openBookmarkModal() {
+    if (!bookmarkBackdrop) return;
+    const { vNum, vRef } = getCurrentVerseInfo();
+    if (bookmarkModalSubtitle) {
+      bookmarkModalSubtitle.textContent = `${vRef} (${getTranslationByCode(activeTranslation).shortName})`;
+    }
+    if (bookmarkFeedbackMsg) bookmarkFeedbackMsg.hidden = true;
+    if (bookmarkSearchInput) {
+      bookmarkSearchInput.value = '';
+    }
+    renderBookmarkRecentList('');
+    bookmarkBackdrop.hidden = false;
+    setTimeout(() => {
+      if (bookmarkSearchInput) bookmarkSearchInput.focus();
+    }, 50);
+  }
+
+  function closeBookmarkModal() {
+    if (bookmarkBackdrop) bookmarkBackdrop.hidden = true;
+    focusTypingInput();
+  }
+
+  function handleSaveBookmark() {
+    if (!bookmarkSearchInput) return;
+    const name = bookmarkSearchInput.value.trim();
+    if (!name) {
+      showBookmarkFeedback('Please enter a bookmark name.', true);
+      bookmarkSearchInput.focus();
+      return;
+    }
+    const { vNum, vRef, vText } = getCurrentVerseInfo();
+    const existing = findBookmarkByName(name);
+    if (existing) {
+      updateBookmarkLocation(existing.id, {
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: vNum,
+        verseRef: vRef,
+        verseText: vText,
+        translation: activeTranslation
+      });
+      showBookmarkFeedback(`✓ Updated existing bookmark "${existing.name}" to ${vRef}`);
+    } else {
+      createBookmark({
+        name,
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: vNum,
+        verseRef: vRef,
+        verseText: vText,
+        translation: activeTranslation
+      });
+      showBookmarkFeedback(`✓ Created new bookmark "${name}" at ${vRef}`);
+    }
+    updateSingleVerseBookmarkBtn();
+    renderBookmarkRecentList(bookmarkSearchInput.value);
+  }
+
+  if (singleBookmarkBtn) {
+    singleBookmarkBtn.addEventListener('click', () => {
+      openBookmarkModal();
+    });
+  }
+
+  if (bookmarkCloseBtn) {
+    bookmarkCloseBtn.addEventListener('click', closeBookmarkModal);
+  }
+
+  if (bookmarkBackdrop) {
+    bookmarkBackdrop.addEventListener('click', (e) => {
+      if (e.target === bookmarkBackdrop) closeBookmarkModal();
+    });
+  }
+
+  if (bookmarkSaveBtn) {
+    bookmarkSaveBtn.addEventListener('click', handleSaveBookmark);
+  }
+
+  if (bookmarkSearchInput) {
+    bookmarkSearchInput.addEventListener('input', (e) => {
+      renderBookmarkRecentList(e.target.value);
+    });
+    bookmarkSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSaveBookmark();
+      } else if (e.key === 'Escape') {
+        closeBookmarkModal();
+      }
+    });
+  }
+
+  onBookmarksUpdated = () => {
+    updateSingleVerseBookmarkBtn();
+  };
+  window.addEventListener('bible:bookmarks-updated', onBookmarksUpdated);
 
   // ── 3. Prev / Next Chapter Stepper & Restart Button ────────────
   function navigatePrevStep() {

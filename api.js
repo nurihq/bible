@@ -192,6 +192,7 @@ function createDefaultStore() {
     ],
     meditations: {}, // { "1:1:1": MeditationRecord }
     favorites: {}, // { "1:1:1": FavoriteRecord }
+    bookmarks: {}, // { [id]: BookmarkRecord }
     chapters: {}, // { "1:1": CompletedChapterRecord }
     sessions: [], // TypingSession[] (sorted newest first)
     unsyncedSessionIds: []
@@ -212,6 +213,7 @@ export function getLocalStore() {
           skipCompletedVerses: parsed.skipCompletedVerses !== false,
           meditations: (parsed.meditations && typeof parsed.meditations === 'object') ? parsed.meditations : {},
           favorites: (parsed.favorites && typeof parsed.favorites === 'object') ? parsed.favorites : {},
+          bookmarks: (parsed.bookmarks && typeof parsed.bookmarks === 'object') ? parsed.bookmarks : {},
           chapters: parsed.chapters || {},
           sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
           unsyncedSessionIds: Array.isArray(parsed.unsyncedSessionIds) ? parsed.unsyncedSessionIds : []
@@ -255,7 +257,8 @@ export function syncPreferencesToCloud() {
       meditateMode: Boolean(store.meditateMode),
       meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE,
       meditations: store.meditations || {},
-      favorites: store.favorites || {}
+      favorites: store.favorites || {},
+      bookmarks: store.bookmarks || {}
     })
   }).catch(() => {});
 }
@@ -636,6 +639,175 @@ export function getAllFavorites() {
   const store = getLocalStore();
   const list = Object.values(store.favorites || {});
   return list.sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || ''));
+}
+
+// ── Scripture Bookmarks ─────────────────────────────────────────
+export function getAllBookmarks() {
+  const store = getLocalStore();
+  const list = Object.values(store.bookmarks || {});
+  return list.sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+}
+
+export function getRecentBookmarks(limit = 5) {
+  return getAllBookmarks().slice(0, limit);
+}
+
+export function getBookmarkById(id) {
+  const store = getLocalStore();
+  return (store.bookmarks && store.bookmarks[id]) || null;
+}
+
+export function findBookmarkByName(name) {
+  if (!name || typeof name !== 'string') return null;
+  const cleanName = name.trim().toLowerCase();
+  const bookmarks = getAllBookmarks();
+  return bookmarks.find(b => (b.name || '').trim().toLowerCase() === cleanName) || null;
+}
+
+export function isVerseBookmarked(bookId, chapter, verse) {
+  const bookmarks = getAllBookmarks();
+  const bId = Number(bookId);
+  const ch = Number(chapter);
+  const vr = verse !== null && verse !== undefined ? Number(verse) : null;
+  return bookmarks.some(b => b.bookId === bId && b.chapter === ch && (vr === null || b.verse === vr));
+}
+
+export function getBookmarksForVerse(bookId, chapter, verse) {
+  const bookmarks = getAllBookmarks();
+  const bId = Number(bookId);
+  const ch = Number(chapter);
+  const vr = verse !== null && verse !== undefined ? Number(verse) : null;
+  return bookmarks.filter(b => b.bookId === bId && b.chapter === ch && (vr === null || b.verse === vr));
+}
+
+export function createBookmark({ name, bookId, chapter, verse, verseRef, verseText, translation }) {
+  const store = getLocalStore();
+  if (!store.bookmarks || typeof store.bookmarks !== 'object') {
+    store.bookmarks = {};
+  }
+  const id = 'bm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+  const now = new Date().toISOString();
+  const cleanName = String(name || '').trim() || 'Bookmark';
+  const record = {
+    id,
+    name: cleanName,
+    bookId: Number(bookId),
+    chapter: Number(chapter),
+    verse: verse !== null && verse !== undefined ? Number(verse) : null,
+    verseRef: String(verseRef || ''),
+    verseText: String(verseText || ''),
+    translation: String(translation || 'ESV'),
+    createdAt: now,
+    updatedAt: now,
+    history: []
+  };
+  store.bookmarks[id] = record;
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { record, action: 'create' } }));
+  return record;
+}
+
+export function updateBookmarkLocation(id, { bookId, chapter, verse, verseRef, verseText, translation }) {
+  const store = getLocalStore();
+  if (!store.bookmarks || !store.bookmarks[id]) return null;
+  const bm = store.bookmarks[id];
+  const newBookId = Number(bookId);
+  const newChapter = Number(chapter);
+  const newVerse = verse !== null && verse !== undefined ? Number(verse) : null;
+
+  const isSameLocation = bm.bookId === newBookId && bm.chapter === newChapter && bm.verse === newVerse;
+  if (!isSameLocation) {
+    if (!Array.isArray(bm.history)) bm.history = [];
+    bm.history.unshift({
+      bookId: bm.bookId,
+      chapter: bm.chapter,
+      verse: bm.verse,
+      verseRef: bm.verseRef || '',
+      verseText: bm.verseText || '',
+      translation: bm.translation || 'ESV',
+      timestamp: bm.updatedAt || bm.createdAt || new Date().toISOString()
+    });
+    if (bm.history.length > 50) bm.history.pop();
+  }
+
+  bm.bookId = newBookId;
+  bm.chapter = newChapter;
+  bm.verse = newVerse;
+  if (verseRef) bm.verseRef = String(verseRef);
+  if (verseText) bm.verseText = String(verseText);
+  if (translation) bm.translation = String(translation);
+  bm.updatedAt = new Date().toISOString();
+
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { record: bm, action: 'update_location' } }));
+  return bm;
+}
+
+export function renameBookmark(id, newName) {
+  const store = getLocalStore();
+  if (!store.bookmarks || !store.bookmarks[id]) return null;
+  const cleanName = String(newName || '').trim();
+  if (!cleanName) return null;
+  store.bookmarks[id].name = cleanName;
+  store.bookmarks[id].updatedAt = new Date().toISOString();
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { record: store.bookmarks[id], action: 'rename' } }));
+  return store.bookmarks[id];
+}
+
+export function deleteBookmark(id) {
+  const store = getLocalStore();
+  if (!store.bookmarks || !store.bookmarks[id]) return false;
+  delete store.bookmarks[id];
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { id, action: 'delete' } }));
+  return true;
+}
+
+export function restoreBookmarkHistory(id, historyIndex) {
+  const store = getLocalStore();
+  if (!store.bookmarks || !store.bookmarks[id]) return null;
+  const bm = store.bookmarks[id];
+  if (!Array.isArray(bm.history) || !bm.history[historyIndex]) return null;
+  const target = bm.history[historyIndex];
+  bm.history.splice(historyIndex, 1);
+  bm.history.unshift({
+    bookId: bm.bookId,
+    chapter: bm.chapter,
+    verse: bm.verse,
+    verseRef: bm.verseRef || '',
+    verseText: bm.verseText || '',
+    translation: bm.translation || 'ESV',
+    timestamp: bm.updatedAt || new Date().toISOString()
+  });
+  bm.bookId = target.bookId;
+  bm.chapter = target.chapter;
+  bm.verse = target.verse;
+  bm.verseRef = target.verseRef;
+  bm.verseText = target.verseText;
+  bm.translation = target.translation;
+  bm.updatedAt = new Date().toISOString();
+
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { record: bm, action: 'restore_history' } }));
+  return bm;
+}
+
+export function deleteBookmarkHistoryEntry(id, historyIndex) {
+  const store = getLocalStore();
+  if (!store.bookmarks || !store.bookmarks[id]) return null;
+  const bm = store.bookmarks[id];
+  if (!Array.isArray(bm.history) || !bm.history[historyIndex]) return null;
+  bm.history.splice(historyIndex, 1);
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:bookmarks-updated', { detail: { record: bm, action: 'delete_history_entry' } }));
+  return bm;
 }
 
 const RANDOM_HISTORY_KEY = 'bible_random_verse_history';
@@ -2042,6 +2214,12 @@ export async function syncLocalToCloud() {
         latestStore.favorites = {
           ...(latestStore.favorites || {}),
           ...cp.favorites
+        };
+      }
+      if (cp.bookmarks && typeof cp.bookmarks === 'object') {
+        latestStore.bookmarks = {
+          ...(latestStore.bookmarks || {}),
+          ...cp.bookmarks
         };
       }
     }

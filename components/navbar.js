@@ -5,7 +5,8 @@ import {
   setPreferredTranslation,
   getChapterProgressSummary,
   getAllMeditations,
-  getAllFavorites
+  getAllFavorites,
+  getAllBookmarks
 } from '../api.js?v=20261107_v1';
 import {
   BIBLE_BOOKS,
@@ -51,6 +52,13 @@ export class Navbar {
       const badge = document.querySelector('#nav-menu-favorites-btn .nav-item-badge');
       if (badge) {
         badge.textContent = String(getAllFavorites().length);
+      }
+    });
+
+    window.addEventListener('bible:bookmarks-updated', () => {
+      const badge = document.querySelector('#nav-menu-bookmarks-btn .nav-item-badge');
+      if (badge) {
+        badge.textContent = String(getAllBookmarks().length);
       }
     });
 
@@ -375,10 +383,13 @@ export class Navbar {
     const isProgressActive = cleanPath === '/progress';
     const isMeditationsActive = cleanPath === '/meditations';
     const isFavoritesActive = cleanPath === '/favorites';
+    const isBookmarksActive = cleanPath === '/bookmarks';
     const allMeds = getAllMeditations();
     const meditationCount = allMeds.length;
     const allFavs = getAllFavorites();
     const favoritesCount = allFavs.length;
+    const allBookmarks = getAllBookmarks();
+    const bookmarksCount = allBookmarks.length;
     const showUnauthBanner = !isAuthed && !isHomeScreen && !isSignInScreen;
     const showTools = !isHomeScreen && !isSignInScreen;
 
@@ -490,6 +501,12 @@ export class Navbar {
                   <span class="nav-item-icon">❤️</span>
                   <span class="nav-item-title">Favorites</span>
                   <span class="nav-item-badge">${favoritesCount}</span>
+                </a>
+
+                <a href="#/bookmarks" class="nav-profile-dropdown-item ${isBookmarksActive ? 'active' : ''}" id="nav-menu-bookmarks-btn">
+                  <span class="nav-item-icon">🔖</span>
+                  <span class="nav-item-title">Bookmarks</span>
+                  <span class="nav-item-badge">${bookmarksCount}</span>
                 </a>
 
                 <a href="#/meditations" class="nav-profile-dropdown-item ${isMeditationsActive ? 'active' : ''}" id="nav-menu-meditations-btn">

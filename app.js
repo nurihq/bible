@@ -9,6 +9,7 @@ import { renderTypingScreen } from './screens/typing.js?v=20261107_v1';
 import { renderProgressScreen } from './screens/progress.js?v=20261107_v1';
 import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v1';
 import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v1';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261107_v1';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';
@@ -245,6 +246,13 @@ class App {
       document.title = 'Favorited Verses | Promises to Creation';
       trackPageView('/favorites', document.title);
       renderFavoritesScreen(this.mainContainer);
+      return;
+    }
+
+    if (path === '/bookmarks') {
+      document.title = 'Bookmarks | Promises to Creation';
+      trackPageView('/bookmarks', document.title);
+      renderBookmarksScreen(this.mainContainer);
       return;
     }
 
