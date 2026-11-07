@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261106_v3';
+} from '../bible-data.js?v=20261107_v1';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -42,9 +42,9 @@ import {
   isVerseTyped,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261106_v3';
-import { trackEvent } from '../analytics.js?v=20261106_v3';
-import { navigate } from '../app.js?v=20261106_v3';
+} from '../api.js?v=20261107_v1';
+import { trackEvent } from '../analytics.js?v=20261107_v1';
+import { navigate } from '../app.js?v=20261107_v1';
 
 function escapeHtml(str) {
   return String(str)
@@ -132,6 +132,7 @@ export function renderTypingScreen(container, params = {}) {
 
   let onWindowKeydown = null;
   let onStatsUpdated = null;
+  let onWindowWheel = null;
   function cleanup() {
     clearTimer();
     document.documentElement.classList.remove('typing-active-view');
@@ -143,6 +144,10 @@ export function renderTypingScreen(container, params = {}) {
     if (onStatsUpdated) {
       window.removeEventListener('bible:stats-updated', onStatsUpdated);
       onStatsUpdated = null;
+    }
+    if (onWindowWheel) {
+      window.removeEventListener('wheel', onWindowWheel);
+      onWindowWheel = null;
     }
   }
   window.__bibleTypingCleanup = cleanup;
@@ -1579,6 +1584,58 @@ export function renderTypingScreen(container, params = {}) {
     }
   };
   window.addEventListener('keydown', onWindowKeydown);
+
+  // Allow scrolling the chapter card content when wheel/trackpad is used outside the card (e.g. gutters to left/right)
+  onWindowWheel = (e) => {
+    if (!document.body.contains(container)) {
+      cleanup();
+      return;
+    }
+
+    // If options modal, completion modal, or browse drawer is open, don't hijack scroll
+    const optionsBackdrop = container.querySelector('#typing-options-backdrop');
+    if (
+      (completionBackdrop && !completionBackdrop.hidden) ||
+      (optionsBackdrop && !optionsBackdrop.hidden) ||
+      document.body.classList.contains('browse-open')
+    ) {
+      return;
+    }
+
+    // If wheel event originates from a scrollable dropdown or modal card, let it scroll naturally
+    if (e.target && e.target.closest && (
+      e.target.closest('.nav-dropdown-menu') ||
+      e.target.closest('.typing-options-card') ||
+      e.target.closest('.completion-modal-card')
+    )) {
+      return;
+    }
+
+    // If the mouse is already inside the passage scroll container, native browser scrolling handles it
+    if (passageScroll && passageScroll.contains(e.target)) {
+      return;
+    }
+
+    // Forward outside scroll to passage scroll
+    if (passageScroll) {
+      let delta = e.deltaY;
+      if (e.deltaMode === 1) {
+        delta *= 33; // DOM_DELTA_LINE
+      } else if (e.deltaMode === 2) {
+        delta *= window.innerHeight; // DOM_DELTA_PAGE
+      }
+
+      if (delta !== 0) {
+        if (typeof passageScroll.scrollBy === 'function') {
+          passageScroll.scrollBy({ top: delta, behavior: 'instant' });
+        } else {
+          passageScroll.scrollTop += delta;
+        }
+        e.preventDefault();
+      }
+    }
+  };
+  window.addEventListener('wheel', onWindowWheel, { passive: false });
 
   // Mobile virtual keyboard fallback via input event
   hiddenInput.addEventListener('input', (e) => {
