@@ -1,17 +1,17 @@
-import { Navbar } from './components/navbar.js?v=20261107_v10';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getPreferredTranslation, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v10';
-import { initGA, trackPageView } from './analytics.js?v=20261107_v10';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261107_v10';
-import { navigate, parseActiveRoute } from './router.js?v=20261107_v10';
-export { navigate, parseActiveRoute } from './router.js?v=20261107_v10';
+import { Navbar } from './components/navbar.js?v=20261107_v11';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getPreferredTranslation, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v11';
+import { initGA, trackPageView } from './analytics.js?v=20261107_v11';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261107_v11';
+import { navigate, parseActiveRoute } from './router.js?v=20261107_v11';
+export { navigate, parseActiveRoute } from './router.js?v=20261107_v11';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261107_v10';
-import { renderLandingScreen } from './screens/home.js?v=20261107_v10';
-import { renderTypingScreen } from './screens/typing.js?v=20261107_v10';
-import { renderProgressScreen } from './screens/progress.js?v=20261107_v10';
-import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v10';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v10';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261107_v10';
+import { renderSignInScreen } from './screens/signin.js?v=20261107_v11';
+import { renderLandingScreen } from './screens/home.js?v=20261107_v11';
+import { renderTypingScreen } from './screens/typing.js?v=20261107_v11';
+import { renderProgressScreen } from './screens/progress.js?v=20261107_v11';
+import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v11';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v11';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261107_v11';
 
 class App {
   constructor() {

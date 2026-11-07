@@ -1,5 +1,5 @@
 // Google Analytics 4 tracking integration for bible
-import { CONFIG } from './config.js?v=20261107_v10';
+import { CONFIG } from './config.js?v=20261107_v11';
 
 export const GA_MEASUREMENT_ID = CONFIG.GA_MEASUREMENT_ID || 'G-6B52RELLEB';
 
