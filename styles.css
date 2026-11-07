@@ -3074,3 +3074,563 @@ sup.verse-num.is-both {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NAVBAR PROFILE DROPDOWN MENU
+   ══════════════════════════════════════════════════════════════════════════ */
+.nav-profile-menu-container {
+  position: relative;
+}
+
+.nav-user-chip-btn {
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+  user-select: none;
+  font-family: inherit;
+}
+
+.nav-user-chip-btn:hover,
+.nav-user-chip-btn[aria-expanded="true"] {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+  color: var(--text-primary);
+}
+
+.nav-user-avatar-fallback {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.nav-profile-caret {
+  font-size: 0.65rem;
+  opacity: 0.65;
+  transition: transform var(--transition-fast);
+  margin-left: 2px;
+}
+
+.nav-user-chip-btn[aria-expanded="true"] .nav-profile-caret {
+  transform: rotate(180deg);
+}
+
+.nav-profile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 250px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-profile-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.5rem 0.6rem;
+}
+
+.nav-profile-dropdown-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border: 1.5px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.nav-profile-dropdown-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nav-profile-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-profile-dropdown-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-profile-dropdown-email {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-profile-dropdown-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.4rem 0;
+}
+
+.nav-profile-dropdown-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.nav-profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.nav-profile-dropdown-item:hover,
+.nav-profile-dropdown-item.active {
+  background: var(--bg-hover);
+  color: var(--primary);
+}
+
+.nav-profile-dropdown-item.is-signout {
+  color: var(--accent-rose);
+}
+
+.nav-profile-dropdown-item.is-signout:hover {
+  background: var(--accent-rose-light);
+  color: var(--accent-rose);
+}
+
+.nav-item-badge {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MEDITATIONS SCREEN (Scripture Artwork Gallery)
+   ══════════════════════════════════════════════════════════════════════════ */
+.meditations-screen-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.meditations-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.meditations-title {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.35rem;
+  color: var(--text-primary);
+}
+
+.meditations-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  max-width: 650px;
+}
+
+.meditations-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.meditations-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.75rem;
+  flex-wrap: wrap;
+}
+
+.meditations-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem;
+  flex: 1 1 320px;
+  max-width: 500px;
+}
+
+.meditations-search-icon {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.meditations-search-input {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.88rem;
+  width: 100%;
+  outline: none;
+}
+
+.meditations-search-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.meditations-search-clear-btn:hover {
+  color: var(--text-primary);
+}
+
+.meditations-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.meditations-filter-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.meditations-filter-select {
+  padding: 0.42rem 0.75rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.meditations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.meditation-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.meditation-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.meditation-card-preview {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meditation-card-svg-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.meditation-card-svg-container svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.meditation-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  backdrop-filter: blur(2px);
+}
+
+.meditation-card-preview:hover .meditation-card-overlay {
+  opacity: 1;
+}
+
+.meditation-card-expand-badge {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+}
+
+.meditation-card-body {
+  padding: 1rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.meditation-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.meditation-card-ref {
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+}
+
+.meditation-card-tr {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  text-transform: uppercase;
+}
+
+.meditation-card-template-name {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.meditation-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+.meditation-meta-pill {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.meditation-meta-date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.meditation-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border-color);
+}
+
+.meditation-open-btn {
+  flex: 1 1 auto;
+}
+
+.meditation-expand-btn {
+  flex: 0 0 auto;
+}
+
+.meditation-delete-btn {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.meditation-delete-btn:hover {
+  color: var(--accent-rose);
+  border-color: var(--accent-rose);
+}
+
+.meditations-empty-state {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.meditations-empty-state .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.meditations-empty-state h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.meditations-empty-state p {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+/* Modal Fullscreen View */
+.meditation-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.meditation-modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(960px, 95vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.meditation-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meditation-modal-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.meditation-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: var(--font-serif);
+}
+
+.meditation-modal-tag {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.meditation-modal-canvas-wrapper {
+  flex: 1 1 auto;
+  min-height: 380px;
+  max-height: 65vh;
+  background: var(--bg-subtle);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.meditation-modal-canvas-wrapper svg {
+  width: 100%;
+  height: 100%;
+  max-height: 60vh;
+  display: block;
+}
+
+.meditation-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}

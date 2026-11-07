@@ -176,6 +176,7 @@ function createDefaultStore() {
       '#64748B',
       '#FFFFFF'
     ],
+    meditations: {}, // { "1:1:1": MeditationRecord }
     chapters: {}, // { "1:1": CompletedChapterRecord }
     sessions: [], // TypingSession[] (sorted newest first)
     unsyncedSessionIds: []
@@ -192,6 +193,7 @@ export function getLocalStore() {
           ...createDefaultStore(),
           ...parsed,
           skipCompletedVerses: parsed.skipCompletedVerses !== false,
+          meditations: (parsed.meditations && typeof parsed.meditations === 'object') ? parsed.meditations : {},
           chapters: parsed.chapters || {},
           sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
           unsyncedSessionIds: Array.isArray(parsed.unsyncedSessionIds) ? parsed.unsyncedSessionIds : []
@@ -229,7 +231,8 @@ export function syncPreferencesToCloud() {
       shuffleVerses: Boolean(store.shuffleVerses),
       shuffleScope: store.shuffleScope || 'bible',
       meditateMode: Boolean(store.meditateMode),
-      meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE
+      meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE,
+      meditations: store.meditations || {}
     })
   }).catch(() => {});
 }
@@ -388,6 +391,55 @@ export function setMeditatePalettePref(palette) {
     store.meditatePalette = palette;
     saveLocalStore(store);
     syncPreferencesToCloud();
+  }
+}
+
+// ── Scripture Meditations (Saved Color-by-Numbers Artworks) ─────
+export function saveVerseMeditation({ bookId, chapter, verse, verseRef, verseText, translation, templateIdx, fills }) {
+  const store = getLocalStore();
+  if (!store.meditations || typeof store.meditations !== 'object') {
+    store.meditations = {};
+  }
+  const key = `${bookId}:${chapter}:${verse}`;
+  const record = {
+    key,
+    bookId: Number(bookId),
+    chapter: Number(chapter),
+    verse: Number(verse),
+    verseRef: String(verseRef || ''),
+    verseText: String(verseText || ''),
+    translation: String(translation || 'ESV'),
+    templateIdx: Number(templateIdx || 0),
+    fills: { ...(fills || {}) },
+    updatedAt: new Date().toISOString()
+  };
+  store.meditations[key] = record;
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:meditations-updated', { detail: { record } }));
+  return record;
+}
+
+export function getVerseMeditation(bookId, chapter, verse) {
+  const store = getLocalStore();
+  const key = `${bookId}:${chapter}:${verse}`;
+  return store.meditations?.[key] || null;
+}
+
+export function getAllMeditations() {
+  const store = getLocalStore();
+  const list = Object.values(store.meditations || {});
+  return list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+}
+
+export function deleteVerseMeditation(bookId, chapter, verse) {
+  const store = getLocalStore();
+  const key = `${bookId}:${chapter}:${verse}`;
+  if (store.meditations && store.meditations[key]) {
+    delete store.meditations[key];
+    saveLocalStore(store);
+    syncPreferencesToCloud();
+    window.dispatchEvent(new CustomEvent('bible:meditations-updated', { detail: { key, deleted: true } }));
   }
 }
 
@@ -1784,6 +1836,12 @@ export async function syncLocalToCloud() {
       if (cp.meditateMode !== undefined) latestStore.meditateMode = Boolean(cp.meditateMode);
       if (Array.isArray(cp.meditatePalette) && cp.meditatePalette.length === 10) {
         latestStore.meditatePalette = cp.meditatePalette;
+      }
+      if (cp.meditations && typeof cp.meditations === 'object') {
+        latestStore.meditations = {
+          ...(latestStore.meditations || {}),
+          ...cp.meditations
+        };
       }
     }
 

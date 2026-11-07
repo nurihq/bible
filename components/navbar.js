@@ -3,7 +3,8 @@ import {
   getLocalStore,
   getPreferredTranslation,
   setPreferredTranslation,
-  getChapterProgressSummary
+  getChapterProgressSummary,
+  getAllMeditations
 } from '../api.js?v=20261107_v1';
 import {
   BIBLE_BOOKS,
@@ -361,6 +362,9 @@ export class Navbar {
     const isSignInScreen = cleanPath === '/signin';
     const isTypingActive = cleanPath === '/typing' || cleanPath.startsWith('/typing/');
     const isProgressActive = cleanPath === '/progress';
+    const isMeditationsActive = cleanPath === '/meditations';
+    const allMeds = getAllMeditations();
+    const meditationCount = allMeds.length;
     const showUnauthBanner = !isAuthed && !isHomeScreen && !isSignInScreen;
     const showTools = !isHomeScreen && !isSignInScreen;
 
@@ -427,25 +431,85 @@ export class Navbar {
               <span>📊</span>
               <span class="nav-about-text">Progress</span>
             </a>
+
+            <a href="#/meditations" class="nav-about-btn ${isMeditationsActive ? 'active' : ''}" title="Scripture Meditations">
+              <span>🎨</span>
+              <span class="nav-about-text">Meditations</span>
+            </a>
           ` : ''}
 
           <button class="icon-btn" id="theme-toggle-btn" title="${this.theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
             ${this.theme === 'dark' ? '☀️' : '🌙'}
           </button>
 
-          ${isAuthed ? `
-            <div class="nav-user-chip" title="${escapeHtml(user?.email || '')}">
-              ${user?.picture ? `<img src="${escapeHtml(user.picture)}" alt="" class="nav-user-avatar" referrerpolicy="no-referrer" />` : ''}
-              <span class="nav-user-name">${escapeHtml((user?.name || 'User').split(' ')[0])}</span>
-            </div>
-            <button class="btn-signout" id="nav-signout-btn">
-              Sign Out
+          <!-- User Profile Avatar & Dropdown Menu -->
+          <div class="nav-profile-menu-container" id="nav-profile-menu-container">
+            <button
+              type="button"
+              class="nav-user-chip nav-user-chip-btn ${!isAuthed ? 'nav-guest-chip' : ''}"
+              id="nav-profile-dropdown-btn"
+              title="${isAuthed ? `Account & Meditations (${escapeHtml(user?.email || '')})` : 'Menu & Meditations'}"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              ${isAuthed && user?.picture
+                ? `<img src="${escapeHtml(user.picture)}" alt="" class="nav-user-avatar" referrerpolicy="no-referrer" />`
+                : `<span class="nav-user-avatar-fallback">${isAuthed ? escapeHtml((user?.name || user?.email || 'U').charAt(0).toUpperCase()) : '👤'}</span>`
+              }
+              <span class="nav-user-name">${escapeHtml(isAuthed ? (user?.name || 'User').split(' ')[0] : 'Menu')}</span>
+              <span class="nav-profile-caret">▾</span>
             </button>
-          ` : `
-            <a href="#/signin" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; text-decoration: none;">
-              Sign In
-            </a>
-          `}
+
+            <div class="nav-profile-dropdown" id="nav-profile-dropdown" hidden>
+              <div class="nav-profile-dropdown-header">
+                <div class="nav-profile-dropdown-avatar">
+                  ${isAuthed && user?.picture
+                    ? `<img src="${escapeHtml(user.picture)}" alt="" referrerpolicy="no-referrer" />`
+                    : `<span>${isAuthed ? escapeHtml((user?.name || user?.email || 'U').charAt(0).toUpperCase()) : '👤'}</span>`
+                  }
+                </div>
+                <div class="nav-profile-dropdown-info">
+                  <strong class="nav-profile-dropdown-name">${escapeHtml(isAuthed ? (user?.name || 'User') : 'Guest User')}</strong>
+                  <span class="nav-profile-dropdown-email">${escapeHtml(isAuthed ? (user?.email || '') : 'Not signed in')}</span>
+                </div>
+              </div>
+
+              <div class="nav-profile-dropdown-divider"></div>
+
+              <div class="nav-profile-dropdown-menu">
+                <a href="#/meditations" class="nav-profile-dropdown-item ${isMeditationsActive ? 'active' : ''}" id="nav-menu-meditations-btn">
+                  <span class="nav-item-icon">🎨</span>
+                  <span class="nav-item-title">Meditations</span>
+                  <span class="nav-item-badge">${meditationCount}</span>
+                </a>
+
+                <a href="#/progress" class="nav-profile-dropdown-item ${isProgressActive ? 'active' : ''}" id="nav-menu-progress-btn">
+                  <span class="nav-item-icon">📊</span>
+                  <span class="nav-item-title">Typing Progress</span>
+                </a>
+
+                <a href="#/typing" class="nav-profile-dropdown-item ${isTypingActive ? 'active' : ''}" id="nav-menu-typing-btn">
+                  <span class="nav-item-icon">⌨️</span>
+                  <span class="nav-item-title">Scripture Typing</span>
+                </a>
+              </div>
+
+              <div class="nav-profile-dropdown-divider"></div>
+
+              <div class="nav-profile-dropdown-footer">
+                ${isAuthed ? `
+                  <button type="button" class="nav-profile-dropdown-item is-signout" id="nav-signout-btn">
+                    <span class="nav-item-icon">🚪</span>
+                    <span class="nav-item-title">Sign Out</span>
+                  </button>
+                ` : `
+                  <a href="#/signin" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; text-decoration: none;">
+                    Sign In
+                  </a>
+                `}
+              </div>
+            </div>
+          </div>
         </div>
       </header>
       ${showUnauthBanner ? `
@@ -536,10 +600,57 @@ export class Navbar {
     const signOutBtn = container.querySelector('#nav-signout-btn');
     if (signOutBtn) {
       signOutBtn.addEventListener('click', () => {
+        const dropdown = container.querySelector('#nav-profile-dropdown');
+        if (dropdown) dropdown.hidden = true;
         trackEvent('sign_out');
         Auth.signOut();
         if (this.onSignOut) this.onSignOut();
         navigate('#/');
+      });
+    }
+
+    // Profile Dropdown Menu interaction
+    const profileBtn = container.querySelector('#nav-profile-dropdown-btn');
+    const profileDropdown = container.querySelector('#nav-profile-dropdown');
+    if (profileBtn && profileDropdown) {
+      profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.drawerOpen) this.closeDrawer();
+        const willOpen = profileDropdown.hidden;
+        profileDropdown.hidden = !willOpen;
+        profileBtn.setAttribute('aria-expanded', String(willOpen));
+      });
+
+      profileDropdown.addEventListener('click', (e) => {
+        const linkOrBtn = e.target.closest('a, button');
+        if (linkOrBtn && linkOrBtn.id !== 'nav-profile-dropdown-btn') {
+          profileDropdown.hidden = true;
+          profileBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    // Close profile dropdown when clicking outside
+    if (!this._profileDocListenerAttached) {
+      this._profileDocListenerAttached = true;
+      document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('nav-profile-dropdown');
+        const menuWrapper = document.getElementById('nav-profile-menu-container');
+        if (dropdown && !dropdown.hidden && (!menuWrapper || !menuWrapper.contains(e.target))) {
+          dropdown.hidden = true;
+          const btn = document.getElementById('nav-profile-dropdown-btn');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const dropdown = document.getElementById('nav-profile-dropdown');
+          if (dropdown && !dropdown.hidden) {
+            dropdown.hidden = true;
+            const btn = document.getElementById('nav-profile-dropdown-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+          }
+        }
       });
     }
   }

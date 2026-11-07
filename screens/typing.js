@@ -46,7 +46,10 @@ import {
   isVerseRead,
   isVerseTyped,
   toggleChapterRead,
-  toggleVerseRead
+  toggleVerseRead,
+  saveVerseMeditation,
+  getVerseMeditation,
+  deleteVerseMeditation
 } from '../api.js?v=20261107_v1';
 import {
   renderMeditateArtworkSvg,
@@ -1234,14 +1237,12 @@ export function renderTypingScreen(container, params = {}) {
     const verseText = currentVerseObj.text || '';
     const verseRef = `${book.name} ${initialChapter}:${activeVNum}`;
 
-    const storageKey = `meditate_fills_${book.id}_${initialChapter}_${activeVNum}_${currentArtworkTemplateIdx}`;
-    let savedFills = {};
-    try {
-      const raw = sessionStorage.getItem(storageKey);
-      if (raw) savedFills = JSON.parse(raw);
-    } catch (e) {
-      savedFills = {};
+    const existingMed = getVerseMeditation(book.id, initialChapter, activeVNum);
+    if (existingMed && typeof existingMed.templateIdx === 'number') {
+      currentArtworkTemplateIdx = existingMed.templateIdx;
     }
+
+    let savedFills = existingMed?.fills ? { ...existingMed.fills } : {};
 
     const svgHtml = renderMeditateArtworkSvg(
       currentArtworkTemplateIdx,
@@ -1321,9 +1322,16 @@ export function renderTypingScreen(container, params = {}) {
         seg.style.fill = currentColor;
 
         savedFills[segId] = currentColor;
-        try {
-          sessionStorage.setItem(storageKey, JSON.stringify(savedFills));
-        } catch (err) {}
+        saveVerseMeditation({
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: activeVNum,
+          verseRef,
+          verseText,
+          translation: getTranslationByCode(activeTranslation).shortName,
+          templateIdx: currentArtworkTemplateIdx,
+          fills: savedFills
+        });
       });
     }
 
@@ -1357,6 +1365,16 @@ export function renderTypingScreen(container, params = {}) {
     if (changeArtBtn) {
       changeArtBtn.addEventListener('click', () => {
         currentArtworkTemplateIdx = (currentArtworkTemplateIdx + 1) % TOTAL_MEDITATE_ART_TEMPLATES;
+        saveVerseMeditation({
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: activeVNum,
+          verseRef,
+          verseText,
+          translation: getTranslationByCode(activeTranslation).shortName,
+          templateIdx: currentArtworkTemplateIdx,
+          fills: savedFills
+        });
         renderMeditateModeCanvas();
       });
     }
@@ -1366,9 +1384,7 @@ export function renderTypingScreen(container, params = {}) {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         savedFills = {};
-        try {
-          sessionStorage.removeItem(storageKey);
-        } catch (err) {}
+        deleteVerseMeditation(book.id, initialChapter, activeVNum);
         const segments = svgEl ? svgEl.querySelectorAll('.paint-segment') : [];
         segments.forEach((s) => {
           s.setAttribute('fill', '#FFFFFF');

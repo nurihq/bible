@@ -7,6 +7,7 @@ import { renderSignInScreen } from './screens/signin.js?v=20261107_v1';
 import { renderLandingScreen } from './screens/home.js?v=20261107_v1';
 import { renderTypingScreen } from './screens/typing.js?v=20261107_v1';
 import { renderProgressScreen } from './screens/progress.js?v=20261107_v1';
+import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v1';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';
@@ -221,6 +222,13 @@ class App {
       document.title = 'Typing Progress & Bible Tracking | Promises to Creation';
       trackPageView('/progress', document.title);
       renderProgressScreen(this.mainContainer);
+      return;
+    }
+
+    if (path === '/meditations') {
+      document.title = 'Scripture Meditations | Promises to Creation';
+      trackPageView('/meditations', document.title);
+      renderMeditationsScreen(this.mainContainer);
       return;
     }
 

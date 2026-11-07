@@ -1,5 +1,12 @@
-// Meditate Mode — Interactive Uplifting "Color by Numbers" SVG Artwork & Verse Canvas
 export const TOTAL_MEDITATE_ART_TEMPLATES = 5;
+
+export const MEDITATE_ART_TEMPLATE_NAMES = [
+  'Mountain Sunrise & Valley Pines',
+  'Coastal Lighthouse & Ocean Waves',
+  'Songbird Branch & Morning Sun',
+  'Serene Alpine Lake & Reflections',
+  'Wildflower Meadow & Gentle Hills'
+];
 
 function escapeHtml(str) {
   return String(str || '')
