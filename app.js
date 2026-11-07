@@ -8,6 +8,7 @@ import { renderLandingScreen } from './screens/home.js?v=20261107_v1';
 import { renderTypingScreen } from './screens/typing.js?v=20261107_v1';
 import { renderProgressScreen } from './screens/progress.js?v=20261107_v1';
 import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v1';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v1';
 
 function parseActiveRoute() {
   const rawHash = window.location.hash || '';
@@ -229,6 +230,13 @@ class App {
       document.title = 'Scripture Meditations | Promises to Creation';
       trackPageView('/meditations', document.title);
       renderMeditationsScreen(this.mainContainer);
+      return;
+    }
+
+    if (path === '/favorites') {
+      document.title = 'Favorited Verses | Promises to Creation';
+      trackPageView('/favorites', document.title);
+      renderFavoritesScreen(this.mainContainer);
       return;
     }
 

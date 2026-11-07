@@ -49,7 +49,9 @@ import {
   toggleVerseRead,
   saveVerseMeditation,
   getVerseMeditation,
-  deleteVerseMeditation
+  deleteVerseMeditation,
+  toggleVerseFavorite,
+  isVerseFavorited
 } from '../api.js?v=20261107_v1';
 import {
   renderMeditateArtworkSvg,
@@ -148,6 +150,7 @@ export function renderTypingScreen(container, params = {}) {
 
   let onWindowKeydown = null;
   let onStatsUpdated = null;
+  let onFavoritesUpdated = null;
   let onWindowWheel = null;
   function cleanup() {
     clearTimer();
@@ -160,6 +163,10 @@ export function renderTypingScreen(container, params = {}) {
     if (onStatsUpdated) {
       window.removeEventListener('bible:stats-updated', onStatsUpdated);
       onStatsUpdated = null;
+    }
+    if (onFavoritesUpdated) {
+      window.removeEventListener('bible:favorites-updated', onFavoritesUpdated);
+      onFavoritesUpdated = null;
     }
     if (onWindowWheel) {
       window.removeEventListener('wheel', onWindowWheel);
@@ -243,6 +250,8 @@ export function renderTypingScreen(container, params = {}) {
     return '';
   }
 
+  const isSingleVerseFav = singleVerseMode ? isVerseFavorited(book.id, initialChapter, targetSingleVerseNum || 1) : false;
+
   container.innerHTML = `
     <div class="typing-screen-container">
       <!-- Two-Line Summary Bar: Line 1 Navigation & Actions, Line 2 Live Telemetry -->
@@ -268,6 +277,15 @@ export function renderTypingScreen(container, params = {}) {
           </div>
 
           <div class="summary-actions-group">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm summary-action-btn single-verse-fav-btn ${isSingleVerseFav ? 'is-favorited' : ''}"
+              id="single-verse-fav-btn"
+              title="${isSingleVerseFav ? 'Verse is in Favorites. Click to remove.' : 'Save verse to Favorites'}"
+              ${singleVerseMode ? '' : 'hidden'}
+            >
+              <span id="single-verse-fav-icon">${isSingleVerseFav ? '❤️' : '🤍'}</span>
+            </button>
             <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options & Actions">
               ⚙️ Options
             </button>
@@ -499,6 +517,8 @@ export function renderTypingScreen(container, params = {}) {
   const prevStepBtn = container.querySelector('#prev-step-btn');
   const nextStepBtn = container.querySelector('#next-step-btn');
   const advanceStepBtn = container.querySelector('#advance-step-btn');
+  const singleFavBtn = container.querySelector('#single-verse-fav-btn');
+  const singleFavIcon = container.querySelector('#single-verse-fav-icon');
   const optionsBtn = container.querySelector('#typing-options-btn');
   const optionsBackdrop = container.querySelector('#typing-options-backdrop');
   const optionsCloseBtn = container.querySelector('#options-close-btn');
@@ -809,6 +829,58 @@ export function renderTypingScreen(container, params = {}) {
   };
   window.addEventListener('bible:stats-updated', onStatsUpdated);
 
+  function updateSingleVerseFavBtn() {
+    if (!singleFavBtn || !singleFavIcon) return;
+    const vNum = targetSingleVerseNum || 1;
+    const isFav = isVerseFavorited(book.id, initialChapter, vNum);
+    singleFavBtn.classList.toggle('is-favorited', isFav);
+    singleFavIcon.textContent = isFav ? '❤️' : '🤍';
+    singleFavBtn.title = isFav
+      ? `Verse ${vNum} is in Favorites. Click to remove.`
+      : `Save Verse ${vNum} to Favorites`;
+  }
+
+  if (singleFavBtn) {
+    singleFavBtn.addEventListener('click', () => {
+      const vNum = targetSingleVerseNum || 1;
+      const matched = (allChapterVerses && allChapterVerses.find(v => v.verse === vNum)) || (verses && verses[0]);
+      const vText = matched ? matched.text : '';
+      const nowFav = toggleVerseFavorite({
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: vNum,
+        verseRef: `${book.name} ${initialChapter}:${vNum}`,
+        verseText: vText,
+        translation: activeTranslation
+      });
+      updateSingleVerseFavBtn();
+      trackEvent('toggle_verse_favorite', {
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: vNum,
+        isFavorited: nowFav,
+        mode: 'single'
+      });
+    });
+  }
+
+  onFavoritesUpdated = (e) => {
+    updateSingleVerseFavBtn();
+    const vNum = e?.detail?.record?.verse || (e?.detail?.key ? Number(e.detail.key.split(':')[2]) : null);
+    if (vNum) {
+      const favBtn = container.querySelector(`.verse-fav-btn[data-verse="${vNum}"]`);
+      if (favBtn) {
+        const isFav = isVerseFavorited(book.id, initialChapter, vNum);
+        favBtn.classList.toggle('is-favorited', isFav);
+        favBtn.textContent = isFav ? '❤️' : '🤍';
+        favBtn.title = isFav
+          ? `Verse ${vNum} in favorites. Click to remove.`
+          : `Save Verse ${vNum} to favorites`;
+      }
+    }
+  };
+  window.addEventListener('bible:favorites-updated', onFavoritesUpdated);
+
   // ── 3. Prev / Next Chapter Stepper & Restart Button ────────────
   function navigatePrevStep() {
     if (singleVerseMode && targetSingleVerseNum) {
@@ -1084,6 +1156,46 @@ export function renderTypingScreen(container, params = {}) {
           });
           wordSpan.appendChild(sup);
           supElement = sup;
+
+          if (!singleVerseMode) {
+            const favBtn = document.createElement('button');
+            favBtn.type = 'button';
+            favBtn.className = 'verse-fav-btn';
+            favBtn.setAttribute('data-verse', String(v.verse));
+            const isFav = isVerseFavorited(book.id, initialChapter, v.verse);
+            if (isFav) {
+              favBtn.classList.add('is-favorited');
+              favBtn.textContent = '❤️';
+              favBtn.title = `Verse ${v.verse} in favorites. Click to remove.`;
+            } else {
+              favBtn.textContent = '🤍';
+              favBtn.title = `Save Verse ${v.verse} to favorites`;
+            }
+            favBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const nowFav = toggleVerseFavorite({
+                bookId: book.id,
+                chapter: initialChapter,
+                verse: v.verse,
+                verseRef: `${book.name} ${initialChapter}:${v.verse}`,
+                verseText: v.text,
+                translation: activeTranslation
+              });
+              favBtn.classList.toggle('is-favorited', nowFav);
+              favBtn.textContent = nowFav ? '❤️' : '🤍';
+              favBtn.title = nowFav
+                ? `Verse ${v.verse} in favorites. Click to remove.`
+                : `Save Verse ${v.verse} to favorites`;
+              trackEvent('toggle_verse_favorite', {
+                bookId: book.id,
+                chapter: initialChapter,
+                verse: v.verse,
+                isFavorited: nowFav,
+                mode: 'chapter'
+              });
+            });
+            wordSpan.appendChild(favBtn);
+          }
         }
 
         for (let i = 0; i < word.length; i++) {

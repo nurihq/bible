@@ -177,6 +177,7 @@ function createDefaultStore() {
       '#FFFFFF'
     ],
     meditations: {}, // { "1:1:1": MeditationRecord }
+    favorites: {}, // { "1:1:1": FavoriteRecord }
     chapters: {}, // { "1:1": CompletedChapterRecord }
     sessions: [], // TypingSession[] (sorted newest first)
     unsyncedSessionIds: []
@@ -194,6 +195,7 @@ export function getLocalStore() {
           ...parsed,
           skipCompletedVerses: parsed.skipCompletedVerses !== false,
           meditations: (parsed.meditations && typeof parsed.meditations === 'object') ? parsed.meditations : {},
+          favorites: (parsed.favorites && typeof parsed.favorites === 'object') ? parsed.favorites : {},
           chapters: parsed.chapters || {},
           sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
           unsyncedSessionIds: Array.isArray(parsed.unsyncedSessionIds) ? parsed.unsyncedSessionIds : []
@@ -232,7 +234,8 @@ export function syncPreferencesToCloud() {
       shuffleScope: store.shuffleScope || 'bible',
       meditateMode: Boolean(store.meditateMode),
       meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE,
-      meditations: store.meditations || {}
+      meditations: store.meditations || {},
+      favorites: store.favorites || {}
     })
   }).catch(() => {});
 }
@@ -441,6 +444,67 @@ export function deleteVerseMeditation(bookId, chapter, verse) {
     syncPreferencesToCloud();
     window.dispatchEvent(new CustomEvent('bible:meditations-updated', { detail: { key, deleted: true } }));
   }
+}
+
+// ── Favorited Scripture Verses ─────────────────────────────────
+export function saveVerseFavorite({ bookId, chapter, verse, verseRef, verseText, translation }) {
+  const store = getLocalStore();
+  if (!store.favorites || typeof store.favorites !== 'object') {
+    store.favorites = {};
+  }
+  const key = `${bookId}:${chapter}:${verse}`;
+  const record = {
+    key,
+    bookId: Number(bookId),
+    chapter: Number(chapter),
+    verse: Number(verse),
+    verseRef: String(verseRef || ''),
+    verseText: String(verseText || ''),
+    translation: String(translation || 'ESV'),
+    addedAt: new Date().toISOString()
+  };
+  store.favorites[key] = record;
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:favorites-updated', { detail: { record, isFavorited: true } }));
+  return record;
+}
+
+export function removeVerseFavorite(bookId, chapter, verse) {
+  const store = getLocalStore();
+  const key = `${bookId}:${chapter}:${verse}`;
+  if (store.favorites && store.favorites[key]) {
+    delete store.favorites[key];
+    saveLocalStore(store);
+    syncPreferencesToCloud();
+    window.dispatchEvent(new CustomEvent('bible:favorites-updated', { detail: { key, isFavorited: false } }));
+    return true;
+  }
+  return false;
+}
+
+export function toggleVerseFavorite({ bookId, chapter, verse, verseRef, verseText, translation }) {
+  const key = `${bookId}:${chapter}:${verse}`;
+  const store = getLocalStore();
+  if (store.favorites && store.favorites[key]) {
+    removeVerseFavorite(bookId, chapter, verse);
+    return false;
+  } else {
+    saveVerseFavorite({ bookId, chapter, verse, verseRef, verseText, translation });
+    return true;
+  }
+}
+
+export function isVerseFavorited(bookId, chapter, verse) {
+  const store = getLocalStore();
+  const key = `${bookId}:${chapter}:${verse}`;
+  return Boolean(store.favorites && store.favorites[key]);
+}
+
+export function getAllFavorites() {
+  const store = getLocalStore();
+  const list = Object.values(store.favorites || {});
+  return list.sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || ''));
 }
 
 const RANDOM_HISTORY_KEY = 'bible_random_verse_history';
@@ -1841,6 +1905,12 @@ export async function syncLocalToCloud() {
         latestStore.meditations = {
           ...(latestStore.meditations || {}),
           ...cp.meditations
+        };
+      }
+      if (cp.favorites && typeof cp.favorites === 'object') {
+        latestStore.favorites = {
+          ...(latestStore.favorites || {}),
+          ...cp.favorites
         };
       }
     }

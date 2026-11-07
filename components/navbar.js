@@ -4,7 +4,8 @@ import {
   getPreferredTranslation,
   setPreferredTranslation,
   getChapterProgressSummary,
-  getAllMeditations
+  getAllMeditations,
+  getAllFavorites
 } from '../api.js?v=20261107_v1';
 import {
   BIBLE_BOOKS,
@@ -43,6 +44,13 @@ export class Navbar {
     window.addEventListener('bible:auth-changed', () => {
       if (this.currentContainer) {
         this.render(this.currentContainer, this.currentRoute || window.location.hash);
+      }
+    });
+
+    window.addEventListener('bible:favorites-updated', () => {
+      const badge = document.querySelector('#nav-menu-favorites-btn .nav-item-badge');
+      if (badge) {
+        badge.textContent = String(getAllFavorites().length);
       }
     });
 
@@ -363,8 +371,11 @@ export class Navbar {
     const isTypingActive = cleanPath === '/typing' || cleanPath.startsWith('/typing/');
     const isProgressActive = cleanPath === '/progress';
     const isMeditationsActive = cleanPath === '/meditations';
+    const isFavoritesActive = cleanPath === '/favorites';
     const allMeds = getAllMeditations();
     const meditationCount = allMeds.length;
+    const allFavs = getAllFavorites();
+    const favoritesCount = allFavs.length;
     const showUnauthBanner = !isAuthed && !isHomeScreen && !isSignInScreen;
     const showTools = !isHomeScreen && !isSignInScreen;
 
@@ -477,6 +488,12 @@ export class Navbar {
               <div class="nav-profile-dropdown-divider"></div>
 
               <div class="nav-profile-dropdown-menu">
+                <a href="#/favorites" class="nav-profile-dropdown-item ${isFavoritesActive ? 'active' : ''}" id="nav-menu-favorites-btn">
+                  <span class="nav-item-icon">❤️</span>
+                  <span class="nav-item-title">Favorites</span>
+                  <span class="nav-item-badge">${favoritesCount}</span>
+                </a>
+
                 <a href="#/meditations" class="nav-profile-dropdown-item ${isMeditationsActive ? 'active' : ''}" id="nav-menu-meditations-btn">
                   <span class="nav-item-icon">🎨</span>
                   <span class="nav-item-title">Meditations</span>

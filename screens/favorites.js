@@ -1,0 +1,349 @@
+import {
+  getAllFavorites,
+  removeVerseFavorite,
+  setMeditateModePref
+} from '../api.js?v=20261107_v1';
+import { getBookById } from '../bible-data.js?v=20261107_v1';
+import { trackEvent } from '../analytics.js?v=20261107_v1';
+import { navigate } from '../app.js?v=20261107_v1';
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return '';
+  }
+}
+
+export function renderFavoritesScreen(container) {
+  let favorites = getAllFavorites();
+  let searchQuery = '';
+  let testamentFilter = 'ALL'; // 'ALL', 'OT', 'NT'
+  let sortBy = 'newest'; // 'newest', 'canonical', 'alpha'
+
+  function getFilteredFavorites() {
+    return favorites
+      .filter((fav) => {
+        const book = getBookById(fav.bookId);
+        if (testamentFilter !== 'ALL') {
+          if (book.testament !== testamentFilter) return false;
+        }
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const refMatch = (fav.verseRef || '').toLowerCase().includes(q);
+          const textMatch = (fav.verseText || '').toLowerCase().includes(q);
+          const bookMatch = (book.name || '').toLowerCase().includes(q);
+          const trMatch = (fav.translation || '').toLowerCase().includes(q);
+          if (!refMatch && !textMatch && !bookMatch && !trMatch) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') {
+          return (b.addedAt || '').localeCompare(a.addedAt || '');
+        }
+        if (sortBy === 'canonical') {
+          if (a.bookId !== b.bookId) return a.bookId - b.bookId;
+          if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+          return a.verse - b.verse;
+        }
+        if (sortBy === 'alpha') {
+          return (a.verseRef || '').localeCompare(b.verseRef || '');
+        }
+        return 0;
+      });
+  }
+
+  function render() {
+    favorites = getAllFavorites();
+    const filtered = getFilteredFavorites();
+    const totalCount = favorites.length;
+
+    container.innerHTML = `
+      <div class="favorites-screen-container">
+        <!-- Top Screen Header -->
+        <div class="favorites-header">
+          <div class="favorites-header-main">
+            <h1 class="favorites-title">❤️ Favorited Verses</h1>
+            <p class="favorites-subtitle">
+              Your cherished collection of Scripture passages saved while reading, typing, and meditating.
+            </p>
+          </div>
+
+          <div class="favorites-header-actions">
+            ${totalCount > 0 ? `
+              <button type="button" class="btn btn-primary btn-sm" id="favorites-random-btn" title="Pick a random favorited verse to type">
+                🎲 Practice Random Favorite
+              </button>
+            ` : ''}
+            <button type="button" class="btn btn-secondary btn-sm" id="favorites-open-typing-btn" title="Continue Scripture typing">
+              ⌨️ Scripture Typing
+            </button>
+          </div>
+        </div>
+
+        <!-- Toolbar: Search & Filters -->
+        <div class="favorites-toolbar">
+          <div class="favorites-search-box">
+            <span class="favorites-search-icon">🔍</span>
+            <input
+              type="text"
+              id="favorites-search-input"
+              class="favorites-search-input"
+              placeholder="Search by verse reference (e.g. John 3:16) or text..."
+              value="${escapeHtml(searchQuery)}"
+              aria-label="Search favorites"
+            />
+            ${searchQuery ? `<button type="button" class="favorites-search-clear-btn" id="favorites-search-clear">✕</button>` : ''}
+          </div>
+
+          <div class="favorites-filters-wrapper">
+            <div class="favorites-filter-group">
+              <span class="favorites-filter-label">Testament:</span>
+              <select class="favorites-filter-select" id="favorites-testament-filter" aria-label="Filter by testament">
+                <option value="ALL" ${testamentFilter === 'ALL' ? 'selected' : ''}>All (${totalCount})</option>
+                <option value="OT" ${testamentFilter === 'OT' ? 'selected' : ''}>Old Testament</option>
+                <option value="NT" ${testamentFilter === 'NT' ? 'selected' : ''}>New Testament</option>
+              </select>
+            </div>
+
+            <div class="favorites-filter-group">
+              <span class="favorites-filter-label">Sort:</span>
+              <select class="favorites-filter-select" id="favorites-sort-select" aria-label="Sort favorites">
+                <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
+                <option value="canonical" ${sortBy === 'canonical' ? 'selected' : ''}>Canonical Order</option>
+                <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Alphabetical</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Cards Grid or Empty State -->
+        ${filtered.length === 0 ? renderEmptyStateHtml() : `
+          <div class="favorites-grid" id="favorites-grid">
+            ${filtered.map(fav => renderFavoriteCardHtml(fav)).join('')}
+          </div>
+        `}
+      </div>
+    `;
+
+    attachEventListeners();
+  }
+
+  function renderEmptyStateHtml() {
+    const isFiltered = searchQuery || testamentFilter !== 'ALL';
+    if (isFiltered) {
+      return `
+        <div class="favorites-empty-state">
+          <div class="empty-icon">🔍</div>
+          <h3>No matching favorited verses found</h3>
+          <p>Try clearing your search query or selecting "All" in the testament filter above.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="favorites-reset-filter-btn">
+            Clear Filters
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="favorites-empty-state">
+        <div class="empty-icon">🤍</div>
+        <h3>No Favorited Verses Yet</h3>
+        <p>
+          Save verses to this collection at any time!
+          In <strong>Chapter Mode</strong>, hover over any verse and click the heart icon.
+          In <strong>Single Verse Mode</strong>, tap the heart button right next to <strong>⚙️ Options</strong>.
+        </p>
+        <button type="button" class="btn btn-primary btn-md" id="favorites-start-typing-btn">
+          ⌨️ Start Typing Scripture
+        </button>
+      </div>
+    `;
+  }
+
+  function renderFavoriteCardHtml(fav) {
+    const book = getBookById(fav.bookId);
+    const verseRef = fav.verseRef || `${book.name} ${fav.chapter}:${fav.verse}`;
+    const testamentBadge = book.testament === 'OT' ? 'Old Testament' : 'New Testament';
+
+    return `
+      <div class="favorite-card" data-key="${escapeHtml(fav.key)}" data-book="${fav.bookId}" data-chapter="${fav.chapter}" data-verse="${fav.verse}">
+        <div class="favorite-card-header">
+          <div class="favorite-card-title-group">
+            <h3 class="favorite-card-ref">${escapeHtml(verseRef)}</h3>
+            <div class="favorite-card-badges">
+              <span class="favorite-pill favorite-pill-tr">${escapeHtml(fav.translation || 'ESV')}</span>
+              <span class="favorite-pill favorite-pill-testament">${escapeHtml(testamentBadge)}</span>
+            </div>
+          </div>
+          <button type="button" class="favorite-remove-btn" title="Remove from favorites" data-action="remove">
+            ❤️
+          </button>
+        </div>
+
+        <div class="favorite-card-body">
+          <p class="favorite-card-text">“${escapeHtml(fav.verseText)}”</p>
+        </div>
+
+        <div class="favorite-card-footer">
+          <div class="favorite-card-meta">
+            ${fav.addedAt ? `<span class="favorite-meta-date">Saved ${formatDate(fav.addedAt)}</span>` : ''}
+          </div>
+          <div class="favorite-card-actions">
+            <button type="button" class="btn btn-primary btn-sm favorite-type-btn" data-action="type" title="Type this verse in single verse mode">
+              ⌨️ Type
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm favorite-meditate-btn" data-action="meditate" title="Meditate and color this verse">
+              🎨 Meditate
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm favorite-copy-btn" data-action="copy" title="Copy verse text to clipboard">
+              📋
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function attachEventListeners() {
+    // Search input
+    const searchInput = container.querySelector('#favorites-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.trim();
+        render();
+      });
+    }
+
+    const clearBtn = container.querySelector('#favorites-search-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        searchQuery = '';
+        render();
+      });
+    }
+
+    // Testament filter
+    const testFilter = container.querySelector('#favorites-testament-filter');
+    if (testFilter) {
+      testFilter.addEventListener('change', (e) => {
+        testamentFilter = e.target.value;
+        render();
+      });
+    }
+
+    // Sort select
+    const sortSelect = container.querySelector('#favorites-sort-select');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', (e) => {
+        sortBy = e.target.value;
+        render();
+      });
+    }
+
+    // Reset filters
+    const resetBtn = container.querySelector('#favorites-reset-filter-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        searchQuery = '';
+        testamentFilter = 'ALL';
+        render();
+      });
+    }
+
+    // Start typing from empty state
+    const startBtn = container.querySelector('#favorites-start-typing-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        navigate('#/typing');
+      });
+    }
+
+    const openTypingBtn = container.querySelector('#favorites-open-typing-btn');
+    if (openTypingBtn) {
+      openTypingBtn.addEventListener('click', () => {
+        navigate('#/typing');
+      });
+    }
+
+    // Random favorite practice
+    const randomBtn = container.querySelector('#favorites-random-btn');
+    if (randomBtn) {
+      randomBtn.addEventListener('click', () => {
+        if (favorites.length === 0) return;
+        const rand = favorites[Math.floor(Math.random() * favorites.length)];
+        trackEvent('practice_random_favorite', { bookId: rand.bookId, chapter: rand.chapter, verse: rand.verse });
+        navigate(`#/typing/${rand.bookId}/${rand.chapter}/${rand.verse}`);
+      });
+    }
+
+    // Grid card click actions (Type, Meditate, Remove, Copy)
+    const grid = container.querySelector('#favorites-grid');
+    if (grid) {
+      grid.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const card = btn.closest('.favorite-card');
+        if (!card) return;
+
+        const bookId = Number(card.getAttribute('data-book'));
+        const chapter = Number(card.getAttribute('data-chapter'));
+        const verse = Number(card.getAttribute('data-verse'));
+        const action = btn.getAttribute('data-action');
+
+        if (action === 'type') {
+          trackEvent('open_favorite_verse_type', { bookId, chapter, verse });
+          navigate(`#/typing/${bookId}/${chapter}/${verse}`);
+          return;
+        }
+
+        if (action === 'meditate') {
+          setMeditateModePref(true);
+          trackEvent('open_favorite_verse_meditate', { bookId, chapter, verse });
+          navigate(`#/typing/${bookId}/${chapter}/${verse}`);
+          return;
+        }
+
+        if (action === 'copy') {
+          const textEl = card.querySelector('.favorite-card-text');
+          const refEl = card.querySelector('.favorite-card-ref');
+          const text = textEl ? textEl.textContent.replace(/^[“"]|[”"]$/g, '') : '';
+          const ref = refEl ? refEl.textContent : '';
+          const fullCopy = `“${text}” — ${ref}`;
+          navigator.clipboard.writeText(fullCopy).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '✓ Copied';
+            setTimeout(() => {
+              btn.textContent = orig;
+            }, 1500);
+          }).catch(() => {});
+          return;
+        }
+
+        if (action === 'remove') {
+          removeVerseFavorite(bookId, chapter, verse);
+          trackEvent('remove_favorite_verse', { bookId, chapter, verse });
+          render();
+          return;
+        }
+      });
+    }
+  }
+
+  render();
+}
