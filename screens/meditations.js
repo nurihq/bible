@@ -6,7 +6,8 @@ import {
 } from '../api.js?v=20261107_v1';
 import {
   renderMeditateArtworkSvg,
-  MEDITATE_ART_TEMPLATE_NAMES,
+  getArtworkTemplateName,
+  MEDITATE_ART_THEME_NAMES,
   TOTAL_MEDITATE_ART_TEMPLATES
 } from '../meditate-art.js?v=20261107_v1';
 import { getBookById, getRandomVerseRef } from '../bible-data.js?v=20261107_v1';
@@ -39,12 +40,12 @@ function formatDate(isoStr) {
 export function renderMeditationsScreen(container) {
   let meditations = getAllMeditations();
   let searchQuery = '';
-  let selectedTemplateFilter = 'ALL'; // 'ALL' or number 0..4
+  let selectedTemplateFilter = 'ALL'; // 'ALL' or theme index 0..9
 
   function getFilteredMeditations() {
     return meditations.filter((m) => {
       if (selectedTemplateFilter !== 'ALL') {
-        if (Number(m.templateIdx) !== Number(selectedTemplateFilter)) {
+        if (Number(m.templateIdx) % 10 !== Number(selectedTemplateFilter)) {
           return false;
         }
       }
@@ -100,10 +101,10 @@ export function renderMeditationsScreen(container) {
           </div>
 
           <div class="meditations-filter-group">
-            <span class="meditations-filter-label">Artwork:</span>
-            <select class="meditations-filter-select" id="meditations-template-filter" aria-label="Filter by artwork template">
-              <option value="ALL" ${selectedTemplateFilter === 'ALL' ? 'selected' : ''}>All Artworks (${totalCount})</option>
-              ${MEDITATE_ART_TEMPLATE_NAMES.map((name, idx) => `
+            <span class="meditations-filter-label">Theme:</span>
+            <select class="meditations-filter-select" id="meditations-template-filter" aria-label="Filter by artwork theme">
+              <option value="ALL" ${selectedTemplateFilter === 'ALL' ? 'selected' : ''}>All Themes (${totalCount})</option>
+              ${MEDITATE_ART_THEME_NAMES.map((name, idx) => `
                 <option value="${idx}" ${String(selectedTemplateFilter) === String(idx) ? 'selected' : ''}>${name}</option>
               `).join('')}
             </select>
@@ -175,14 +176,20 @@ export function renderMeditationsScreen(container) {
   }
 
   function renderMeditationCardHtml(m) {
-    const templateName = MEDITATE_ART_TEMPLATE_NAMES[m.templateIdx] || 'Scripture Art';
+    const templateName = getArtworkTemplateName(m.templateIdx);
     const coloredSegmentsCount = Object.keys(m.fills || {}).length;
     const svgHtml = renderMeditateArtworkSvg(
       m.templateIdx,
       m.verseText,
       m.verseRef,
       m.translation || 'ESV',
-      m.fills || {}
+      m.fills || {},
+      {
+        fontFamily: m.fontFamily,
+        fontSize: m.fontSize,
+        textX: m.textX,
+        textY: m.textY
+      }
     );
 
     return `
@@ -365,7 +372,7 @@ export function renderMeditationsScreen(container) {
     if (!modalBackdrop) return;
 
     if (modalRef) modalRef.textContent = `${med.verseRef} (${med.translation || 'ESV'})`;
-    if (modalTemplate) modalTemplate.textContent = MEDITATE_ART_TEMPLATE_NAMES[med.templateIdx] || 'Scripture Art';
+    if (modalTemplate) modalTemplate.textContent = getArtworkTemplateName(med.templateIdx);
 
     if (modalCanvasWrapper) {
       modalCanvasWrapper.innerHTML = renderMeditateArtworkSvg(
@@ -373,7 +380,13 @@ export function renderMeditationsScreen(container) {
         med.verseText,
         med.verseRef,
         med.translation || 'ESV',
-        med.fills || {}
+        med.fills || {},
+        {
+          fontFamily: med.fontFamily,
+          fontSize: med.fontSize,
+          textX: med.textX,
+          textY: med.textY
+        }
       );
     }
 

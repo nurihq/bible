@@ -155,6 +155,9 @@ export async function initFirebaseAuthObserver() {
   } catch (e) {}
 }
 
+export const DEFAULT_MEDITATE_FONT = "'Playfair Display', Georgia, serif";
+export const DEFAULT_MEDITATE_FONT_SIZE = 20;
+
 // ── Local & Cloud Store ─────────────────────────────────────────
 function createDefaultStore() {
   return {
@@ -164,6 +167,8 @@ function createDefaultStore() {
     lastChapter: 1,
     lastVerse: null,
     meditateMode: false,
+    meditateFont: DEFAULT_MEDITATE_FONT,
+    meditateFontSize: DEFAULT_MEDITATE_FONT_SIZE,
     meditatePalette: [
       '#38BDF8',
       '#3B82F6',
@@ -397,13 +402,51 @@ export function setMeditatePalettePref(palette) {
   }
 }
 
+export function getMeditateFontPref() {
+  const store = getLocalStore();
+  return store.meditateFont || DEFAULT_MEDITATE_FONT;
+}
+
+export function setMeditateFontPref(font) {
+  const store = getLocalStore();
+  store.meditateFont = String(font || DEFAULT_MEDITATE_FONT);
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
+export function getMeditateFontSizePref() {
+  const store = getLocalStore();
+  return typeof store.meditateFontSize === 'number' ? store.meditateFontSize : DEFAULT_MEDITATE_FONT_SIZE;
+}
+
+export function setMeditateFontSizePref(size) {
+  const store = getLocalStore();
+  store.meditateFontSize = Math.max(12, Math.min(48, Number(size) || DEFAULT_MEDITATE_FONT_SIZE));
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
 // ── Scripture Meditations (Saved Color-by-Numbers Artworks) ─────
-export function saveVerseMeditation({ bookId, chapter, verse, verseRef, verseText, translation, templateIdx, fills }) {
+export function saveVerseMeditation({
+  bookId,
+  chapter,
+  verse,
+  verseRef,
+  verseText,
+  translation,
+  templateIdx,
+  fills,
+  fontFamily,
+  fontSize,
+  textX,
+  textY
+}) {
   const store = getLocalStore();
   if (!store.meditations || typeof store.meditations !== 'object') {
     store.meditations = {};
   }
   const key = `${bookId}:${chapter}:${verse}`;
+  const existing = store.meditations[key] || {};
   const record = {
     key,
     bookId: Number(bookId),
@@ -413,7 +456,11 @@ export function saveVerseMeditation({ bookId, chapter, verse, verseRef, verseTex
     verseText: String(verseText || ''),
     translation: String(translation || 'ESV'),
     templateIdx: Number(templateIdx || 0),
-    fills: { ...(fills || {}) },
+    fills: { ...(existing.fills || {}), ...(fills || {}) },
+    fontFamily: fontFamily || existing.fontFamily || store.meditateFont || DEFAULT_MEDITATE_FONT,
+    fontSize: typeof fontSize === 'number' ? fontSize : (typeof existing.fontSize === 'number' ? existing.fontSize : (store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE)),
+    textX: typeof textX === 'number' ? textX : (typeof existing.textX === 'number' ? existing.textX : 50),
+    textY: typeof textY === 'number' ? textY : (typeof existing.textY === 'number' ? existing.textY : 76),
     updatedAt: new Date().toISOString()
   };
   store.meditations[key] = record;

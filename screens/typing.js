@@ -51,7 +51,11 @@ import {
   getVerseMeditation,
   deleteVerseMeditation,
   toggleVerseFavorite,
-  isVerseFavorited
+  isVerseFavorited,
+  getMeditateFontPref,
+  setMeditateFontPref,
+  getMeditateFontSizePref,
+  setMeditateFontSizePref
 } from '../api.js?v=20261107_v1';
 import {
   renderMeditateArtworkSvg,
@@ -265,13 +269,13 @@ export function renderTypingScreen(container, params = {}) {
                 ${singleVerseMode ? `${book.name} ${initialChapter}:${targetSingleVerseNum}` : `${book.name} ${initialChapter}`}
               </h1>
               <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
-              <button type="button" class="btn btn-secondary btn-sm meditate-mark-read-btn" id="meditate-mark-read-btn" title="Mark this verse as read" ${singleVerseMode && meditateMode ? '' : 'hidden'}>
-                <span id="meditate-mark-read-label">📖 Mark Read</span>
-              </button>
             </div>
             <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next ${singleVerseMode ? 'Verse' : 'Chapter'}">›</button>
-            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance ? '' : 'hidden'}>
+            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance && !meditateMode ? '' : 'hidden'}>
               ${(singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›'}
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm meditate-mark-read-btn" id="meditate-mark-read-btn" title="Mark this verse as read" ${singleVerseMode && meditateMode ? '' : 'hidden'}>
+              <span id="meditate-mark-read-label">📖 Mark Read</span>
             </button>
             <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
           </div>
@@ -1310,6 +1314,10 @@ export function renderTypingScreen(container, params = {}) {
   function applyMeditateModeState() {
     const isMeditate = Boolean(singleVerseMode && meditateMode);
 
+    if (advanceStepBtn) {
+      advanceStepBtn.hidden = isMeditate || !singleVerseMode || autoAdvance;
+    }
+
     if (meditateMarkReadBtn) {
       meditateMarkReadBtn.hidden = !isMeditate;
     }
@@ -1355,13 +1363,19 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     let savedFills = existingMed?.fills ? { ...existingMed.fills } : {};
+    let activeFont = existingMed?.fontFamily || getMeditateFontPref();
+    let activeFontSize = typeof existingMed?.fontSize === 'number' ? existingMed.fontSize : getMeditateFontSizePref();
+    let textX = typeof existingMed?.textX === 'number' ? existingMed.textX : 50;
+    let textY = typeof existingMed?.textY === 'number' ? existingMed.textY : 76;
 
+    // Render artwork with NO border plaque (verse text rendered as interactive draggable overlay)
     const svgHtml = renderMeditateArtworkSvg(
       currentArtworkTemplateIdx,
-      verseText,
-      verseRef,
-      getTranslationByCode(activeTranslation).shortName,
-      savedFills
+      '',
+      '',
+      '',
+      savedFills,
+      { textX, textY, fontFamily: activeFont, fontSize: activeFontSize }
     );
 
     const activeColor = meditatePalette[activePaletteIndex] || '#38BDF8';
@@ -1370,15 +1384,37 @@ export function renderTypingScreen(container, params = {}) {
     meditateCanvasWrapper.innerHTML = `
       <div class="meditate-art-container" id="meditate-art-container">
         ${svgHtml}
+
+        <!-- Draggable, Resizable Scripture Typography (NO border plaque) -->
+        <div
+          class="meditate-draggable-text-box"
+          id="meditate-draggable-text-box"
+          style="left: ${textX}%; top: ${textY}%; font-family: ${activeFont}; font-size: ${activeFontSize}px;"
+          title="Drag to position scripture anywhere on the artwork"
+        >
+          <div class="meditate-drag-grip" id="meditate-drag-grip" title="Click &amp; drag to reposition scripture">
+            <span class="grip-dots">⋮⋮</span>
+            <span class="grip-label">Drag</span>
+          </div>
+          <div class="meditate-drag-content">
+            <p class="meditate-drag-quote">“${escapeHtml(verseText)}”</p>
+            <div class="meditate-drag-citation">
+              <strong>${escapeHtml(verseRef)}</strong>
+              <span class="meditate-tr-badge">${escapeHtml(getTranslationByCode(activeTranslation).shortName)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Bottom Palette Toolbar -->
       <div class="meditate-palette-bar" id="meditate-palette-bar">
+        <!-- Tool Mode Indicator -->
         <div class="meditate-tool-indicator">
           <span class="meditate-tool-icon">${isEraserActive ? '🧹 Eraser' : '🎨 Paint'}</span>
           <span class="meditate-active-color-dot" id="meditate-active-color-dot" style="background:${activeColor};"></span>
         </div>
 
+        <!-- 10 Colors Swatches -->
         <div class="meditate-swatches-strip" id="meditate-swatches-strip">
           ${meditatePalette.map((color, idx) => {
             const isEraser = idx === 9;
@@ -1409,12 +1445,30 @@ export function renderTypingScreen(container, params = {}) {
           }).join('')}
         </div>
 
+        <!-- Font Selector, Font Resizing & Artwork Actions (NO clear button, NO numbers on artwork button) -->
         <div class="meditate-actions-strip">
-          <button type="button" class="btn btn-secondary btn-xs" id="meditate-change-art-btn" title="Cycle to another uplifting artwork">
-            🎲 Artwork (${currentArtworkTemplateIdx + 1}/${TOTAL_MEDITATE_ART_TEMPLATES})
-          </button>
-          <button type="button" class="btn btn-secondary btn-xs" id="meditate-reset-colors-btn" title="Reset all colored segments back to white">
-            ↺ Clear
+          <!-- Font Family Selector -->
+          <div class="meditate-font-control-group">
+            <span class="meditate-ctrl-lbl">Font:</span>
+            <select class="meditate-font-select" id="meditate-font-select" title="Choose scripture font">
+              <option value="'Playfair Display', Georgia, serif" ${activeFont.includes('Playfair') ? 'selected' : ''}>Serif (Playfair)</option>
+              <option value="'Inter', -apple-system, sans-serif" ${activeFont.includes('Inter') ? 'selected' : ''}>Sans (Inter)</option>
+              <option value="'Caveat', cursive, serif" ${activeFont.includes('Caveat') ? 'selected' : ''}>Script (Caveat)</option>
+              <option value="'Cinzel', Georgia, serif" ${activeFont.includes('Cinzel') ? 'selected' : ''}>Majestic (Cinzel)</option>
+              <option value="'JetBrains Mono', monospace" ${activeFont.includes('Mono') ? 'selected' : ''}>Monospace</option>
+            </select>
+          </div>
+
+          <!-- Font Size Stepper -->
+          <div class="meditate-font-size-group">
+            <button type="button" class="btn btn-secondary btn-xs font-size-btn" id="meditate-font-down-btn" title="Decrease font size">A−</button>
+            <span class="meditate-font-size-lbl" id="meditate-font-size-lbl">${activeFontSize}px</span>
+            <button type="button" class="btn btn-secondary btn-xs font-size-btn" id="meditate-font-up-btn" title="Increase font size">A+</button>
+          </div>
+
+          <!-- Change Artwork (NO numbers on button) -->
+          <button type="button" class="btn btn-secondary btn-xs" id="meditate-change-art-btn" title="Cycle to next uplifting artwork">
+            🎨 Change Artwork
           </button>
         </div>
       </div>
@@ -1442,9 +1496,143 @@ export function renderTypingScreen(container, params = {}) {
           verseText,
           translation: getTranslationByCode(activeTranslation).shortName,
           templateIdx: currentArtworkTemplateIdx,
-          fills: savedFills
+          fills: savedFills,
+          fontFamily: activeFont,
+          fontSize: activeFontSize,
+          textX,
+          textY
         });
       });
+    }
+
+    // Attach Draggable Text Handler
+    const dragBox = meditateCanvasWrapper.querySelector('#meditate-draggable-text-box');
+    const containerEl = meditateCanvasWrapper.querySelector('#meditate-art-container');
+    if (dragBox && containerEl) {
+      let isDragging = false;
+      let startMouseX = 0;
+      let startMouseY = 0;
+      let startLeftPct = textX;
+      let startTopPct = textY;
+
+      const onPointerDown = (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        isDragging = true;
+        dragBox.classList.add('is-dragging');
+        startMouseX = e.clientX;
+        startMouseY = e.clientY;
+        startLeftPct = textX;
+        startTopPct = textY;
+        try {
+          dragBox.setPointerCapture(e.pointerId);
+        } catch (_) {}
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      const onPointerMove = (e) => {
+        if (!isDragging) return;
+        const rect = containerEl.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        const deltaX = e.clientX - startMouseX;
+        const deltaY = e.clientY - startMouseY;
+
+        const deltaPctX = (deltaX / rect.width) * 100;
+        const deltaPctY = (deltaY / rect.height) * 100;
+
+        textX = Math.max(2, Math.min(95, Math.round((startLeftPct + deltaPctX) * 10) / 10));
+        textY = Math.max(2, Math.min(95, Math.round((startTopPct + deltaPctY) * 10) / 10));
+
+        dragBox.style.left = `${textX}%`;
+        dragBox.style.top = `${textY}%`;
+      };
+
+      const onPointerUp = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        dragBox.classList.remove('is-dragging');
+        try {
+          dragBox.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+
+        saveVerseMeditation({
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: activeVNum,
+          verseRef,
+          verseText,
+          translation: getTranslationByCode(activeTranslation).shortName,
+          templateIdx: currentArtworkTemplateIdx,
+          fills: savedFills,
+          fontFamily: activeFont,
+          fontSize: activeFontSize,
+          textX,
+          textY
+        });
+      };
+
+      dragBox.addEventListener('pointerdown', onPointerDown);
+      dragBox.addEventListener('pointermove', onPointerMove);
+      dragBox.addEventListener('pointerup', onPointerUp);
+      dragBox.addEventListener('pointercancel', onPointerUp);
+    }
+
+    // Attach Font Family Selector handler
+    const fontSelect = meditateCanvasWrapper.querySelector('#meditate-font-select');
+    if (fontSelect) {
+      fontSelect.addEventListener('change', (e) => {
+        activeFont = e.target.value;
+        setMeditateFontPref(activeFont);
+        if (dragBox) dragBox.style.fontFamily = activeFont;
+        saveVerseMeditation({
+          bookId: book.id,
+          chapter: initialChapter,
+          verse: activeVNum,
+          verseRef,
+          verseText,
+          translation: getTranslationByCode(activeTranslation).shortName,
+          templateIdx: currentArtworkTemplateIdx,
+          fills: savedFills,
+          fontFamily: activeFont,
+          fontSize: activeFontSize,
+          textX,
+          textY
+        });
+      });
+    }
+
+    // Attach Font Size Stepper handlers
+    const fontDownBtn = meditateCanvasWrapper.querySelector('#meditate-font-down-btn');
+    const fontUpBtn = meditateCanvasWrapper.querySelector('#meditate-font-up-btn');
+    const fontSizeLbl = meditateCanvasWrapper.querySelector('#meditate-font-size-lbl');
+
+    const updateFontSize = (newSize) => {
+      activeFontSize = Math.max(13, Math.min(42, newSize));
+      setMeditateFontSizePref(activeFontSize);
+      if (fontSizeLbl) fontSizeLbl.textContent = `${activeFontSize}px`;
+      if (dragBox) dragBox.style.fontSize = `${activeFontSize}px`;
+      saveVerseMeditation({
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: activeVNum,
+        verseRef,
+        verseText,
+        translation: getTranslationByCode(activeTranslation).shortName,
+        templateIdx: currentArtworkTemplateIdx,
+        fills: savedFills,
+        fontFamily: activeFont,
+        fontSize: activeFontSize,
+        textX,
+        textY
+      });
+    };
+
+    if (fontDownBtn) {
+      fontDownBtn.addEventListener('click', () => updateFontSize(activeFontSize - 2));
+    }
+    if (fontUpBtn) {
+      fontUpBtn.addEventListener('click', () => updateFontSize(activeFontSize + 2));
     }
 
     // Attach Swatch Click handlers
@@ -1472,7 +1660,7 @@ export function renderTypingScreen(container, params = {}) {
       input.addEventListener('change', onColorChange);
     });
 
-    // Attach Change Art button
+    // Attach Change Art button (No numbers on button)
     const changeArtBtn = meditateCanvasWrapper.querySelector('#meditate-change-art-btn');
     if (changeArtBtn) {
       changeArtBtn.addEventListener('click', () => {
@@ -1485,23 +1673,13 @@ export function renderTypingScreen(container, params = {}) {
           verseText,
           translation: getTranslationByCode(activeTranslation).shortName,
           templateIdx: currentArtworkTemplateIdx,
-          fills: savedFills
+          fills: savedFills,
+          fontFamily: activeFont,
+          fontSize: activeFontSize,
+          textX,
+          textY
         });
         renderMeditateModeCanvas();
-      });
-    }
-
-    // Attach Reset Colors button
-    const resetBtn = meditateCanvasWrapper.querySelector('#meditate-reset-colors-btn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        savedFills = {};
-        deleteVerseMeditation(book.id, initialChapter, activeVNum);
-        const segments = svgEl ? svgEl.querySelectorAll('.paint-segment') : [];
-        segments.forEach((s) => {
-          s.setAttribute('fill', '#FFFFFF');
-          s.style.fill = '#FFFFFF';
-        });
       });
     }
 
