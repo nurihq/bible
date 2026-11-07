@@ -159,6 +159,7 @@ export function renderTypingScreen(container, params = {}) {
   let verseMistakes = 0;
   let lastSkipJumpTime = 0;
   let sittingSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let lastTrackedCursorVerse = null;
 
   function clearTimer() {
     if (timerInterval) {
@@ -274,8 +275,15 @@ export function renderTypingScreen(container, params = {}) {
     return '';
   }
 
-  const isSingleVerseFav = singleVerseMode ? isVerseFavorited(book.id, initialChapter, targetSingleVerseNum || 1) : false;
-  let isSingleVerseBookmarked = singleVerseMode ? isVerseBookmarked(book.id, initialChapter, targetSingleVerseNum || 1) : false;
+  const initialVerseNum = singleVerseMode ? (targetSingleVerseNum || 1) : (requestedStartVerse || 1);
+  const isInitialFav = isVerseFavorited(book.id, initialChapter, initialVerseNum);
+  const isInitialBookmarked = isVerseBookmarked(book.id, initialChapter, initialVerseNum);
+  const initialFavTooltip = singleVerseMode
+    ? (isInitialFav ? 'Favourite (Saved)' : 'Favourite')
+    : (isInitialFav ? `Favourite (v. ${initialVerseNum} Saved)` : `Favourite (v. ${initialVerseNum})`);
+  const initialBookmarkTooltip = singleVerseMode
+    ? (isInitialBookmarked ? 'Bookmark (Saved)' : 'Bookmark')
+    : (isInitialBookmarked ? `Bookmark (v. ${initialVerseNum} Saved)` : `Bookmark (v. ${initialVerseNum})`);
 
   container.innerHTML = `
     <div class="typing-screen-container">
@@ -304,23 +312,21 @@ export function renderTypingScreen(container, params = {}) {
           <div class="summary-actions-group">
             <button
               type="button"
-              class="btn btn-secondary btn-sm summary-action-btn single-verse-fav-btn ${isSingleVerseFav ? 'is-favorited' : ''}"
+              class="btn btn-secondary btn-sm summary-action-btn single-verse-fav-btn ${isInitialFav ? 'is-favorited' : ''}"
               id="single-verse-fav-btn"
-              data-tooltip="${isSingleVerseFav ? 'Favourite (Saved)' : 'Favourite'}"
-              aria-label="${isSingleVerseFav ? 'Verse is in Favorites. Click to remove.' : 'Save verse to Favorites'}"
-              ${singleVerseMode ? '' : 'hidden'}
+              data-tooltip="${initialFavTooltip}"
+              aria-label="${isInitialFav ? `Verse ${initialVerseNum} is in Favorites. Click to remove.` : `Save verse ${initialVerseNum} to Favorites`}"
             >
-              <span id="single-verse-fav-icon">${isSingleVerseFav ? '❤️' : '🤍'}</span>
+              <span id="single-verse-fav-icon">${isInitialFav ? '❤️' : '🤍'}</span>
             </button>
             <button
               type="button"
-              class="btn btn-secondary btn-sm summary-action-btn single-verse-bookmark-btn ${isSingleVerseBookmarked ? 'is-bookmarked' : ''}"
+              class="btn btn-secondary btn-sm summary-action-btn single-verse-bookmark-btn ${isInitialBookmarked ? 'is-bookmarked' : ''}"
               id="single-verse-bookmark-btn"
-              data-tooltip="${isSingleVerseBookmarked ? 'Bookmark (Saved)' : 'Bookmark'}"
-              aria-label="${isSingleVerseBookmarked ? 'Verse is bookmarked. Click to view, update or add bookmarks.' : 'Bookmark this verse'}"
-              ${singleVerseMode ? '' : 'hidden'}
+              data-tooltip="${initialBookmarkTooltip}"
+              aria-label="${isInitialBookmarked ? `Verse ${initialVerseNum} is bookmarked. Click to view, update or add bookmarks.` : `Bookmark verse ${initialVerseNum}`}"
             >
-              <svg class="bookmark-ribbon-icon" width="16" height="16" viewBox="0 0 24 24" fill="${isSingleVerseBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="bookmark-ribbon-icon" width="16" height="16" viewBox="0 0 24 24" fill="${isInitialBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
               </svg>
             </button>
@@ -931,13 +937,27 @@ export function renderTypingScreen(container, params = {}) {
   };
   window.addEventListener('bible:stats-updated', onStatsUpdated);
 
+  function getCurrentCursorVerseNum() {
+    if (singleVerseMode) {
+      return targetSingleVerseNum || 1;
+    }
+    if (Array.isArray(charToVerseMap) && charToVerseMap.length > 0) {
+      const idx = Math.min(cursorIdx, charToVerseMap.length - 1);
+      return charToVerseMap[Math.max(0, idx)] || (verses && verses[0]?.verse) || 1;
+    }
+    return requestedStartVerse || (verses && verses[0]?.verse) || 1;
+  }
+
   function updateSingleVerseFavBtn() {
     if (!singleFavBtn || !singleFavIcon) return;
-    const vNum = targetSingleVerseNum || 1;
+    const vNum = getCurrentCursorVerseNum();
     const isFav = isVerseFavorited(book.id, initialChapter, vNum);
     singleFavBtn.classList.toggle('is-favorited', isFav);
     singleFavIcon.textContent = isFav ? '❤️' : '🤍';
-    singleFavBtn.setAttribute('data-tooltip', isFav ? 'Favourite (Saved)' : 'Favourite');
+    const tooltipText = singleVerseMode
+      ? (isFav ? 'Favourite (Saved)' : 'Favourite')
+      : (isFav ? `Favourite (v. ${vNum} Saved)` : `Favourite (v. ${vNum})`);
+    singleFavBtn.setAttribute('data-tooltip', tooltipText);
     singleFavBtn.setAttribute('aria-label', isFav
       ? `Verse ${vNum} is in Favorites. Click to remove.`
       : `Save Verse ${vNum} to Favorites`);
@@ -946,8 +966,8 @@ export function renderTypingScreen(container, params = {}) {
 
   if (singleFavBtn) {
     singleFavBtn.addEventListener('click', () => {
-      const vNum = targetSingleVerseNum || 1;
-      const matched = (allChapterVerses && allChapterVerses.find(v => v.verse === vNum)) || (verses && verses[0]);
+      const vNum = getCurrentCursorVerseNum();
+      const matched = (verses && verses.find(v => v.verse === vNum)) || (allChapterVerses && allChapterVerses.find(v => v.verse === vNum)) || (verses && verses[0]);
       const vText = matched ? matched.text : '';
       const nowFav = toggleVerseFavorite({
         bookId: book.id,
@@ -963,7 +983,7 @@ export function renderTypingScreen(container, params = {}) {
         chapter: initialChapter,
         verse: vNum,
         isFavorited: nowFav,
-        mode: 'single'
+        mode: singleVerseMode ? 'single' : 'chapter_header'
       });
     });
   }
@@ -1010,12 +1030,15 @@ export function renderTypingScreen(container, params = {}) {
 
   function updateSingleVerseBookmarkBtn() {
     if (!singleBookmarkBtn) return;
-    const vNum = targetSingleVerseNum || 1;
+    const vNum = getCurrentCursorVerseNum();
     const isBookmarked = isVerseBookmarked(book.id, initialChapter, vNum);
     singleBookmarkBtn.classList.toggle('is-bookmarked', isBookmarked);
     const svgEl = singleBookmarkBtn.querySelector('.bookmark-ribbon-icon');
     if (svgEl) svgEl.setAttribute('fill', isBookmarked ? 'currentColor' : 'none');
-    singleBookmarkBtn.setAttribute('data-tooltip', isBookmarked ? 'Bookmark (Saved)' : 'Bookmark');
+    const tooltipText = singleVerseMode
+      ? (isBookmarked ? 'Bookmark (Saved)' : 'Bookmark')
+      : (isBookmarked ? `Bookmark (v. ${vNum} Saved)` : `Bookmark (v. ${vNum})`);
+    singleBookmarkBtn.setAttribute('data-tooltip', tooltipText);
     singleBookmarkBtn.setAttribute('aria-label', isBookmarked
       ? `Verse ${vNum} is bookmarked. Click to view, update, or add bookmarks.`
       : `Bookmark Verse ${vNum}`);
@@ -1023,8 +1046,8 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function getCurrentVerseInfo() {
-    const vNum = targetSingleVerseNum || 1;
-    const matched = (allChapterVerses && allChapterVerses.find(v => v.verse === vNum)) || (verses && verses[0]);
+    const vNum = getCurrentCursorVerseNum();
+    const matched = (verses && verses.find(v => v.verse === vNum)) || (allChapterVerses && allChapterVerses.find(v => v.verse === vNum)) || (verses && verses[0]);
     const vText = matched ? matched.text : '';
     const vRef = `${book.name} ${initialChapter}:${vNum}`;
     return { vNum, vText, vRef };
@@ -2272,6 +2295,12 @@ export function renderTypingScreen(container, params = {}) {
     const activeVerseBlock = passageContent.querySelector(`.verse-block[data-verse="${currentVerseNum}"]`);
     if (activeVerseBlock) {
       activeVerseBlock.classList.add('is-active-verse');
+    }
+
+    if (!singleVerseMode && currentVerseNum !== lastTrackedCursorVerse) {
+      lastTrackedCursorVerse = currentVerseNum;
+      updateSingleVerseFavBtn();
+      updateSingleVerseBookmarkBtn();
     }
 
     // Update progress bar if element exists

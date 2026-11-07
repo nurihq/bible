@@ -7,16 +7,16 @@ import {
   getAllMeditations,
   getAllFavorites,
   getAllBookmarks
-} from '../api.js?v=20261107_v4';
+} from '../api.js?v=20261107_v5';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261107_v4';
-import { trackEvent } from '../analytics.js?v=20261107_v4';
-import { navigate } from '../router.js?v=20261107_v4';
+} from '../bible-data.js?v=20261107_v5';
+import { trackEvent } from '../analytics.js?v=20261107_v5';
+import { navigate } from '../router.js?v=20261107_v5';
 
 function escapeHtml(str) {
   return String(str)
