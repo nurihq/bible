@@ -164,7 +164,12 @@ export const DEFAULT_MEDITATE_BOX_WIDTH = 440;
 function createDefaultStore() {
   return {
     preferredTranslation: 'ESV',
+    singleVerseMode: true,
+    shuffleVerses: true,
+    autoAdvance: false,
+    advanceButton: true,
     skipCompletedVerses: true,
+    showTypingStats: false,
     lastBookId: 1,
     lastChapter: 1,
     lastVerse: null,
@@ -199,9 +204,11 @@ export function getLocalStore() {
     try {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        return {
+        const store = {
           ...createDefaultStore(),
           ...parsed,
+          singleVerseMode: parsed.singleVerseMode !== undefined ? Boolean(parsed.singleVerseMode) : true,
+          shuffleVerses: parsed.shuffleVerses !== undefined ? Boolean(parsed.shuffleVerses) : true,
           skipCompletedVerses: parsed.skipCompletedVerses !== false,
           meditations: (parsed.meditations && typeof parsed.meditations === 'object') ? parsed.meditations : {},
           favorites: (parsed.favorites && typeof parsed.favorites === 'object') ? parsed.favorites : {},
@@ -287,6 +294,7 @@ export function setShowTypingStatsPref(show) {
 
 export function getSingleVerseModePref() {
   const store = getLocalStore();
+  if (store.singleVerseMode === undefined) return true;
   return Boolean(store.singleVerseMode);
 }
 
@@ -331,6 +339,7 @@ export function setSkipCelebrationModalPref(skip) {
 
 export function getShuffleVersesPref() {
   const store = getLocalStore();
+  if (store.shuffleVerses === undefined) return true;
   return Boolean(store.shuffleVerses);
 }
 

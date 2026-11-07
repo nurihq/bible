@@ -1,7 +1,7 @@
 import { Navbar } from './components/navbar.js?v=20261107_v1';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v1';
+import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getPreferredTranslation, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v1';
 import { initGA, trackPageView } from './analytics.js?v=20261107_v1';
-import { getBookById, replenishRandomVersePreloads } from './bible-data.js?v=20261107_v1';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261107_v1';
 
 import { renderSignInScreen } from './screens/signin.js?v=20261107_v1';
 import { renderLandingScreen } from './screens/home.js?v=20261107_v1';
@@ -173,6 +173,11 @@ class App {
 
     if (path === '/typing') {
       if (getSingleVerseModePref()) {
+        if (getShuffleVersesPref()) {
+          const randRef = getNextPreloadedRandomVerse(getPreferredTranslation() || 'ESV');
+          navigate(`#/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
+          return;
+        }
         const store = getLocalStore();
         const bId = store.lastBookId || 1;
         const ch = store.lastChapter || 1;
