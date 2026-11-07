@@ -404,12 +404,26 @@ export function renderMeditationsScreen(container) {
     modalBackdrop.hidden = false;
   }
 
-  // Listen for background updates to meditations
+  // Clean up any prior meditations listeners
+  if (window.__bibleMeditationsCleanup) {
+    window.__bibleMeditationsCleanup();
+  }
+
+  // Listen for background updates only while this screen is active in the DOM
   const onMeditationsUpdated = () => {
+    if (!document.body.contains(container) || !container.querySelector('.meditations-screen-container')) {
+      window.removeEventListener('bible:meditations-updated', onMeditationsUpdated);
+      return;
+    }
     meditations = getAllMeditations();
     render();
   };
+
   window.addEventListener('bible:meditations-updated', onMeditationsUpdated);
+  window.__bibleMeditationsCleanup = () => {
+    window.removeEventListener('bible:meditations-updated', onMeditationsUpdated);
+    window.__bibleMeditationsCleanup = null;
+  };
 
   render();
 }

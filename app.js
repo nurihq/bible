@@ -141,6 +141,9 @@ class App {
     if (!path.startsWith('/typing') && window.__bibleTypingCleanup) {
       window.__bibleTypingCleanup();
     }
+    if (path !== '/meditations' && window.__bibleMeditationsCleanup) {
+      window.__bibleMeditationsCleanup();
+    }
 
     // Re-render navbar (and global unauthenticated warning banner on non-landing/non-signin screens)
     this.navbar.render(this.navContainer, routeToken);
