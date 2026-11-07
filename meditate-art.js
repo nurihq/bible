@@ -114,11 +114,13 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
   // Scripture text position and typography (with NO border plaque)
   const posX = typeof textStyle?.textX === 'number' ? textStyle.textX : 50;
   const posY = typeof textStyle?.textY === 'number' ? textStyle.textY : 76;
-  const fontFamily = textStyle?.fontFamily || "'Playfair Display', Georgia, serif";
+  const fontFamily = textStyle?.fontFamily || "Arial, -apple-system, sans-serif";
   const fontSize = typeof textStyle?.fontSize === 'number' ? textStyle.fontSize : 20;
+  const fontCase = textStyle?.fontCase === 'uppercase' ? 'uppercase' : 'normal';
+  const boxWidth = typeof textStyle?.boxWidth === 'number' ? textStyle.boxWidth : 440;
 
   // Convert percentage (0..100) to SVG viewBox coordinates (1000 x 700)
-  const svgX = Math.round((posX / 100) * 1000 - 320);
+  const svgX = Math.round((posX / 100) * 1000 - boxWidth / 2);
   const svgY = Math.round((posY / 100) * 700 - 70);
 
   return `
@@ -140,8 +142,8 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
 
       <!-- Scripture Text Overlay (NO border plaque — pure draggable typography) -->
       ${verseText ? `
-        <foreignObject x="${Math.max(10, Math.min(360, svgX))}" y="${Math.max(20, Math.min(520, svgY))}" width="640" height="200" style="overflow: visible; pointer-events: none;">
-          <div xmlns="http://www.w3.org/1999/xhtml" class="meditate-verse-embed-noborder" style="font-family: ${fontFamily}; font-size: ${fontSize}px;">
+        <foreignObject x="${Math.max(10, Math.min(990 - boxWidth, svgX))}" y="${Math.max(20, Math.min(520, svgY))}" width="${boxWidth}" height="400" style="overflow: visible; pointer-events: none;">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="meditate-verse-embed-noborder" style="font-family: ${fontFamily}; font-size: ${fontSize}px; text-transform: ${fontCase};">
             <p class="meditate-verse-quote-noborder">“${escapeHtml(verseText)}”</p>
             <div class="meditate-verse-citation-noborder">
               <strong>${escapeHtml(verseRef)}</strong>

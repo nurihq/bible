@@ -155,8 +155,10 @@ export async function initFirebaseAuthObserver() {
   } catch (e) {}
 }
 
-export const DEFAULT_MEDITATE_FONT = "'Playfair Display', Georgia, serif";
+export const DEFAULT_MEDITATE_FONT = "Arial, -apple-system, sans-serif";
 export const DEFAULT_MEDITATE_FONT_SIZE = 20;
+export const DEFAULT_MEDITATE_FONT_CASE = "normal";
+export const DEFAULT_MEDITATE_BOX_WIDTH = 440;
 
 // ── Local & Cloud Store ─────────────────────────────────────────
 function createDefaultStore() {
@@ -169,6 +171,8 @@ function createDefaultStore() {
     meditateMode: false,
     meditateFont: DEFAULT_MEDITATE_FONT,
     meditateFontSize: DEFAULT_MEDITATE_FONT_SIZE,
+    meditateFontCase: DEFAULT_MEDITATE_FONT_CASE,
+    meditateBoxWidth: DEFAULT_MEDITATE_BOX_WIDTH,
     meditatePalette: [
       '#38BDF8',
       '#3B82F6',
@@ -426,6 +430,30 @@ export function setMeditateFontSizePref(size) {
   syncPreferencesToCloud();
 }
 
+export function getMeditateFontCasePref() {
+  const store = getLocalStore();
+  return store.meditateFontCase || DEFAULT_MEDITATE_FONT_CASE;
+}
+
+export function setMeditateFontCasePref(fontCase) {
+  const store = getLocalStore();
+  store.meditateFontCase = fontCase === 'uppercase' ? 'uppercase' : 'normal';
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
+export function getMeditateBoxWidthPref() {
+  const store = getLocalStore();
+  return typeof store.meditateBoxWidth === 'number' ? store.meditateBoxWidth : DEFAULT_MEDITATE_BOX_WIDTH;
+}
+
+export function setMeditateBoxWidthPref(width) {
+  const store = getLocalStore();
+  store.meditateBoxWidth = Math.max(160, Math.min(900, Number(width) || DEFAULT_MEDITATE_BOX_WIDTH));
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
 // ── Scripture Meditations (Saved Color-by-Numbers Artworks) ─────
 export function saveVerseMeditation({
   bookId,
@@ -438,6 +466,8 @@ export function saveVerseMeditation({
   fills,
   fontFamily,
   fontSize,
+  fontCase,
+  boxWidth,
   textX,
   textY
 }) {
@@ -459,6 +489,8 @@ export function saveVerseMeditation({
     fills: { ...(existing.fills || {}), ...(fills || {}) },
     fontFamily: fontFamily || existing.fontFamily || store.meditateFont || DEFAULT_MEDITATE_FONT,
     fontSize: typeof fontSize === 'number' ? fontSize : (typeof existing.fontSize === 'number' ? existing.fontSize : (store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE)),
+    fontCase: fontCase || existing.fontCase || store.meditateFontCase || DEFAULT_MEDITATE_FONT_CASE,
+    boxWidth: typeof boxWidth === 'number' ? boxWidth : (typeof existing.boxWidth === 'number' ? existing.boxWidth : (store.meditateBoxWidth || DEFAULT_MEDITATE_BOX_WIDTH)),
     textX: typeof textX === 'number' ? textX : (typeof existing.textX === 'number' ? existing.textX : 50),
     textY: typeof textY === 'number' ? textY : (typeof existing.textY === 'number' ? existing.textY : 76),
     updatedAt: new Date().toISOString()
