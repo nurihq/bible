@@ -306,7 +306,8 @@ export function renderTypingScreen(container, params = {}) {
               type="button"
               class="btn btn-secondary btn-sm summary-action-btn single-verse-fav-btn ${isSingleVerseFav ? 'is-favorited' : ''}"
               id="single-verse-fav-btn"
-              title="${isSingleVerseFav ? 'Verse is in Favorites. Click to remove.' : 'Save verse to Favorites'}"
+              data-tooltip="${isSingleVerseFav ? 'Favourite (Saved)' : 'Favourite'}"
+              aria-label="${isSingleVerseFav ? 'Verse is in Favorites. Click to remove.' : 'Save verse to Favorites'}"
               ${singleVerseMode ? '' : 'hidden'}
             >
               <span id="single-verse-fav-icon">${isSingleVerseFav ? '❤️' : '🤍'}</span>
@@ -315,7 +316,8 @@ export function renderTypingScreen(container, params = {}) {
               type="button"
               class="btn btn-secondary btn-sm summary-action-btn single-verse-bookmark-btn ${isSingleVerseBookmarked ? 'is-bookmarked' : ''}"
               id="single-verse-bookmark-btn"
-              title="${isSingleVerseBookmarked ? 'Verse is bookmarked. Click to view, update or add bookmarks.' : 'Bookmark this verse'}"
+              data-tooltip="${isSingleVerseBookmarked ? 'Bookmark (Saved)' : 'Bookmark'}"
+              aria-label="${isSingleVerseBookmarked ? 'Verse is bookmarked. Click to view, update or add bookmarks.' : 'Bookmark this verse'}"
               ${singleVerseMode ? '' : 'hidden'}
             >
               <svg class="bookmark-ribbon-icon" width="16" height="16" viewBox="0 0 24 24" fill="${isSingleVerseBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -935,9 +937,11 @@ export function renderTypingScreen(container, params = {}) {
     const isFav = isVerseFavorited(book.id, initialChapter, vNum);
     singleFavBtn.classList.toggle('is-favorited', isFav);
     singleFavIcon.textContent = isFav ? '❤️' : '🤍';
-    singleFavBtn.title = isFav
+    singleFavBtn.setAttribute('data-tooltip', isFav ? 'Favourite (Saved)' : 'Favourite');
+    singleFavBtn.setAttribute('aria-label', isFav
       ? `Verse ${vNum} is in Favorites. Click to remove.`
-      : `Save Verse ${vNum} to Favorites`;
+      : `Save Verse ${vNum} to Favorites`);
+    singleFavBtn.removeAttribute('title');
   }
 
   if (singleFavBtn) {
@@ -1011,9 +1015,11 @@ export function renderTypingScreen(container, params = {}) {
     singleBookmarkBtn.classList.toggle('is-bookmarked', isBookmarked);
     const svgEl = singleBookmarkBtn.querySelector('.bookmark-ribbon-icon');
     if (svgEl) svgEl.setAttribute('fill', isBookmarked ? 'currentColor' : 'none');
-    singleBookmarkBtn.title = isBookmarked
+    singleBookmarkBtn.setAttribute('data-tooltip', isBookmarked ? 'Bookmark (Saved)' : 'Bookmark');
+    singleBookmarkBtn.setAttribute('aria-label', isBookmarked
       ? `Verse ${vNum} is bookmarked. Click to view, update, or add bookmarks.`
-      : `Bookmark Verse ${vNum}`;
+      : `Bookmark Verse ${vNum}`);
+    singleBookmarkBtn.removeAttribute('title');
   }
 
   function getCurrentVerseInfo() {
