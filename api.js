@@ -157,7 +157,8 @@ export async function initFirebaseAuthObserver() {
 
 export const DEFAULT_MEDITATE_FONT = "Arial, -apple-system, sans-serif";
 export const DEFAULT_MEDITATE_FONT_SIZE = 20;
-export const DEFAULT_MEDITATE_FONT_CASE = "normal";
+export const DEFAULT_MEDITATE_FONT_CASE = "none";
+export const DEFAULT_MEDITATE_FONT_COLOR = "";
 export const DEFAULT_MEDITATE_BOX_WIDTH = 440;
 
 // ── Local & Cloud Store ─────────────────────────────────────────
@@ -177,6 +178,7 @@ function createDefaultStore() {
     meditateFont: DEFAULT_MEDITATE_FONT,
     meditateFontSize: DEFAULT_MEDITATE_FONT_SIZE,
     meditateFontCase: DEFAULT_MEDITATE_FONT_CASE,
+    meditateFontColor: DEFAULT_MEDITATE_FONT_COLOR,
     meditateBoxWidth: DEFAULT_MEDITATE_BOX_WIDTH,
     meditatePalette: [
       '#38BDF8',
@@ -452,12 +454,25 @@ export function setMeditateFontSizePref(size) {
 
 export function getMeditateFontCasePref() {
   const store = getLocalStore();
-  return store.meditateFontCase || DEFAULT_MEDITATE_FONT_CASE;
+  const val = store.meditateFontCase;
+  return val === 'uppercase' ? 'uppercase' : 'none';
 }
 
 export function setMeditateFontCasePref(fontCase) {
   const store = getLocalStore();
-  store.meditateFontCase = fontCase === 'uppercase' ? 'uppercase' : 'normal';
+  store.meditateFontCase = fontCase === 'uppercase' ? 'uppercase' : 'none';
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
+export function getMeditateFontColorPref() {
+  const store = getLocalStore();
+  return typeof store.meditateFontColor === 'string' ? store.meditateFontColor : DEFAULT_MEDITATE_FONT_COLOR;
+}
+
+export function setMeditateFontColorPref(color) {
+  const store = getLocalStore();
+  store.meditateFontColor = String(color || '');
   saveLocalStore(store);
   syncPreferencesToCloud();
 }
@@ -487,6 +502,7 @@ export function saveVerseMeditation({
   fontFamily,
   fontSize,
   fontCase,
+  fontColor,
   boxWidth,
   textX,
   textY
@@ -504,6 +520,14 @@ export function saveVerseMeditation({
     return null;
   }
 
+  const determinedCase = fontCase !== undefined
+    ? (fontCase === 'uppercase' ? 'uppercase' : 'none')
+    : (existing.fontCase === 'uppercase' ? 'uppercase' : (store.meditateFontCase === 'uppercase' ? 'uppercase' : 'none'));
+
+  const determinedColor = typeof fontColor === 'string'
+    ? fontColor
+    : (typeof existing.fontColor === 'string' ? existing.fontColor : (store.meditateFontColor || DEFAULT_MEDITATE_FONT_COLOR));
+
   const record = {
     key,
     bookId: Number(bookId),
@@ -516,7 +540,8 @@ export function saveVerseMeditation({
     fills: mergedFills,
     fontFamily: fontFamily || existing.fontFamily || store.meditateFont || DEFAULT_MEDITATE_FONT,
     fontSize: typeof fontSize === 'number' ? fontSize : (typeof existing.fontSize === 'number' ? existing.fontSize : (store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE)),
-    fontCase: fontCase || existing.fontCase || store.meditateFontCase || DEFAULT_MEDITATE_FONT_CASE,
+    fontCase: determinedCase,
+    fontColor: determinedColor,
     boxWidth: typeof boxWidth === 'number' ? boxWidth : (typeof existing.boxWidth === 'number' ? existing.boxWidth : (store.meditateBoxWidth || DEFAULT_MEDITATE_BOX_WIDTH)),
     textX: typeof textX === 'number' ? textX : (typeof existing.textX === 'number' ? existing.textX : 50),
     textY: typeof textY === 'number' ? textY : (typeof existing.textY === 'number' ? existing.textY : 76),

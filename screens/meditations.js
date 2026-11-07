@@ -188,6 +188,7 @@ export function renderMeditationsScreen(container) {
         fontFamily: m.fontFamily,
         fontSize: m.fontSize,
         fontCase: m.fontCase,
+        fontColor: m.fontColor,
         boxWidth: m.boxWidth,
         textX: m.textX,
         textY: m.textY
@@ -393,6 +394,7 @@ export function renderMeditationsScreen(container) {
           fontFamily: med.fontFamily,
           fontSize: med.fontSize,
           fontCase: med.fontCase,
+          fontColor: med.fontColor,
           boxWidth: med.boxWidth,
           textX: med.textX,
           textY: med.textY

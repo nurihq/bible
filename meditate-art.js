@@ -116,7 +116,8 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
   const posY = typeof textStyle?.textY === 'number' ? textStyle.textY : 76;
   const fontFamily = textStyle?.fontFamily || "Arial, -apple-system, sans-serif";
   const fontSize = typeof textStyle?.fontSize === 'number' ? textStyle.fontSize : 20;
-  const fontCase = textStyle?.fontCase === 'uppercase' ? 'uppercase' : 'normal';
+  const fontCase = textStyle?.fontCase === 'uppercase' ? 'uppercase' : 'none';
+  const fontColor = textStyle?.fontColor || '';
   const boxWidth = typeof textStyle?.boxWidth === 'number' ? textStyle.boxWidth : 440;
 
   // Convert percentage (0..100) to SVG viewBox coordinates (1000 x 700)
@@ -143,7 +144,7 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
       <!-- Scripture Text Overlay (NO border plaque — pure draggable typography) -->
       ${verseText ? `
         <foreignObject x="${Math.max(10, Math.min(990 - boxWidth, svgX))}" y="${Math.max(20, Math.min(520, svgY))}" width="${boxWidth}" height="400" style="overflow: visible; pointer-events: none;">
-          <div xmlns="http://www.w3.org/1999/xhtml" class="meditate-verse-embed-noborder" style="font-family: ${fontFamily}; font-size: ${fontSize}px; text-transform: ${fontCase};">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="meditate-verse-embed-noborder ${fontColor ? 'has-custom-color' : ''}" style="font-family: ${fontFamily}; font-size: ${fontSize}px; text-transform: ${fontCase}; ${fontColor ? `--meditate-font-color: ${fontColor}; color: ${fontColor};` : ''}">
             <p class="meditate-verse-quote-noborder">“${escapeHtml(verseText)}”</p>
             <div class="meditate-verse-citation-noborder">
               <strong>${escapeHtml(verseRef)}</strong>

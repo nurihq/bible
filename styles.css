@@ -3255,7 +3255,7 @@ sup.verse-num.is-both {
   margin: 0 0 0.35rem;
   line-height: 1.5;
   font-style: italic;
-  color: #0f172a;
+  color: var(--meditate-font-color, #0f172a);
   text-shadow:
     0 0 12px rgba(255, 255, 255, 0.95),
     0 0 20px rgba(255, 255, 255, 0.8),
@@ -3263,11 +3263,20 @@ sup.verse-num.is-both {
 }
 
 [data-theme="dark"] .meditate-drag-quote {
-  color: #f8fafc;
+  color: var(--meditate-font-color, #f8fafc);
   text-shadow:
     0 0 12px rgba(0, 0, 0, 0.95),
     0 0 20px rgba(0, 0, 0, 0.8),
     0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.meditate-draggable-text-box.has-custom-color .meditate-drag-quote,
+.meditate-verse-embed-noborder.has-custom-color .meditate-verse-quote-noborder {
+  color: var(--meditate-font-color);
+  text-shadow:
+    0 0 8px rgba(0, 0, 0, 0.8),
+    0 1px 3px rgba(0, 0, 0, 0.95),
+    0 0 16px rgba(255, 255, 255, 0.7);
 }
 
 .meditate-drag-citation {
@@ -3277,13 +3286,23 @@ sup.verse-num.is-both {
   gap: 0.45rem;
   font-family: var(--font-sans);
   font-size: 0.78rem;
-  color: #334155;
+  color: var(--meditate-font-color, #334155);
+  opacity: 0.92;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
 }
 
 [data-theme="dark"] .meditate-drag-citation {
-  color: #cbd5e1;
+  color: var(--meditate-font-color, #cbd5e1);
+  opacity: 0.92;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+}
+
+.meditate-draggable-text-box.has-custom-color .meditate-drag-citation,
+.meditate-verse-embed-noborder.has-custom-color .meditate-verse-citation-noborder {
+  color: var(--meditate-font-color);
+  text-shadow:
+    0 0 6px rgba(0, 0, 0, 0.8),
+    0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 /* Font Settings Button & Popover */
@@ -3437,7 +3456,7 @@ sup.verse-num.is-both {
   margin: 0 0 0.35rem;
   line-height: 1.5;
   font-style: italic;
-  color: #0f172a;
+  color: var(--meditate-font-color, #0f172a);
   text-shadow:
     0 0 12px rgba(255, 255, 255, 0.95),
     0 0 20px rgba(255, 255, 255, 0.8),
@@ -3445,7 +3464,7 @@ sup.verse-num.is-both {
 }
 
 [data-theme="dark"] .meditate-verse-quote-noborder {
-  color: #f8fafc;
+  color: var(--meditate-font-color, #f8fafc);
   text-shadow:
     0 0 12px rgba(0, 0, 0, 0.95),
     0 0 20px rgba(0, 0, 0, 0.8),
@@ -3459,8 +3478,108 @@ sup.verse-num.is-both {
   gap: 0.45rem;
   font-family: var(--font-sans);
   font-size: 0.8rem;
-  color: #334155;
+  color: var(--meditate-font-color, #334155);
+  opacity: 0.92;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .meditate-verse-citation-noborder {
+  color: var(--meditate-font-color, #cbd5e1);
+  opacity: 0.92;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+}
+
+/* Font Colour Swatches in Typography Popover */
+.meditate-font-color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.15rem 0;
+}
+
+.meditate-color-swatch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  position: relative;
+}
+
+.meditate-color-swatch-btn:hover {
+  transform: scale(1.18);
+}
+
+.meditate-color-swatch-btn.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+  transform: scale(1.12);
+}
+
+.swatch-circle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: block;
+}
+
+.swatch-auto-icon {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  background: var(--bg-subtle);
+}
+
+.meditate-color-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  position: relative;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.meditate-color-picker-btn:hover {
+  transform: scale(1.18);
+  border-color: var(--primary);
+}
+
+.meditate-color-picker-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+}
+
+.meditate-picker-label {
+  font-size: 0.72rem;
+  pointer-events: none;
+  line-height: 1;
 }
 
 

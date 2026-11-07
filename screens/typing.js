@@ -65,19 +65,22 @@ import {
   setMeditateFontSizePref,
   getMeditateFontCasePref,
   setMeditateFontCasePref,
+  getMeditateFontColorPref,
+  setMeditateFontColorPref,
   getMeditateBoxWidthPref,
   setMeditateBoxWidthPref,
   DEFAULT_MEDITATE_FONT,
   DEFAULT_MEDITATE_FONT_SIZE,
   DEFAULT_MEDITATE_FONT_CASE,
+  DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261107_v3';
+} from '../api.js?v=20261107_v5';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261107_v3';
-import { trackEvent } from '../analytics.js?v=20261107_v3';
-import { navigate } from '../router.js?v=20261107_v3';
+} from '../meditate-art.js?v=20261107_v5';
+import { trackEvent } from '../analytics.js?v=20261107_v5';
+import { navigate } from '../router.js?v=20261107_v5';
 
 function escapeHtml(str) {
   return String(str)
@@ -1722,7 +1725,8 @@ export function renderTypingScreen(container, params = {}) {
       ? existingMed.fontFamily
       : getMeditateFontPref();
     let activeFontSize = typeof existingMed?.fontSize === 'number' ? existingMed.fontSize : getMeditateFontSizePref();
-    let activeFontCase = existingMed?.fontCase || getMeditateFontCasePref();
+    let activeFontCase = existingMed?.fontCase === 'uppercase' ? 'uppercase' : (getMeditateFontCasePref() === 'uppercase' ? 'uppercase' : 'none');
+    let activeFontColor = typeof existingMed?.fontColor === 'string' ? existingMed.fontColor : getMeditateFontColorPref();
     let activeBoxWidth = typeof existingMed?.boxWidth === 'number' ? existingMed.boxWidth : getMeditateBoxWidthPref();
     let textX = typeof existingMed?.textX === 'number' ? existingMed.textX : 50;
     let textY = typeof existingMed?.textY === 'number' ? existingMed.textY : 76;
@@ -1744,6 +1748,7 @@ export function renderTypingScreen(container, params = {}) {
         fontFamily: activeFont,
         fontSize: activeFontSize,
         fontCase: activeFontCase,
+        fontColor: activeFontColor,
         boxWidth: activeBoxWidth,
         textX,
         textY
@@ -1757,7 +1762,7 @@ export function renderTypingScreen(container, params = {}) {
       '',
       '',
       savedFills,
-      { textX, textY, fontFamily: activeFont, fontSize: activeFontSize, fontCase: activeFontCase, boxWidth: activeBoxWidth }
+      { textX, textY, fontFamily: activeFont, fontSize: activeFontSize, fontCase: activeFontCase, fontColor: activeFontColor, boxWidth: activeBoxWidth }
     );
 
     const activeColor = meditatePalette[activePaletteIndex] || '#38BDF8';
@@ -1769,9 +1774,9 @@ export function renderTypingScreen(container, params = {}) {
 
         <!-- Draggable, Resizable Scripture Typography (NO border plaque, wraps dynamically) -->
         <div
-          class="meditate-draggable-text-box"
+          class="meditate-draggable-text-box ${activeFontColor ? 'has-custom-color' : ''}"
           id="meditate-draggable-text-box"
-          style="left: ${textX}%; top: ${textY}%; width: ${activeBoxWidth}px; font-family: ${activeFont}; font-size: ${activeFontSize}px; text-transform: ${activeFontCase};"
+          style="left: ${textX}%; top: ${textY}%; width: ${activeBoxWidth}px; font-family: ${activeFont}; font-size: ${activeFontSize}px; text-transform: ${activeFontCase}; ${activeFontColor ? `--meditate-font-color: ${activeFontColor}; color: ${activeFontColor};` : ''}"
           title="Drag to position scripture, or drag edge handle to resize width"
         >
           <div class="meditate-drag-grip" id="meditate-drag-grip" title="Click &amp; drag to reposition scripture">
@@ -1892,6 +1897,81 @@ export function renderTypingScreen(container, params = {}) {
                   <button type="button" class="btn btn-secondary btn-xs font-size-btn" id="meditate-font-down-btn" title="Decrease font size">A−</button>
                   <span class="meditate-font-size-lbl" id="meditate-font-size-lbl">${activeFontSize}px</span>
                   <button type="button" class="btn btn-secondary btn-xs font-size-btn" id="meditate-font-up-btn" title="Increase font size">A+</button>
+                </div>
+              </div>
+
+              <!-- Font Colour Selector -->
+              <div class="meditate-popover-row">
+                <span class="meditate-popover-label">Font Colour</span>
+                <div class="meditate-font-color-row" id="meditate-font-color-row">
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${!activeFontColor ? 'is-active' : ''}"
+                    data-color=""
+                    title="Default (Theme Auto)"
+                  >
+                    <span class="swatch-auto-icon">Auto</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#ffffff' ? 'is-active' : ''}"
+                    data-color="#ffffff"
+                    title="White"
+                  >
+                    <span class="swatch-circle" style="background: #ffffff; border: 1px solid rgba(0,0,0,0.25);"></span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#0f172a' ? 'is-active' : ''}"
+                    data-color="#0f172a"
+                    title="Charcoal"
+                  >
+                    <span class="swatch-circle" style="background: #0f172a;"></span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#f59e0b' ? 'is-active' : ''}"
+                    data-color="#f59e0b"
+                    title="Gold"
+                  >
+                    <span class="swatch-circle" style="background: #f59e0b;"></span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#38bdf8' ? 'is-active' : ''}"
+                    data-color="#38bdf8"
+                    title="Sky Blue"
+                  >
+                    <span class="swatch-circle" style="background: #38bdf8;"></span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#10b981' ? 'is-active' : ''}"
+                    data-color="#10b981"
+                    title="Emerald"
+                  >
+                    <span class="swatch-circle" style="background: #10b981;"></span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#f43f5e' ? 'is-active' : ''}"
+                    data-color="#f43f5e"
+                    title="Rose"
+                  >
+                    <span class="swatch-circle" style="background: #f43f5e;"></span>
+                  </button>
+                  <button
+                    type="button"
+                    class="meditate-color-swatch-btn ${activeFontColor.toLowerCase() === '#8b5cf6' ? 'is-active' : ''}"
+                    data-color="#8b5cf6"
+                    title="Violet"
+                  >
+                    <span class="swatch-circle" style="background: #8b5cf6;"></span>
+                  </button>
+                  <label class="meditate-color-picker-btn" title="Pick custom colour">
+                    <input type="color" id="meditate-font-color-picker" class="meditate-color-picker-input" value="${activeFontColor || '#38bdf8'}" />
+                    <span class="meditate-picker-label">🎨</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -2097,18 +2177,20 @@ export function renderTypingScreen(container, params = {}) {
       });
     }
 
-    // Attach Default button (resets font to Arial, normal case, 20px, default width)
+    // Attach Default button (resets font to Arial, normal case, 20px, default width, default color)
     if (defaultBtn) {
       defaultBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         activeFont = DEFAULT_MEDITATE_FONT;
         activeFontSize = DEFAULT_MEDITATE_FONT_SIZE;
-        activeFontCase = DEFAULT_MEDITATE_FONT_CASE;
+        activeFontCase = DEFAULT_MEDITATE_FONT_CASE; // 'none'
+        activeFontColor = DEFAULT_MEDITATE_FONT_COLOR; // ''
         activeBoxWidth = DEFAULT_MEDITATE_BOX_WIDTH;
 
         setMeditateFontPref(activeFont);
         setMeditateFontSizePref(activeFontSize);
         setMeditateFontCasePref(activeFontCase);
+        setMeditateFontColorPref(activeFontColor);
         setMeditateBoxWidthPref(activeBoxWidth);
 
         if (fontSelect) fontSelect.value = DEFAULT_MEDITATE_FONT;
@@ -2116,11 +2198,19 @@ export function renderTypingScreen(container, params = {}) {
         defaultBtn.classList.add('is-active');
         if (allCapsBtn) allCapsBtn.classList.remove('is-active');
 
+        // Reset color swatches active state
+        meditateCanvasWrapper.querySelectorAll('.meditate-color-swatch-btn').forEach(btn => {
+          btn.classList.toggle('is-active', !btn.getAttribute('data-color'));
+        });
+
         if (dragBox) {
           dragBox.style.fontFamily = activeFont;
           dragBox.style.fontSize = `${activeFontSize}px`;
-          dragBox.style.textTransform = activeFontCase;
+          dragBox.style.textTransform = 'none';
           dragBox.style.width = `${activeBoxWidth}px`;
+          dragBox.style.removeProperty('--meditate-font-color');
+          dragBox.style.removeProperty('color');
+          dragBox.classList.remove('has-custom-color');
         }
         persistMeditation();
       });
@@ -2134,7 +2224,7 @@ export function renderTypingScreen(container, params = {}) {
         setMeditateFontCasePref(activeFontCase);
         allCapsBtn.classList.add('is-active');
         if (defaultBtn) defaultBtn.classList.remove('is-active');
-        if (dragBox) dragBox.style.textTransform = activeFontCase;
+        if (dragBox) dragBox.style.textTransform = 'uppercase';
         persistMeditation();
       });
     }
@@ -2161,6 +2251,57 @@ export function renderTypingScreen(container, params = {}) {
       fontUpBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         updateFontSize(activeFontSize + 2);
+      });
+    }
+
+    // Attach Font Colour Swatches & Picker handlers
+    const fontColorSwatches = meditateCanvasWrapper.querySelectorAll('.meditate-color-swatch-btn');
+    const fontColorPicker = meditateCanvasWrapper.querySelector('#meditate-font-color-picker');
+
+    const updateFontColor = (newColor) => {
+      activeFontColor = newColor || '';
+      setMeditateFontColorPref(activeFontColor);
+
+      fontColorSwatches.forEach(btn => {
+        const c = btn.getAttribute('data-color') || '';
+        btn.classList.toggle('is-active', (c.toLowerCase() === activeFontColor.toLowerCase()) || (!c && !activeFontColor));
+      });
+
+      if (dragBox) {
+        if (activeFontColor) {
+          dragBox.style.setProperty('--meditate-font-color', activeFontColor);
+          dragBox.style.color = activeFontColor;
+          dragBox.classList.add('has-custom-color');
+        } else {
+          dragBox.style.removeProperty('--meditate-font-color');
+          dragBox.style.removeProperty('color');
+          dragBox.classList.remove('has-custom-color');
+        }
+      }
+
+      if (defaultBtn) {
+        defaultBtn.classList.toggle('is-active', activeFont.includes('Arial') && activeFontCase !== 'uppercase' && !activeFontColor);
+      }
+
+      persistMeditation();
+    };
+
+    fontColorSwatches.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const color = btn.getAttribute('data-color') || '';
+        updateFontColor(color);
+      });
+    });
+
+    if (fontColorPicker) {
+      fontColorPicker.addEventListener('input', (e) => {
+        e.stopPropagation();
+        updateFontColor(e.target.value);
+      });
+      fontColorPicker.addEventListener('change', (e) => {
+        e.stopPropagation();
+        updateFontColor(e.target.value);
       });
     }
 
