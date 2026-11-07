@@ -442,11 +442,6 @@ export class Navbar {
               <span>📊</span>
               <span class="nav-about-text">Progress</span>
             </a>
-
-            <a href="#/meditations" class="nav-about-btn ${isMeditationsActive ? 'active' : ''}" title="Scripture Meditations">
-              <span>🎨</span>
-              <span class="nav-about-text">Meditations</span>
-            </a>
           ` : ''}
 
           <button class="icon-btn" id="theme-toggle-btn" title="${this.theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
@@ -498,16 +493,6 @@ export class Navbar {
                   <span class="nav-item-icon">🎨</span>
                   <span class="nav-item-title">Meditations</span>
                   <span class="nav-item-badge">${meditationCount}</span>
-                </a>
-
-                <a href="#/progress" class="nav-profile-dropdown-item ${isProgressActive ? 'active' : ''}" id="nav-menu-progress-btn">
-                  <span class="nav-item-icon">📊</span>
-                  <span class="nav-item-title">Typing Progress</span>
-                </a>
-
-                <a href="#/typing" class="nav-profile-dropdown-item ${isTypingActive ? 'active' : ''}" id="nav-menu-typing-btn">
-                  <span class="nav-item-icon">⌨️</span>
-                  <span class="nav-item-title">Scripture Typing</span>
                 </a>
               </div>
 
