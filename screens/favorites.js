@@ -1,6 +1,7 @@
 import {
   getAllFavorites,
   removeVerseFavorite,
+  updateFavoriteComment,
   setMeditateModePref
 } from '../api.js?v=20261107_v1';
 import { getBookById } from '../bible-data.js?v=20261107_v1';
@@ -34,7 +35,7 @@ export function renderFavoritesScreen(container) {
   let favorites = getAllFavorites();
   let searchQuery = '';
   let testamentFilter = 'ALL'; // 'ALL', 'OT', 'NT'
-  let sortBy = 'newest'; // 'newest', 'canonical', 'alpha'
+  let sortBy = 'newest'; // 'newest', 'notes', 'canonical', 'alpha'
 
   function getFilteredFavorites() {
     return favorites
@@ -49,12 +50,19 @@ export function renderFavoritesScreen(container) {
           const textMatch = (fav.verseText || '').toLowerCase().includes(q);
           const bookMatch = (book.name || '').toLowerCase().includes(q);
           const trMatch = (fav.translation || '').toLowerCase().includes(q);
-          if (!refMatch && !textMatch && !bookMatch && !trMatch) return false;
+          const commentMatch = (fav.comment || '').toLowerCase().includes(q);
+          if (!refMatch && !textMatch && !bookMatch && !trMatch && !commentMatch) return false;
         }
         return true;
       })
       .sort((a, b) => {
         if (sortBy === 'newest') {
+          return (b.addedAt || '').localeCompare(a.addedAt || '');
+        }
+        if (sortBy === 'notes') {
+          const hasA = Boolean(a.comment && a.comment.trim());
+          const hasB = Boolean(b.comment && b.comment.trim());
+          if (hasA !== hasB) return hasB ? 1 : -1;
           return (b.addedAt || '').localeCompare(a.addedAt || '');
         }
         if (sortBy === 'canonical') {
@@ -126,6 +134,7 @@ export function renderFavoritesScreen(container) {
               <span class="favorites-filter-label">Sort:</span>
               <select class="favorites-filter-select" id="favorites-sort-select" aria-label="Sort favorites">
                 <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
+                <option value="notes" ${sortBy === 'notes' ? 'selected' : ''}>With Notes First</option>
                 <option value="canonical" ${sortBy === 'canonical' ? 'selected' : ''}>Canonical Order</option>
                 <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Alphabetical</option>
               </select>
@@ -180,6 +189,7 @@ export function renderFavoritesScreen(container) {
     const book = getBookById(fav.bookId);
     const verseRef = fav.verseRef || `${book.name} ${fav.chapter}:${fav.verse}`;
     const testamentBadge = book.testament === 'OT' ? 'Old Testament' : 'New Testament';
+    const hasComment = Boolean(fav.comment && fav.comment.trim());
 
     return `
       <div class="favorite-card" data-key="${escapeHtml(fav.key)}" data-book="${fav.bookId}" data-chapter="${fav.chapter}" data-verse="${fav.verse}">
@@ -198,6 +208,49 @@ export function renderFavoritesScreen(container) {
 
         <div class="favorite-card-body">
           <p class="favorite-card-text">“${escapeHtml(fav.verseText)}”</p>
+
+          <!-- Reflection / Comment Section -->
+          <div class="favorite-comment-container" data-container="comment">
+            ${hasComment ? `
+              <div class="favorite-comment-box" data-view="comment">
+                <div class="favorite-comment-header">
+                  <span class="favorite-comment-badge">💬 Note</span>
+                  <div class="favorite-comment-actions">
+                    <button type="button" class="favorite-comment-action-btn" data-action="edit-comment" title="Edit note">
+                      ✏️ Edit
+                    </button>
+                    <button type="button" class="favorite-comment-action-btn favorite-comment-delete-btn" data-action="delete-comment" title="Delete note">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+                <p class="favorite-comment-text">${escapeHtml(fav.comment)}</p>
+                ${fav.commentUpdatedAt ? `
+                  <div class="favorite-comment-date">Updated ${formatDate(fav.commentUpdatedAt)}</div>
+                ` : ''}
+              </div>
+            ` : `
+              <button type="button" class="favorite-add-comment-btn" data-action="add-comment" title="Add a personal reflection note">
+                <span>💬 Add reflection or note...</span>
+              </button>
+            `}
+
+            <div class="favorite-comment-editor" data-editor="comment" hidden>
+              <textarea
+                class="favorite-comment-textarea"
+                placeholder="Write your reflections, prayer points, or notes for this verse..."
+                rows="3"
+                maxlength="1000"
+              >${escapeHtml(fav.comment || '')}</textarea>
+              <div class="favorite-comment-editor-footer">
+                <span class="favorite-comment-char-count">${(fav.comment || '').length}/1000</span>
+                <div class="favorite-comment-editor-btns">
+                  <button type="button" class="btn btn-secondary btn-xs" data-action="cancel-comment">Cancel</button>
+                  <button type="button" class="btn btn-primary btn-xs" data-action="save-comment">Save Note</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="favorite-card-footer">
@@ -340,6 +393,97 @@ export function renderFavoritesScreen(container) {
           trackEvent('remove_favorite_verse', { bookId, chapter, verse });
           render();
           return;
+        }
+
+        if (action === 'add-comment') {
+          const containerEl = card.querySelector('[data-container="comment"]');
+          if (!containerEl) return;
+          const addBtn = containerEl.querySelector('[data-action="add-comment"]');
+          const editor = containerEl.querySelector('[data-editor="comment"]');
+          if (addBtn) addBtn.hidden = true;
+          if (editor) {
+            editor.hidden = false;
+            const ta = editor.querySelector('.favorite-comment-textarea');
+            if (ta) {
+              ta.focus();
+              ta.setSelectionRange(ta.value.length, ta.value.length);
+            }
+          }
+          return;
+        }
+
+        if (action === 'edit-comment') {
+          const containerEl = card.querySelector('[data-container="comment"]');
+          if (!containerEl) return;
+          const box = containerEl.querySelector('[data-view="comment"]');
+          const editor = containerEl.querySelector('[data-editor="comment"]');
+          if (box) box.hidden = true;
+          if (editor) {
+            editor.hidden = false;
+            const ta = editor.querySelector('.favorite-comment-textarea');
+            if (ta) {
+              ta.focus();
+              ta.setSelectionRange(ta.value.length, ta.value.length);
+            }
+          }
+          return;
+        }
+
+        if (action === 'cancel-comment') {
+          const containerEl = card.querySelector('[data-container="comment"]');
+          if (!containerEl) return;
+          const box = containerEl.querySelector('[data-view="comment"]');
+          const addBtn = containerEl.querySelector('[data-action="add-comment"]');
+          const editor = containerEl.querySelector('[data-editor="comment"]');
+          if (editor) editor.hidden = true;
+          if (box) box.hidden = false;
+          if (addBtn) addBtn.hidden = false;
+          return;
+        }
+
+        if (action === 'save-comment') {
+          const containerEl = card.querySelector('[data-container="comment"]');
+          if (!containerEl) return;
+          const ta = containerEl.querySelector('.favorite-comment-textarea');
+          const commentText = ta ? ta.value.trim() : '';
+          updateFavoriteComment(bookId, chapter, verse, commentText);
+          trackEvent('save_favorite_comment', { bookId, chapter, verse, hasComment: Boolean(commentText) });
+          render();
+          return;
+        }
+
+        if (action === 'delete-comment') {
+          if (confirm('Delete this reflection note?')) {
+            updateFavoriteComment(bookId, chapter, verse, '');
+            trackEvent('delete_favorite_comment', { bookId, chapter, verse });
+            render();
+          }
+          return;
+        }
+      });
+
+      grid.addEventListener('input', (e) => {
+        if (e.target.matches('.favorite-comment-textarea')) {
+          const ta = e.target;
+          const editor = ta.closest('.favorite-comment-editor');
+          if (editor) {
+            const countEl = editor.querySelector('.favorite-comment-char-count');
+            if (countEl) countEl.textContent = `${ta.value.length}/1000`;
+          }
+        }
+      });
+
+      grid.addEventListener('keydown', (e) => {
+        if (e.target.matches('.favorite-comment-textarea')) {
+          if (e.key === 'Escape') {
+            const card = e.target.closest('.favorite-card');
+            const cancelBtn = card?.querySelector('[data-action="cancel-comment"]');
+            if (cancelBtn) cancelBtn.click();
+          } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            const card = e.target.closest('.favorite-card');
+            const saveBtn = card?.querySelector('[data-action="save-comment"]');
+            if (saveBtn) saveBtn.click();
+          }
         }
       });
     }

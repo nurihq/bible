@@ -551,27 +551,45 @@ export function deleteVerseMeditation(bookId, chapter, verse) {
 }
 
 // ── Favorited Scripture Verses ─────────────────────────────────
-export function saveVerseFavorite({ bookId, chapter, verse, verseRef, verseText, translation }) {
+export function saveVerseFavorite({ bookId, chapter, verse, verseRef, verseText, translation, comment }) {
   const store = getLocalStore();
   if (!store.favorites || typeof store.favorites !== 'object') {
     store.favorites = {};
   }
   const key = `${bookId}:${chapter}:${verse}`;
+  const existing = store.favorites[key] || {};
   const record = {
     key,
     bookId: Number(bookId),
     chapter: Number(chapter),
     verse: Number(verse),
-    verseRef: String(verseRef || ''),
-    verseText: String(verseText || ''),
-    translation: String(translation || 'ESV'),
-    addedAt: new Date().toISOString()
+    verseRef: String(verseRef || existing.verseRef || ''),
+    verseText: String(verseText || existing.verseText || ''),
+    translation: String(translation || existing.translation || 'ESV'),
+    addedAt: existing.addedAt || new Date().toISOString(),
+    comment: typeof comment === 'string' ? comment.trim() : (existing.comment || ''),
+    commentUpdatedAt: existing.commentUpdatedAt || null
   };
   store.favorites[key] = record;
   saveLocalStore(store);
   syncPreferencesToCloud();
   window.dispatchEvent(new CustomEvent('bible:favorites-updated', { detail: { record, isFavorited: true } }));
   return record;
+}
+
+export function updateFavoriteComment(bookId, chapter, verse, comment) {
+  const store = getLocalStore();
+  const key = `${bookId}:${chapter}:${verse}`;
+  if (!store.favorites || !store.favorites[key]) {
+    return null;
+  }
+  const cleanComment = typeof comment === 'string' ? comment.trim() : '';
+  store.favorites[key].comment = cleanComment;
+  store.favorites[key].commentUpdatedAt = cleanComment ? new Date().toISOString() : null;
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:favorites-updated', { detail: { record: store.favorites[key], isFavorited: true } }));
+  return store.favorites[key];
 }
 
 export function removeVerseFavorite(bookId, chapter, verse) {
