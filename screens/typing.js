@@ -2105,7 +2105,6 @@ export function renderTypingScreen(container, params = {}) {
     // Attach Font Size Stepper handlers
     const fontDownBtn = meditateCanvasWrapper.querySelector('#meditate-font-down-btn');
     const fontUpBtn = meditateCanvasWrapper.querySelector('#meditate-font-up-btn');
-    const fontSizeLbl = meditateCanvasWrapper.querySelector('#meditate-font-size-lbl');
 
     const updateFontSize = (newSize) => {
       activeFontSize = Math.max(13, Math.min(42, newSize));
