@@ -163,6 +163,19 @@ function createDefaultStore() {
     lastBookId: 1,
     lastChapter: 1,
     lastVerse: null,
+    meditateMode: false,
+    meditatePalette: [
+      '#38BDF8',
+      '#3B82F6',
+      '#22C55E',
+      '#EAB308',
+      '#F97316',
+      '#EC4899',
+      '#A855F7',
+      '#B45309',
+      '#64748B',
+      '#FFFFFF'
+    ],
     chapters: {}, // { "1:1": CompletedChapterRecord }
     sessions: [], // TypingSession[] (sorted newest first)
     unsyncedSessionIds: []
@@ -214,7 +227,9 @@ export function syncPreferencesToCloud() {
       skipCompletedVerses: store.skipCompletedVerses !== false,
       showTypingStats: Boolean(store.showTypingStats),
       shuffleVerses: Boolean(store.shuffleVerses),
-      shuffleScope: store.shuffleScope || 'bible'
+      shuffleScope: store.shuffleScope || 'bible',
+      meditateMode: Boolean(store.meditateMode),
+      meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE
     })
   }).catch(() => {});
 }
@@ -332,6 +347,48 @@ export function setAdvanceButtonPref(advance) {
   store.advanceButton = Boolean(advance);
   saveLocalStore(store);
   syncPreferencesToCloud();
+}
+
+export const DEFAULT_MEDITATE_PALETTE = [
+  '#38BDF8', // Sky Blue
+  '#3B82F6', // Royal Blue
+  '#22C55E', // Meadow Green
+  '#EAB308', // Sun Gold
+  '#F97316', // Sunset Orange
+  '#EC4899', // Blossom Pink
+  '#A855F7', // Lilac Purple
+  '#B45309', // Warm Earth
+  '#64748B', // Slate Grey
+  '#FFFFFF'  // Eraser / White
+];
+
+export function getMeditateModePref() {
+  const store = getLocalStore();
+  return Boolean(store.meditateMode);
+}
+
+export function setMeditateModePref(enabled) {
+  const store = getLocalStore();
+  store.meditateMode = Boolean(enabled);
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
+export function getMeditatePalettePref() {
+  const store = getLocalStore();
+  if (Array.isArray(store.meditatePalette) && store.meditatePalette.length === 10) {
+    return store.meditatePalette;
+  }
+  return [...DEFAULT_MEDITATE_PALETTE];
+}
+
+export function setMeditatePalettePref(palette) {
+  const store = getLocalStore();
+  if (Array.isArray(palette) && palette.length === 10) {
+    store.meditatePalette = palette;
+    saveLocalStore(store);
+    syncPreferencesToCloud();
+  }
 }
 
 const RANDOM_HISTORY_KEY = 'bible_random_verse_history';
@@ -1724,6 +1781,10 @@ export async function syncLocalToCloud() {
       if (cp.showTypingStats !== undefined) latestStore.showTypingStats = Boolean(cp.showTypingStats);
       if (cp.shuffleVerses !== undefined) latestStore.shuffleVerses = Boolean(cp.shuffleVerses);
       if (cp.shuffleScope) latestStore.shuffleScope = cp.shuffleScope;
+      if (cp.meditateMode !== undefined) latestStore.meditateMode = Boolean(cp.meditateMode);
+      if (Array.isArray(cp.meditatePalette) && cp.meditatePalette.length === 10) {
+        latestStore.meditatePalette = cp.meditatePalette;
+      }
     }
 
     if (progressData) {

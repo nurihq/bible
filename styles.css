@@ -2856,3 +2856,221 @@ sup.verse-num.is-both {
   background: rgba(245, 158, 11, 0.14);
   border-color: rgba(245, 158, 11, 0.35);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MEDITATE MODE (Coloring Canvas & Verse Sanctuary)
+   ══════════════════════════════════════════════════════════════════════════ */
+.meditate-mark-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.meditate-mark-read-btn.is-read-active {
+  background: var(--accent-emerald-light);
+  color: var(--accent-emerald);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.meditate-canvas-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-surface);
+}
+
+.meditate-art-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.meditate-svg-art {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: block;
+  user-select: none;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.06));
+}
+
+.paint-segment {
+  cursor: pointer;
+  transition: fill 0.15s ease, filter 0.15s ease, stroke-width 0.12s ease;
+}
+
+.paint-segment:hover {
+  filter: brightness(0.92);
+  stroke: var(--primary) !important;
+  stroke-width: 3.2px !important;
+}
+
+.meditate-verse-embed {
+  font-family: var(--font-serif);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0.25rem 0.5rem;
+  user-select: text;
+}
+
+.meditate-verse-quote {
+  font-size: clamp(0.95rem, 1.6vw, 1.25rem);
+  line-height: 1.6;
+  font-style: italic;
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.meditate-verse-citation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.meditate-tr-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+}
+
+/* Palette & Paint Controls Bar */
+.meditate-palette-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.45rem 0.85rem;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.meditate-tool-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.meditate-active-color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.meditate-swatches-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.2rem 0;
+  scrollbar-width: none;
+}
+
+.meditate-swatches-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.meditate-swatch-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.meditate-swatch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.meditate-swatch-btn:hover {
+  transform: scale(1.12);
+}
+
+.meditate-swatch-btn.is-active {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2.5px var(--primary), var(--shadow-md);
+  border-color: #ffffff;
+}
+
+.meditate-swatch-btn.is-eraser {
+  border: 2px dashed #94a3b8;
+  color: #64748b;
+}
+
+.meditate-swatch-edit-trigger {
+  position: relative;
+  cursor: pointer;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 1px;
+  transition: color var(--transition-fast);
+}
+
+.meditate-swatch-edit-trigger:hover {
+  color: var(--text-primary);
+}
+
+.meditate-color-input-hidden {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.meditate-actions-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}

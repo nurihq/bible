@@ -27,6 +27,11 @@ import {
   setAutoAdvancePref,
   getShuffleVersesPref,
   setShuffleVersesPref,
+  getMeditateModePref,
+  setMeditateModePref,
+  getMeditatePalettePref,
+  setMeditatePalettePref,
+  DEFAULT_MEDITATE_PALETTE,
   pushRandomVerseHistory,
   popRandomVerseHistory,
   pushRandomVerseForward,
@@ -43,6 +48,10 @@ import {
   toggleChapterRead,
   toggleVerseRead
 } from '../api.js?v=20261107_v1';
+import {
+  renderMeditateArtworkSvg,
+  TOTAL_MEDITATE_ART_TEMPLATES
+} from '../meditate-art.js?v=20261107_v1';
 import { trackEvent } from '../analytics.js?v=20261107_v1';
 import { navigate } from '../app.js?v=20261107_v1';
 
@@ -75,6 +84,10 @@ export function renderTypingScreen(container, params = {}) {
   let showTypingStats = getShowTypingStatsPref();
   let autoAdvance = getAutoAdvancePref();
   let shuffleVerses = getShuffleVersesPref();
+  let meditateMode = getMeditateModePref();
+  let meditatePalette = getMeditatePalettePref();
+  let activePaletteIndex = 0;
+  let currentArtworkTemplateIdx = Math.abs((book.id * 31 + initialChapter * 7 + (targetSingleVerseNum || 1))) % TOTAL_MEDITATE_ART_TEMPLATES;
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
 
@@ -240,6 +253,9 @@ export function renderTypingScreen(container, params = {}) {
                 ${singleVerseMode ? `${book.name} ${initialChapter}:${targetSingleVerseNum}` : `${book.name} ${initialChapter}`}
               </h1>
               <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
+              <button type="button" class="btn btn-secondary btn-sm meditate-mark-read-btn" id="meditate-mark-read-btn" title="Mark this verse as read" ${singleVerseMode && meditateMode ? '' : 'hidden'}>
+                <span id="meditate-mark-read-label">📖 Mark Read</span>
+              </button>
             </div>
             <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next ${singleVerseMode ? 'Verse' : 'Chapter'}">›</button>
             <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance ? '' : 'hidden'}>
@@ -256,7 +272,7 @@ export function renderTypingScreen(container, params = {}) {
         </div>
 
         <!-- Line 2: Live Metrics / Telemetry (Toggled via Typing Options modal) -->
-        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${showTypingStats ? '' : 'hidden'}>
+        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${(showTypingStats && !(singleVerseMode && meditateMode)) ? '' : 'hidden'}>
           <div class="summary-metrics-group">
             <div class="summary-stat-box">
               <span class="stat-lbl">WPM</span>
@@ -308,7 +324,7 @@ export function renderTypingScreen(container, params = {}) {
           <span>⌨️ Click any verse or press any key to resume typing</span>
         </div>
 
-        <div class="typing-passage-scroll" id="typing-passage-scroll">
+        <div class="typing-passage-scroll" id="typing-passage-scroll" ${singleVerseMode && meditateMode ? 'hidden' : ''}>
           <div class="typing-passage-content" id="typing-passage-content">
             <div class="typing-loading-state">
               <div class="loading-spinner"></div>
@@ -316,6 +332,9 @@ export function renderTypingScreen(container, params = {}) {
             </div>
           </div>
         </div>
+
+        <!-- Meditate Mode Interactive Artwork & Verse Canvas (Full Height, No Scroll) -->
+        <div class="meditate-canvas-wrapper" id="meditate-canvas-wrapper" ${singleVerseMode && meditateMode ? '' : 'hidden'}></div>
       </div>
 
       <!-- Chapter / Verse Completion Modal -->
@@ -432,6 +451,12 @@ export function renderTypingScreen(container, params = {}) {
                   <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
                 </label>
 
+                <!-- Toggle: Meditate Mode (Coloring Canvas) -->
+                <label class="typing-option-row" id="toggle-meditate-mode-row" for="toggle-meditate-mode-checkbox">
+                  <span class="option-title">Meditate Mode (Coloring Canvas)</span>
+                  <input type="checkbox" id="toggle-meditate-mode-checkbox" class="option-switch" ${meditateMode ? 'checked' : ''} />
+                </label>
+
                 <!-- Action: Mark Verse Read -->
                 <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
                   <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
@@ -482,6 +507,9 @@ export function renderTypingScreen(container, params = {}) {
   const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
   const toggleAutoAdvanceCheckbox = container.querySelector('#toggle-auto-advance-checkbox');
+  const toggleMeditateCheckbox = container.querySelector('#toggle-meditate-mode-checkbox');
+  const meditateMarkReadBtn = container.querySelector('#meditate-mark-read-btn');
+  const meditateMarkReadLbl = container.querySelector('#meditate-mark-read-label');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
   const toggleSkipDoneCheckbox = container.querySelector('#toggle-skip-done-checkbox');
   const modalMarkChBtn = container.querySelector('#modal-mark-ch-read-btn');
@@ -490,6 +518,7 @@ export function renderTypingScreen(container, params = {}) {
   const summaryStatsLine = container.querySelector('#typing-summary-stats-line');
   const hiddenInput = container.querySelector('#typing-hidden-input');
   const viewportWrapper = container.querySelector('#typing-viewport-wrapper');
+  const meditateCanvasWrapper = container.querySelector('#meditate-canvas-wrapper');
   const focusBanner = container.querySelector('#typing-focus-banner');
   const passageScroll = container.querySelector('#typing-passage-scroll');
   const passageContent = container.querySelector('#typing-passage-content');
@@ -545,6 +574,7 @@ export function renderTypingScreen(container, params = {}) {
 
     if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
     if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
+    if (toggleMeditateCheckbox) toggleMeditateCheckbox.checked = meditateMode;
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
     if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
     updateReadButtons();
@@ -656,6 +686,14 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
+  if (toggleMeditateCheckbox) {
+    toggleMeditateCheckbox.addEventListener('change', () => {
+      meditateMode = toggleMeditateCheckbox.checked;
+      setMeditateModePref(meditateMode);
+      applyMeditateModeState();
+    });
+  }
+
   // ── Mark Chapter & Verse as Read Controls ─────────────────────
   function updateReadButtons() {
     const sum = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
@@ -705,6 +743,18 @@ export function renderTypingScreen(container, params = {}) {
         markVBtn.title = `Mark verse ${activeVNum} as read`;
       }
     }
+
+    if (meditateMarkReadBtn && meditateMarkReadLbl) {
+      if (isVRead) {
+        meditateMarkReadBtn.classList.add('is-read-active');
+        meditateMarkReadLbl.textContent = '✓ Read';
+        meditateMarkReadBtn.title = `Verse ${activeVNum} is marked as read. Click to unmark.`;
+      } else {
+        meditateMarkReadBtn.classList.remove('is-read-active');
+        meditateMarkReadLbl.textContent = '📖 Mark Read';
+        meditateMarkReadBtn.title = `Mark verse ${activeVNum} as read`;
+      }
+    }
   }
 
   if (modalMarkChBtn) {
@@ -724,6 +774,23 @@ export function renderTypingScreen(container, params = {}) {
       toggleVerseRead(book.id, initialChapter, vNum, activeTranslation);
       trackEvent('toggle_verse_read', { bookId: book.id, chapter: initialChapter, verse: vNum });
       updateReadButtons();
+    });
+  }
+
+  if (meditateMarkReadBtn) {
+    meditateMarkReadBtn.addEventListener('click', () => {
+      const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+      const vNum = (singleVerseMode && targetSingleVerseNum)
+        ? targetSingleVerseNum
+        : ((curVIdx >= 0 && verseRanges[curVIdx]) ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1));
+      toggleVerseRead(book.id, initialChapter, vNum, activeTranslation);
+      trackEvent('toggle_verse_read_meditate', { bookId: book.id, chapter: initialChapter, verse: vNum });
+      updateReadButtons();
+      if (autoAdvance) {
+        setTimeout(() => {
+          navigateNextStep();
+        }, 350);
+      }
     });
   }
 
@@ -1120,6 +1187,213 @@ export function renderTypingScreen(container, params = {}) {
         ? `Single-verse mode — type Verse ${targetSingleVerseNum}, or click "Open Entire Chapter" to view all ${allChapterVerses.length} verses.`
         : `Click any verse in the chapter to start typing from that verse. Completed verses are remembered automatically.`)
     });
+
+    applyMeditateModeState();
+  }
+
+  // ── Meditate Mode (Coloring Canvas & Verse Sanctuary) ─────────
+  function applyMeditateModeState() {
+    const isMeditate = Boolean(singleVerseMode && meditateMode);
+
+    if (meditateMarkReadBtn) {
+      meditateMarkReadBtn.hidden = !isMeditate;
+    }
+
+    if (summaryStatsLine) {
+      summaryStatsLine.hidden = isMeditate || !showTypingStats;
+    }
+
+    if (focusBanner && isMeditate) {
+      focusBanner.hidden = true;
+    }
+
+    if (errorAlert && isMeditate) {
+      errorAlert.hidden = true;
+    }
+
+    if (isMeditate) {
+      if (passageScroll) passageScroll.hidden = true;
+      if (meditateCanvasWrapper) {
+        meditateCanvasWrapper.hidden = false;
+        renderMeditateModeCanvas();
+      }
+    } else {
+      if (passageScroll) passageScroll.hidden = false;
+      if (meditateCanvasWrapper) {
+        meditateCanvasWrapper.hidden = true;
+      }
+      focusTypingInput();
+    }
+  }
+
+  function renderMeditateModeCanvas() {
+    if (!meditateCanvasWrapper) return;
+
+    const activeVNum = targetSingleVerseNum || 1;
+    const currentVerseObj = verses.find(v => v.verse === activeVNum) || verses[0] || { verse: activeVNum, text: '' };
+    const verseText = currentVerseObj.text || '';
+    const verseRef = `${book.name} ${initialChapter}:${activeVNum}`;
+
+    const storageKey = `meditate_fills_${book.id}_${initialChapter}_${activeVNum}_${currentArtworkTemplateIdx}`;
+    let savedFills = {};
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) savedFills = JSON.parse(raw);
+    } catch (e) {
+      savedFills = {};
+    }
+
+    const svgHtml = renderMeditateArtworkSvg(
+      currentArtworkTemplateIdx,
+      verseText,
+      verseRef,
+      getTranslationByCode(activeTranslation).shortName,
+      savedFills
+    );
+
+    const activeColor = meditatePalette[activePaletteIndex] || '#38BDF8';
+    const isEraserActive = activePaletteIndex === 9 || activeColor.toUpperCase() === '#FFFFFF';
+
+    meditateCanvasWrapper.innerHTML = `
+      <div class="meditate-art-container" id="meditate-art-container">
+        ${svgHtml}
+      </div>
+
+      <!-- Bottom Palette Toolbar -->
+      <div class="meditate-palette-bar" id="meditate-palette-bar">
+        <div class="meditate-tool-indicator">
+          <span class="meditate-tool-icon">${isEraserActive ? '🧹 Eraser' : '🎨 Paint'}</span>
+          <span class="meditate-active-color-dot" id="meditate-active-color-dot" style="background:${activeColor};"></span>
+        </div>
+
+        <div class="meditate-swatches-strip" id="meditate-swatches-strip">
+          ${meditatePalette.map((color, idx) => {
+            const isEraser = idx === 9;
+            const isActive = idx === activePaletteIndex;
+            return `
+              <div class="meditate-swatch-unit" data-idx="${idx}">
+                <button
+                  type="button"
+                  class="meditate-swatch-btn ${isActive ? 'is-active' : ''} ${isEraser ? 'is-eraser' : ''}"
+                  data-idx="${idx}"
+                  style="background: ${color};"
+                  title="${isEraser ? 'Eraser (White)' : `Color ${idx + 1}: ${color}`}"
+                >
+                  ${isEraser ? '🧹' : ''}
+                </button>
+                <label class="meditate-swatch-edit-trigger" title="Change this color">
+                  ✎
+                  <input
+                    type="color"
+                    class="meditate-color-input-hidden"
+                    data-idx="${idx}"
+                    value="${color}"
+                    aria-label="Edit color ${idx + 1}"
+                  />
+                </label>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="meditate-actions-strip">
+          <button type="button" class="btn btn-secondary btn-xs" id="meditate-change-art-btn" title="Cycle to another uplifting artwork">
+            🎲 Artwork (${currentArtworkTemplateIdx + 1}/${TOTAL_MEDITATE_ART_TEMPLATES})
+          </button>
+          <button type="button" class="btn btn-secondary btn-xs" id="meditate-reset-colors-btn" title="Reset all colored segments back to white">
+            ↺ Clear
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Attach click listener on SVG segments
+    const svgEl = meditateCanvasWrapper.querySelector('.meditate-svg-art');
+    if (svgEl) {
+      svgEl.addEventListener('click', (e) => {
+        const seg = e.target.closest('.paint-segment');
+        if (!seg) return;
+        const segId = seg.getAttribute('data-seg-id') || seg.id;
+        if (!segId) return;
+
+        const currentColor = meditatePalette[activePaletteIndex] || '#38BDF8';
+        seg.setAttribute('fill', currentColor);
+        seg.style.fill = currentColor;
+
+        savedFills[segId] = currentColor;
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify(savedFills));
+        } catch (err) {}
+      });
+    }
+
+    // Attach Swatch Click handlers
+    const swatchBtns = meditateCanvasWrapper.querySelectorAll('.meditate-swatch-btn');
+    swatchBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = Number(btn.getAttribute('data-idx'));
+        activePaletteIndex = idx;
+        updatePaletteUI();
+      });
+    });
+
+    // Attach Color Input change handlers
+    const colorInputs = meditateCanvasWrapper.querySelectorAll('.meditate-color-input-hidden');
+    colorInputs.forEach((input) => {
+      const onColorChange = (e) => {
+        const idx = Number(input.getAttribute('data-idx'));
+        const newHex = e.target.value.toUpperCase();
+        meditatePalette[idx] = newHex;
+        setMeditatePalettePref(meditatePalette);
+        updatePaletteUI();
+      };
+      input.addEventListener('input', onColorChange);
+      input.addEventListener('change', onColorChange);
+    });
+
+    // Attach Change Art button
+    const changeArtBtn = meditateCanvasWrapper.querySelector('#meditate-change-art-btn');
+    if (changeArtBtn) {
+      changeArtBtn.addEventListener('click', () => {
+        currentArtworkTemplateIdx = (currentArtworkTemplateIdx + 1) % TOTAL_MEDITATE_ART_TEMPLATES;
+        renderMeditateModeCanvas();
+      });
+    }
+
+    // Attach Reset Colors button
+    const resetBtn = meditateCanvasWrapper.querySelector('#meditate-reset-colors-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        savedFills = {};
+        try {
+          sessionStorage.removeItem(storageKey);
+        } catch (err) {}
+        const segments = svgEl ? svgEl.querySelectorAll('.paint-segment') : [];
+        segments.forEach((s) => {
+          s.setAttribute('fill', '#FFFFFF');
+          s.style.fill = '#FFFFFF';
+        });
+      });
+    }
+
+    function updatePaletteUI() {
+      const curColor = meditatePalette[activePaletteIndex] || '#38BDF8';
+      const isEraser = activePaletteIndex === 9 || curColor.toUpperCase() === '#FFFFFF';
+
+      const toolIcon = meditateCanvasWrapper.querySelector('.meditate-tool-icon');
+      if (toolIcon) toolIcon.textContent = isEraser ? '🧹 Eraser' : '🎨 Paint';
+
+      const dot = meditateCanvasWrapper.querySelector('#meditate-active-color-dot');
+      if (dot) dot.style.background = curColor;
+
+      swatchBtns.forEach((btn) => {
+        const idx = Number(btn.getAttribute('data-idx'));
+        const btnColor = meditatePalette[idx];
+        btn.style.background = btnColor;
+        btn.classList.toggle('is-active', idx === activePaletteIndex);
+      });
+    }
   }
 
   function updateLiveMetrics() {
@@ -1531,6 +1805,14 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function handleTypingKeydown(e) {
+    if (singleVerseMode && meditateMode) {
+      if (e.key === 'Escape' && optionsBackdrop && !optionsBackdrop.hidden) {
+        e.preventDefault();
+        closeOptionsModal();
+      }
+      return;
+    }
+
     if (isCompleted) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -1572,6 +1854,13 @@ export function renderTypingScreen(container, params = {}) {
       cleanup();
       return;
     }
+    if (singleVerseMode && meditateMode) {
+      if (e.key === 'Escape' && optionsBackdrop && !optionsBackdrop.hidden) {
+        e.preventDefault();
+        closeOptionsModal();
+      }
+      return;
+    }
     if (e.target === hiddenInput) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea, select')) return;
     if (document.body.classList.contains('browse-open')) {
@@ -1589,6 +1878,11 @@ export function renderTypingScreen(container, params = {}) {
   onWindowWheel = (e) => {
     if (!document.body.contains(container)) {
       cleanup();
+      return;
+    }
+
+    // In meditate mode, the canvas is full height with no scrolling
+    if (singleVerseMode && meditateMode) {
       return;
     }
 
@@ -1639,6 +1933,10 @@ export function renderTypingScreen(container, params = {}) {
 
   // Mobile virtual keyboard fallback via input event
   hiddenInput.addEventListener('input', (e) => {
+    if (singleVerseMode && meditateMode) {
+      hiddenInput.value = '';
+      return;
+    }
     if (isCompleted) {
       hiddenInput.value = '';
       return;
@@ -1657,6 +1955,7 @@ export function renderTypingScreen(container, params = {}) {
   });
 
   function focusTypingInput() {
+    if (singleVerseMode && meditateMode) return;
     if (document.body.classList.contains('browse-open') || !completionBackdrop.hidden) return;
     hiddenInput.focus({ preventScroll: true });
     viewportWrapper.classList.add('is-focused');
@@ -1664,11 +1963,13 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   hiddenInput.addEventListener('focus', () => {
+    if (singleVerseMode && meditateMode) return;
     viewportWrapper.classList.add('is-focused');
     focusBanner.hidden = true;
   });
 
   hiddenInput.addEventListener('blur', () => {
+    if (singleVerseMode && meditateMode) return;
     viewportWrapper.classList.remove('is-focused');
     if (!isCompleted && targetChars.length > 0 && !document.body.classList.contains('browse-open')) {
       focusBanner.hidden = false;
@@ -1676,6 +1977,7 @@ export function renderTypingScreen(container, params = {}) {
   });
 
   viewportWrapper.addEventListener('click', () => {
+    if (singleVerseMode && meditateMode) return;
     focusTypingInput();
   });
 
