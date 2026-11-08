@@ -1,4 +1,5 @@
-import { Navbar } from './components/navbar.js?v=20261108_v17';
+import { Navbar } from './components/navbar.js?v=20261108_v18';
+import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261108_v18';
 import {
   Auth,
   syncLocalToCloud,
@@ -9,19 +10,19 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261108_v17';
-import { initGA, trackPageView } from './analytics.js?v=20261108_v17';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261108_v17';
-import { navigate, parseActiveRoute } from './router.js?v=20261108_v17';
-export { navigate, parseActiveRoute } from './router.js?v=20261108_v17';
+} from './api.js?v=20261108_v18';
+import { initGA, trackPageView } from './analytics.js?v=20261108_v18';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261108_v18';
+import { navigate, parseActiveRoute } from './router.js?v=20261108_v18';
+export { navigate, parseActiveRoute } from './router.js?v=20261108_v18';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261108_v17';
-import { renderLandingScreen } from './screens/home.js?v=20261108_v17';
-import { renderTypingScreen } from './screens/typing.js?v=20261108_v17';
-import { renderProgressScreen } from './screens/progress.js?v=20261108_v17';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261108_v17';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261108_v17';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261108_v17';
+import { renderSignInScreen } from './screens/signin.js?v=20261108_v18';
+import { renderLandingScreen } from './screens/home.js?v=20261108_v18';
+import { renderTypingScreen } from './screens/typing.js?v=20261108_v18';
+import { renderProgressScreen } from './screens/progress.js?v=20261108_v18';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261108_v18';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261108_v18';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261108_v18';
 
 class App {
   constructor() {
@@ -109,6 +110,7 @@ class App {
   }
 
   init() {
+    initPullToRefresh();
     initFirebaseAuthObserver().catch(() => {});
     this.handleRoute();
     if (getSingleVerseModePref() && getShuffleVersesPref()) {
