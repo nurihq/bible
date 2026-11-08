@@ -1146,6 +1146,18 @@ body.typing-active-view .main-content {
   flex-wrap: wrap;
 }
 
+.summary-tags-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.summary-metrics-group[hidden],
+.summary-tags-group[hidden] {
+  display: none !important;
+}
+
 .summary-stat-divider {
   color: var(--border-color);
   font-weight: 700;

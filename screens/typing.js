@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v16';
+} from '../bible-data.js?v=20261108_v17';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -21,6 +21,8 @@ import {
   setSkipCompletedVersesPref,
   getShowTypingStatsPref,
   setShowTypingStatsPref,
+  getShowProgressTagsPref,
+  setShowProgressTagsPref,
   getSingleVerseModePref,
   setSingleVerseModePref,
   getAutoAdvancePref,
@@ -86,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v16';
+} from '../api.js?v=20261108_v17';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v16';
-import { trackEvent } from '../analytics.js?v=20261108_v16';
-import { navigate } from '../router.js?v=20261108_v16';
+} from '../meditate-art.js?v=20261108_v17';
+import { trackEvent } from '../analytics.js?v=20261108_v17';
+import { navigate } from '../router.js?v=20261108_v17';
 
 function escapeHtml(str) {
   return String(str)
@@ -318,6 +320,7 @@ export function renderTypingScreen(container, params = {}) {
   let activeTranslation = getPreferredTranslation() || 'ESV';
   let skipCompletedVerses = getSkipCompletedVersesPref();
   let showTypingStats = getShowTypingStatsPref();
+  let showProgressTags = getShowProgressTagsPref();
   let autoAdvance = getAutoAdvancePref();
   let shuffleVerses = getShuffleVersesPref();
   let speakStrictness = getSpeakStrictnessPref();
@@ -573,9 +576,15 @@ export function renderTypingScreen(container, params = {}) {
     ? (isInitialBookmarked ? 'Bookmark (Saved)' : 'Bookmark')
     : (isInitialBookmarked ? `Bookmark (v. ${initialVerseNum} Saved)` : `Bookmark (v. ${initialVerseNum})`);
 
+  const initialBadgeHtml = getProgressBadgeHtml();
+  const initialHasBadge = Boolean(initialBadgeHtml && initialBadgeHtml.trim().length > 0);
+  const initialIsMeditate = Boolean(singleVerseMode && activeMode === 'draw');
+  const initialStatsVisible = Boolean(showTypingStats && !initialIsMeditate);
+  const initialTagsVisible = Boolean(showProgressTags && initialHasBadge);
+
   container.innerHTML = `
     <div class="typing-screen-container">
-      <!-- Two-Line Summary Bar: Line 1 Navigation & Actions, Line 2 Live Telemetry -->
+      <!-- Two-Line Summary Bar: Line 1 Navigation & Actions, Line 2 Live Telemetry & Tags -->
       <div class="typing-summary-bar">
         <!-- Line 1: Chapter Nav, Title, Mode & Action Controls -->
         <div class="summary-line summary-line-top">
@@ -606,7 +615,6 @@ export function renderTypingScreen(container, params = {}) {
             <span class="speak-status-pill" id="speak-status-pill" ${activeMode === 'speak' ? '' : 'hidden'}>
               Speak each word aloud...
             </span>
-            <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
           </div>
 
           <div class="summary-actions-group">
@@ -648,9 +656,9 @@ export function renderTypingScreen(container, params = {}) {
           </div>
         </div>
 
-        <!-- Line 2: Live Metrics / Telemetry (Toggled via Actions modal, shown in Type & Speak modes) -->
-        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${(showTypingStats && activeMode !== 'draw') ? '' : 'hidden'}>
-          <div class="summary-metrics-group">
+        <!-- Line 2: Live Metrics & Status Tags (Toggled via Actions modal) -->
+        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${(initialStatsVisible || initialTagsVisible) ? '' : 'hidden'}>
+          <div class="summary-metrics-group" id="summary-metrics-group" ${initialStatsVisible ? '' : 'hidden'}>
             <div class="summary-stat-box">
               <span class="stat-lbl" id="live-stat-lbl-1">${activeMode === 'speak' ? 'Cadence' : 'WPM'}</span>
               <span class="stat-num" id="live-wpm">${activeMode === 'speak' ? '0 WPM' : '0'}</span>
@@ -675,6 +683,10 @@ export function renderTypingScreen(container, params = {}) {
               <span class="stat-lbl">Time</span>
               <span class="stat-num" id="live-time">0:00</span>
             </div>
+          </div>
+
+          <div class="summary-tags-group" id="summary-tags-group" ${initialTagsVisible ? '' : 'hidden'}>
+            <span id="telemetry-completed-badge">${initialBadgeHtml}</span>
           </div>
         </div>
       </div>
@@ -1008,6 +1020,12 @@ export function renderTypingScreen(container, params = {}) {
               <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
             </label>
 
+            <!-- Toggle: Status Tags -->
+            <label class="typing-option-row" id="actions-tags-row" for="toggle-tags-checkbox">
+              <span class="option-title">Show Status Tags (Spoken, Read, Typed)</span>
+              <input type="checkbox" id="toggle-tags-checkbox" class="option-switch" ${showProgressTags ? 'checked' : ''} />
+            </label>
+
             <!-- Action: Restart Passage -->
             <div class="typing-option-row option-action-row" id="actions-restart-row" ${activeMode === 'draw' ? 'hidden' : ''}>
               <span class="option-title">Cursor Position</span>
@@ -1111,6 +1129,7 @@ export function renderTypingScreen(container, params = {}) {
   const actionsDoneBtn = container.querySelector('#actions-done-btn');
   const actionsMarkReadSection = container.querySelector('#actions-mark-read-section');
   const actionsStatsRow = container.querySelector('#actions-stats-row');
+  const actionsTagsRow = container.querySelector('#actions-tags-row');
   const actionsRestartRow = container.querySelector('#actions-restart-row');
 
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
@@ -1121,11 +1140,14 @@ export function renderTypingScreen(container, params = {}) {
   const meditateMarkReadBtn = container.querySelector('#meditate-mark-read-btn');
   const meditateMarkReadLbl = container.querySelector('#meditate-mark-read-label');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
+  const toggleTagsCheckbox = container.querySelector('#toggle-tags-checkbox');
   const toggleSkipDoneCheckbox = container.querySelector('#toggle-skip-done-checkbox');
   const modalMarkChBtn = container.querySelector('#modal-mark-ch-read-btn');
   const modalMarkVerseBtn = container.querySelector('#modal-mark-verse-read-btn');
   const modalRestartBtn = container.querySelector('#modal-restart-btn');
   const summaryStatsLine = container.querySelector('#typing-summary-stats-line');
+  const summaryMetricsGroup = container.querySelector('#summary-metrics-group');
+  const summaryTagsGroup = container.querySelector('#summary-tags-group');
   const hiddenInput = container.querySelector('#typing-hidden-input');
   const viewportWrapper = container.querySelector('#typing-viewport-wrapper');
   const meditateCanvasWrapper = container.querySelector('#meditate-canvas-wrapper');
@@ -1152,6 +1174,28 @@ export function renderTypingScreen(container, params = {}) {
       (bookmarkBackdrop && !bookmarkBackdrop.hidden) ||
       (completionBackdrop && !completionBackdrop.hidden)
     );
+  }
+
+  function syncSummaryBottomLine() {
+    const badgeHtml = getProgressBadgeHtml();
+    const currentBadgeEl = container.querySelector('#telemetry-completed-badge');
+    if (currentBadgeEl) {
+      currentBadgeEl.innerHTML = badgeHtml;
+    }
+    const hasBadge = Boolean(badgeHtml && badgeHtml.trim().length > 0);
+    const isMeditate = Boolean(singleVerseMode && activeMode === 'draw');
+    const statsVisible = Boolean(showTypingStats && !isMeditate);
+    const tagsVisible = Boolean(showProgressTags && hasBadge);
+
+    if (summaryMetricsGroup) {
+      summaryMetricsGroup.hidden = !statsVisible;
+    }
+    if (summaryTagsGroup) {
+      summaryTagsGroup.hidden = !tagsVisible;
+    }
+    if (summaryStatsLine) {
+      summaryStatsLine.hidden = !statsVisible && !tagsVisible;
+    }
   }
 
   // ── 1. Mode Modal, Stacked Mode Settings Modal, Stacked Scope Settings Modal & Actions Modal ──
@@ -1189,10 +1233,7 @@ export function renderTypingScreen(container, params = {}) {
     if (markChRow) {
       markChRow.hidden = singleVerseMode;
     }
-    const badgeEl = container.querySelector('#telemetry-completed-badge');
-    if (badgeEl) {
-      badgeEl.innerHTML = getProgressBadgeHtml();
-    }
+    syncSummaryBottomLine();
 
     // Update descriptions in Mode Modal
     container.querySelectorAll('[data-mode-item]').forEach(item => {
@@ -1383,6 +1424,7 @@ export function renderTypingScreen(container, params = {}) {
 
   function openActionsModal() {
     if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
+    if (toggleTagsCheckbox) toggleTagsCheckbox.checked = showProgressTags;
     if (actionsMarkReadSection) {
       actionsMarkReadSection.hidden = Boolean(singleVerseMode && activeMode === 'draw');
     }
@@ -1568,9 +1610,16 @@ export function renderTypingScreen(container, params = {}) {
       showTypingStats = toggleStatsCheckbox.checked;
       setShowTypingStatsPref(showTypingStats);
       trackEvent('toggle_typing_stats', { enabled: showTypingStats });
-      if (summaryStatsLine) {
-        summaryStatsLine.hidden = !showTypingStats || activeMode === 'draw';
-      }
+      syncSummaryBottomLine();
+    });
+  }
+
+  if (toggleTagsCheckbox) {
+    toggleTagsCheckbox.addEventListener('change', () => {
+      showProgressTags = toggleTagsCheckbox.checked;
+      setShowProgressTagsPref(showProgressTags);
+      trackEvent('toggle_progress_tags', { enabled: showProgressTags });
+      syncSummaryBottomLine();
     });
   }
 
@@ -1596,6 +1645,7 @@ export function renderTypingScreen(container, params = {}) {
 
   // ── Mark Chapter & Verse as Read Controls ─────────────────────
   function updateReadButtons() {
+    syncSummaryBottomLine();
     const sum = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
     const isChRead = sum.isFullyRead;
     const markChBtn = container.querySelector('#modal-mark-ch-read-btn');
@@ -1703,8 +1753,7 @@ export function renderTypingScreen(container, params = {}) {
   updateReadButtons();
 
   onStatsUpdated = () => {
-    const badgeEl = container.querySelector('#telemetry-completed-badge');
-    if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+    syncSummaryBottomLine();
     updateReadButtons();
     for (const vr of verseRanges) {
       if (vr.supEl) updateVerseSup(vr.supEl, vr.verse);
@@ -2502,9 +2551,8 @@ export function renderTypingScreen(container, params = {}) {
     passageContent.innerHTML = '';
     passageContent.appendChild(fragment);
 
-    // Update header badge
-    const badgeEl = container.querySelector('#telemetry-completed-badge');
-    if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+    // Update bottom line & badge
+    syncSummaryBottomLine();
 
     // Determine initial starting verse
     let initialTargetVerseNum = verses[0]?.verse || 1;
@@ -2588,9 +2636,7 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     syncLiveStatsLabels();
-    if (summaryStatsLine) {
-      summaryStatsLine.hidden = isMeditate || !showTypingStats;
-    }
+    syncSummaryBottomLine();
 
     if (focusBannerText) {
       focusBannerText.textContent = isSpeak
@@ -3489,8 +3535,7 @@ export function renderTypingScreen(container, params = {}) {
         completedAt: new Date().toISOString()
       });
 
-      const badgeEl = container.querySelector('#telemetry-completed-badge');
-      if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+      syncSummaryBottomLine();
       resetActiveVerseTelemetry();
 
       return {
@@ -3528,8 +3573,7 @@ export function renderTypingScreen(container, params = {}) {
       completedAt: new Date().toISOString()
     });
 
-    const badgeEl = container.querySelector('#telemetry-completed-badge');
-    if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+    syncSummaryBottomLine();
     resetActiveVerseTelemetry();
 
     return { recordPromise, vWpm, vCpm, vAcc, vDurMs };
@@ -3717,8 +3761,7 @@ export function renderTypingScreen(container, params = {}) {
       enunciation: isSpeak ? finalEnun : null
     });
 
-    const badgeEl = container.querySelector('#telemetry-completed-badge');
-    if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+    syncSummaryBottomLine();
 
     if (singleVerseMode) {
       if (isSpeak) {

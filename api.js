@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261108_v16';
+import { CONFIG } from './config.js?v=20261108_v17';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261108_v16';
+} from './bible-data.js?v=20261108_v17';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -171,6 +171,7 @@ function createDefaultStore() {
     advanceButton: true,
     skipCompletedVerses: true,
     showTypingStats: false,
+    showProgressTags: true,
     lastBookId: 1,
     lastChapter: 1,
     lastVerse: null,
@@ -271,6 +272,7 @@ export function syncPreferencesToCloud() {
       advanceButton: store.advanceButton !== undefined ? Boolean(store.advanceButton) : true,
       skipCompletedVerses: store.skipCompletedVerses !== false,
       showTypingStats: Boolean(store.showTypingStats),
+      showProgressTags: store.showProgressTags !== false,
       shuffleVerses: Boolean(store.shuffleVerses),
       shuffleScope: store.shuffleScope || 'bible',
       activeMode: store.activeMode || (store.meditateMode ? 'draw' : 'type'),
@@ -330,6 +332,19 @@ export function getShowTypingStatsPref() {
 export function setShowTypingStatsPref(show) {
   const store = getLocalStore();
   store.showTypingStats = Boolean(show);
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
+export function getShowProgressTagsPref() {
+  const store = getLocalStore();
+  if (store.showProgressTags === undefined) return true;
+  return Boolean(store.showProgressTags);
+}
+
+export function setShowProgressTagsPref(show) {
+  const store = getLocalStore();
+  store.showProgressTags = Boolean(show);
   saveLocalStore(store);
   syncPreferencesToCloud();
 }
@@ -2521,6 +2536,7 @@ export async function syncLocalToCloud() {
       if (cp.advanceButton !== undefined) latestStore.advanceButton = Boolean(cp.advanceButton);
       if (cp.skipCompletedVerses !== undefined) latestStore.skipCompletedVerses = Boolean(cp.skipCompletedVerses);
       if (cp.showTypingStats !== undefined) latestStore.showTypingStats = Boolean(cp.showTypingStats);
+      if (cp.showProgressTags !== undefined) latestStore.showProgressTags = Boolean(cp.showProgressTags);
       if (cp.shuffleVerses !== undefined) latestStore.shuffleVerses = Boolean(cp.shuffleVerses);
       if (cp.shuffleScope) latestStore.shuffleScope = cp.shuffleScope;
       if (['type', 'speak', 'draw'].includes(cp.activeMode)) {
@@ -2671,6 +2687,8 @@ export const Api = {
   setSkipCompletedVersesPref,
   getShowTypingStatsPref,
   setShowTypingStatsPref,
+  getShowProgressTagsPref,
+  setShowProgressTagsPref,
   getSingleVerseModePref,
   setSingleVerseModePref,
   getAutoAdvancePref,
