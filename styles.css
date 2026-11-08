@@ -55,41 +55,41 @@
 }
 
 [data-theme="dark"] {
-  /* Dark Mode: Matte charcoal with soothing lavender-grey typography */
-  --bg-main: #141318;
-  --bg-surface: #1e1d26;
-  --bg-subtle: #262430;
-  --bg-hover: #2f2d3b;
-  --border-color: #2b2937;
-  --border-focus: #827599;
+  /* Dark Mode: Calming slate-grey surfaces with gentle lavender-grey typography */
+  --bg-main: #20222a;
+  --bg-surface: #2b2d37;
+  --bg-subtle: #343743;
+  --bg-hover: #3d414f;
+  --border-color: #383b47;
+  --border-focus: #9b8eb6;
 
-  --text-primary: #cfcbd6;
-  --text-secondary: #9c97a8;
-  --text-muted: #6e697a;
+  --text-primary: #edeaf4;
+  --text-secondary: #b5b0c2;
+  --text-muted: #888297;
 
-  --accent-zen: #978aa9;
-  --accent-zen-light: #23202c;
-  --accent-slate: #8893a5;
-  --accent-slate-light: #1b1e25;
-  --accent-rose: #bc827b;
-  --accent-rose-light: #261c1b;
+  --accent-zen: #a295b5;
+  --accent-zen-light: #2c2937;
+  --accent-slate: #949fb1;
+  --accent-slate-light: #252934;
+  --accent-rose: #c48b84;
+  --accent-rose-light: #322524;
   --accent-emerald: #34d399;
-  --accent-emerald-light: rgba(52, 211, 153, 0.14);
+  --accent-emerald-light: rgba(52, 211, 153, 0.16);
 
-  --primary: #82759a;
-  --primary-hover: #9689af;
+  --primary: #8f82a9;
+  --primary-hover: #a396bd;
 
-  --char-untyped: #666173;
-  --char-correct: #e2dfe8;
-  --char-correct-bg: rgba(52, 211, 153, 0.11);
-  --char-current-bg: rgba(130, 117, 154, 0.28);
-  --char-current-border: #a597bf;
+  --char-untyped: #7b758b;
+  --char-correct: #f6f3fb;
+  --char-correct-bg: rgba(52, 211, 153, 0.14);
+  --char-current-bg: rgba(145, 132, 172, 0.28);
+  --char-current-border: #b6a8d1;
   --char-error-text: #f87171;
   --char-error-bg: rgba(239, 68, 68, 0.26);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -149,7 +149,7 @@ body {
 }
 
 [data-theme="dark"] .navbar {
-  background-color: rgba(19, 18, 23, 0.94);
+  background-color: rgba(32, 34, 42, 0.94);
 }
 
 .nav-left {
@@ -5950,9 +5950,9 @@ sup.verse-num.is-both {
 }
 
 [data-theme="dark"] .pull-to-refresh-pill {
-  background: rgba(26, 25, 33, 0.96);
+  background: rgba(43, 45, 55, 0.96);
   border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .pull-to-refresh-icon {

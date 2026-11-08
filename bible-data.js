@@ -1,5 +1,5 @@
 // Complete Canon Metadata (66 Books, 1,189 Chapters, ~31,100 Verses) & 22 Bible Translations
-import { VERSE_COUNTS } from './verse-counts.js?v=20261108_v25';
+import { VERSE_COUNTS } from './verse-counts.js?v=20261108_v26';
 
 export const TOTAL_BIBLE_CHAPTERS = 1189;
 export const TOTAL_OT_CHAPTERS = 929;

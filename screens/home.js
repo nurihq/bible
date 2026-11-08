@@ -9,7 +9,7 @@ import {
   markVerseAsRead,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261108_v25';
+} from '../api.js?v=20261108_v26';
 import {
   getBookById,
   getNextChapterRef,
@@ -20,9 +20,9 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261108_v25';
-import { trackEvent } from '../analytics.js?v=20261108_v25';
-import { navigate } from '../router.js?v=20261108_v25';
+} from '../bible-data.js?v=20261108_v26';
+import { trackEvent } from '../analytics.js?v=20261108_v26';
+import { navigate } from '../router.js?v=20261108_v26';
 
 export { renderLandingScreen as renderHomeScreen };
 
