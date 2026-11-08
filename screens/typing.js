@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v20';
+} from '../bible-data.js?v=20261108_v21';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v20';
+} from '../api.js?v=20261108_v21';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v20';
-import { trackEvent } from '../analytics.js?v=20261108_v20';
-import { navigate } from '../router.js?v=20261108_v20';
+} from '../meditate-art.js?v=20261108_v21';
+import { trackEvent } from '../analytics.js?v=20261108_v21';
+import { navigate } from '../router.js?v=20261108_v21';
 
 function escapeHtml(str) {
   return String(str)
@@ -612,9 +612,6 @@ export function renderTypingScreen(container, params = {}) {
             >
               <span id="speak-mic-toggle-label">${micEnabled ? '🎙️ Mic On' : '🔇 Mic Off'}</span>
             </button>
-            <span class="speak-status-pill" id="speak-status-pill" ${activeMode === 'speak' ? '' : 'hidden'}>
-              Speak each word aloud...
-            </span>
           </div>
 
           <div class="summary-actions-group">
@@ -1101,7 +1098,6 @@ export function renderTypingScreen(container, params = {}) {
   const actionsBtn = container.querySelector('#typing-actions-btn');
   const speakMicToggleBtn = container.querySelector('#speak-mic-toggle-btn');
   const speakMicToggleLabel = container.querySelector('#speak-mic-toggle-label');
-  const speakStatusPill = container.querySelector('#speak-status-pill');
 
   // Mode Modal (Base), Mode Settings Modal (Stacked Level 2) & Scope Settings Modal (Stacked Level 3)
   const modeSelectBackdrop = container.querySelector('#mode-select-backdrop');
@@ -2603,19 +2599,13 @@ export function renderTypingScreen(container, params = {}) {
     if (speakMicToggleLabel) {
       speakMicToggleLabel.textContent = micEnabled ? '🎙️ Mic On' : '🔇 Mic Off';
     }
-    if (speakStatusPill) {
-      speakStatusPill.hidden = !isSpeak;
-      if (isSpeak) {
-        if (!speechSupported) {
-          speakStatusPill.textContent = '⚠️ Speech recognition unsupported in this browser (try Chrome/Edge/Safari)';
-          speakStatusPill.classList.add('is-error');
-        } else if (!micEnabled) {
-          speakStatusPill.textContent = 'Mic paused — click "Mic On" to resume speaking';
-          speakStatusPill.classList.remove('is-error');
-        } else {
-          speakStatusPill.textContent = '🎙️ Listening — speak each word naturally...';
-          speakStatusPill.classList.remove('is-error');
-        }
+    if (isSpeak) {
+      if (!speechSupported) {
+        speakMicToggleBtn.title = 'Speech recognition unsupported in this browser (try Chrome/Edge/Safari)';
+      } else if (!micEnabled) {
+        speakMicToggleBtn.title = 'Mic paused — click "Mic On" to resume speaking';
+      } else {
+        speakMicToggleBtn.title = '🎙️ Listening — speak each word naturally (click to pause)';
       }
     }
   }
@@ -3732,11 +3722,6 @@ export function renderTypingScreen(container, params = {}) {
       liveWpmEl.textContent = `${Math.round(finalWpm)} WPM${cadenceDesc.shortLabel ? ` · ${cadenceDesc.shortLabel}` : ''}`;
       liveCpmEl.textContent = `${finalAcc}%`;
       liveAccEl.textContent = `${finalEnun}%`;
-      if (speakStatusPill) {
-        speakStatusPill.textContent = spokenWordErrors.length === 0
-          ? '✓ Passage spoken clearly!'
-          : `✓ Complete · ${spokenWordErrors.length} ${spokenWordErrors.length === 1 ? 'word' : 'words'} to review`;
-      }
     } else {
       liveWpmEl.textContent = finalWpm.toFixed(1);
       liveCpmEl.textContent = String(finalCpm);
@@ -4299,10 +4284,8 @@ export function renderTypingScreen(container, params = {}) {
           micEnabled = false;
           stopSpeechRecognition();
           updateSpeakMicUI();
-          if (speakStatusPill) {
-            speakStatusPill.hidden = false;
-            speakStatusPill.textContent = '⚠️ Microphone access denied — please allow mic permissions';
-            speakStatusPill.classList.add('is-error');
+          if (speakMicToggleBtn) {
+            speakMicToggleBtn.title = '⚠️ Microphone access denied — please allow mic permissions';
           }
         }
       };

@@ -5648,48 +5648,6 @@ sup.verse-num.is-both {
   color: #34d399;
 }
 
-.speak-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.6rem;
-  min-height: 28px;
-  height: 28px;
-  max-height: 28px;
-  box-sizing: border-box;
-  line-height: 1;
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  max-width: 280px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.speak-status-pill.is-listening {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.45);
-  color: #059669;
-}
-
-[data-theme="dark"] .speak-status-pill.is-listening {
-  color: #34d399;
-}
-
-.speak-status-pill.is-error {
-  background: rgba(239, 68, 68, 0.14);
-  border-color: rgba(239, 68, 68, 0.45);
-  color: #dc2626;
-}
-
-[data-theme="dark"] .speak-status-pill.is-error {
-  color: #f87171;
-}
-
 /* Word-level active & non-blocking mispronounced state in Speak Mode */
 .t-word.is-speak-active {
   background: rgba(59, 130, 246, 0.14);
