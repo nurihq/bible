@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v18';
+} from '../bible-data.js?v=20261108_v19';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v18';
+} from '../api.js?v=20261108_v19';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v18';
-import { trackEvent } from '../analytics.js?v=20261108_v18';
-import { navigate } from '../router.js?v=20261108_v18';
+} from '../meditate-art.js?v=20261108_v19';
+import { trackEvent } from '../analytics.js?v=20261108_v19';
+import { navigate } from '../router.js?v=20261108_v19';
 
 function escapeHtml(str) {
   return String(str)
@@ -597,7 +597,7 @@ export function renderTypingScreen(container, params = {}) {
               <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
             </div>
             <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next ${singleVerseMode ? 'Verse' : 'Chapter'}">›</button>
-            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance && activeMode !== 'draw' ? '' : 'hidden'}>
+            <button type="button" class="btn btn-primary btn-sm advance-step-btn is-ready" id="advance-step-btn" title="Verse complete! Click to advance (or press Enter)" hidden>
               ${(singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›'}
             </button>
             <button type="button" class="btn btn-secondary btn-sm meditate-mark-read-btn" id="meditate-mark-read-btn" title="Mark this verse as read" ${singleVerseMode && activeMode === 'draw' ? '' : 'hidden'}>
@@ -1198,6 +1198,22 @@ export function renderTypingScreen(container, params = {}) {
     }
   }
 
+  function syncAdvanceStepBtn() {
+    if (!advanceStepBtn) return;
+    const shouldShow = Boolean(isCompleted && singleVerseMode && !autoAdvance && activeMode !== 'draw');
+    advanceStepBtn.hidden = !shouldShow;
+    if (shouldShow) {
+      advanceStepBtn.classList.remove('btn-secondary');
+      advanceStepBtn.classList.add('btn-primary', 'is-ready');
+      advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
+    } else {
+      advanceStepBtn.classList.remove('btn-primary', 'is-ready');
+      advanceStepBtn.classList.add('btn-secondary');
+      advanceStepBtn.title = 'Advance to next verse (or press Enter)';
+    }
+    advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+  }
+
   // ── 1. Mode Modal, Stacked Mode Settings Modal, Stacked Scope Settings Modal & Actions Modal ──
   function syncScopeRadioUI(isSingle = singleVerseMode) {
     container.querySelectorAll('[data-scope-item]').forEach(item => {
@@ -1225,10 +1241,7 @@ export function renderTypingScreen(container, params = {}) {
     if (readFullChapterBtn) {
       readFullChapterBtn.hidden = !singleVerseMode;
     }
-    if (advanceStepBtn) {
-      advanceStepBtn.hidden = !singleVerseMode || autoAdvance || activeMode === 'draw';
-      advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
-    }
+    syncAdvanceStepBtn();
     const markChRow = container.querySelector('#modal-mark-ch-row');
     if (markChRow) {
       markChRow.hidden = singleVerseMode;
@@ -1555,9 +1568,7 @@ export function renderTypingScreen(container, params = {}) {
     if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
     if (toggleDrawShuffleCheckbox) toggleDrawShuffleCheckbox.checked = shuffleVerses;
     trackEvent('toggle_shuffle', { enabled: shuffleVerses });
-    if (advanceStepBtn) {
-      advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
-    }
+    syncAdvanceStepBtn();
   };
 
   if (toggleShuffleCheckbox) {
@@ -1573,9 +1584,7 @@ export function renderTypingScreen(container, params = {}) {
     if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
     if (toggleDrawAutoAdvanceCheckbox) toggleDrawAutoAdvanceCheckbox.checked = autoAdvance;
     trackEvent('toggle_auto_advance', { enabled: autoAdvance });
-    if (advanceStepBtn) {
-      advanceStepBtn.hidden = !singleVerseMode || autoAdvance || activeMode === 'draw';
-    }
+    syncAdvanceStepBtn();
   };
 
   if (toggleAutoAdvanceCheckbox) {
@@ -2169,13 +2178,7 @@ export function renderTypingScreen(container, params = {}) {
     if (errorAlert) errorAlert.hidden = true;
     if (completionBackdrop) completionBackdrop.hidden = true;
     if (viewportWrapper) viewportWrapper.classList.remove('has-active-error');
-    if (advanceStepBtn) {
-      advanceStepBtn.hidden = !singleVerseMode || autoAdvance || activeMode === 'draw';
-      advanceStepBtn.classList.remove('btn-primary', 'is-ready');
-      advanceStepBtn.classList.add('btn-secondary');
-      advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
-      advanceStepBtn.title = 'Advance to next verse (or press Enter)';
-    }
+    syncAdvanceStepBtn();
 
     // Move cursor to start without clearing completed verses
     const startVerseNum = singleVerseMode
@@ -2627,9 +2630,7 @@ export function renderTypingScreen(container, params = {}) {
       viewportWrapper.classList.toggle('is-speak-active', isSpeak);
     }
 
-    if (advanceStepBtn) {
-      advanceStepBtn.hidden = isMeditate || !singleVerseMode || autoAdvance;
-    }
+    syncAdvanceStepBtn();
 
     if (meditateMarkReadBtn) {
       meditateMarkReadBtn.hidden = !isMeditate;
@@ -3792,13 +3793,7 @@ export function renderTypingScreen(container, params = {}) {
         navigateNextStep();
         return;
       }
-      if (advanceStepBtn) {
-        advanceStepBtn.hidden = false;
-        advanceStepBtn.classList.remove('btn-secondary');
-        advanceStepBtn.classList.add('btn-primary', 'is-ready');
-        advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
-        advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
-      }
+      syncAdvanceStepBtn();
       return;
     }
 
