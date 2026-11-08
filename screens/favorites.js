@@ -2,11 +2,11 @@ import {
   getAllFavorites,
   removeVerseFavorite,
   updateFavoriteComment,
-  setMeditateModePref
-} from '../api.js?v=20261107_v11';
-import { getBookById } from '../bible-data.js?v=20261107_v11';
-import { trackEvent } from '../analytics.js?v=20261107_v11';
-import { navigate } from '../router.js?v=20261107_v11';
+  setActiveModePref
+} from '../api.js?v=20261108_v12';
+import { getBookById } from '../bible-data.js?v=20261108_v12';
+import { trackEvent } from '../analytics.js?v=20261108_v12';
+import { navigate } from '../router.js?v=20261108_v12';
 
 function escapeHtml(str) {
   return String(str || '')
@@ -89,7 +89,7 @@ export function renderFavoritesScreen(container) {
           <div class="favorites-header-main">
             <h1 class="favorites-title">❤️ Favorited Verses</h1>
             <p class="favorites-subtitle">
-              Your cherished collection of Scripture passages saved while reading, typing, and meditating.
+              Your cherished collection of Scripture passages saved while reading, typing, speaking, and drawing.
             </p>
           </div>
 
@@ -99,8 +99,8 @@ export function renderFavoritesScreen(container) {
                 🎲 Practice Random Favorite
               </button>
             ` : ''}
-            <button type="button" class="btn btn-secondary btn-sm" id="favorites-open-typing-btn" title="Continue Scripture typing">
-              ⌨️ Scripture Typing
+            <button type="button" class="btn btn-secondary btn-sm" id="favorites-open-typing-btn" title="Continue Promises practice">
+              📖 Promises
             </button>
           </div>
         </div>
@@ -176,10 +176,10 @@ export function renderFavoritesScreen(container) {
         <p>
           Save verses to this collection at any time!
           In <strong>Chapter Mode</strong>, hover over any verse and click the heart icon.
-          In <strong>Single Verse Mode</strong>, tap the heart button right next to <strong>⚙️ Options</strong>.
+          In <strong>Single Verse Mode</strong>, tap the heart button in the top bar.
         </p>
         <button type="button" class="btn btn-primary btn-md" id="favorites-start-typing-btn">
-          ⌨️ Start Typing Scripture
+          📖 Open Promises
         </button>
       </div>
     `;
@@ -261,8 +261,11 @@ export function renderFavoritesScreen(container) {
             <button type="button" class="btn btn-primary btn-sm favorite-type-btn" data-action="type" title="Type this verse in single verse mode">
               ⌨️ Type
             </button>
-            <button type="button" class="btn btn-secondary btn-sm favorite-meditate-btn" data-action="meditate" title="Meditate and color this verse">
-              🎨 Meditate
+            <button type="button" class="btn btn-secondary btn-sm favorite-speak-btn" data-action="speak" title="Speak this verse aloud">
+              🗣️ Speak
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm favorite-meditate-btn" data-action="draw" title="Draw and color this verse">
+              🎨 Draw
             </button>
             <button type="button" class="btn btn-secondary btn-sm favorite-copy-btn" data-action="copy" title="Copy verse text to clipboard">
               📋
@@ -325,14 +328,14 @@ export function renderFavoritesScreen(container) {
     const startBtn = container.querySelector('#favorites-start-typing-btn');
     if (startBtn) {
       startBtn.addEventListener('click', () => {
-        navigate('/typing');
+        navigate('/promises');
       });
     }
 
     const openTypingBtn = container.querySelector('#favorites-open-typing-btn');
     if (openTypingBtn) {
       openTypingBtn.addEventListener('click', () => {
-        navigate('/typing');
+        navigate('/promises');
       });
     }
 
@@ -342,12 +345,13 @@ export function renderFavoritesScreen(container) {
       randomBtn.addEventListener('click', () => {
         if (favorites.length === 0) return;
         const rand = favorites[Math.floor(Math.random() * favorites.length)];
+        setActiveModePref('type');
         trackEvent('practice_random_favorite', { bookId: rand.bookId, chapter: rand.chapter, verse: rand.verse });
-        navigate(`/typing/${rand.bookId}/${rand.chapter}/${rand.verse}`);
+        navigate(`/type/${rand.bookId}/${rand.chapter}/${rand.verse}`);
       });
     }
 
-    // Grid card click actions (Type, Meditate, Remove, Copy)
+    // Grid card click actions (Type, Speak, Draw, Remove, Copy)
     const grid = container.querySelector('#favorites-grid');
     if (grid) {
       grid.addEventListener('click', (e) => {
@@ -362,15 +366,23 @@ export function renderFavoritesScreen(container) {
         const action = btn.getAttribute('data-action');
 
         if (action === 'type') {
+          setActiveModePref('type');
           trackEvent('open_favorite_verse_type', { bookId, chapter, verse });
-          navigate(`/typing/${bookId}/${chapter}/${verse}`);
+          navigate(`/type/${bookId}/${chapter}/${verse}`);
           return;
         }
 
-        if (action === 'meditate') {
-          setMeditateModePref(true);
-          trackEvent('open_favorite_verse_meditate', { bookId, chapter, verse });
-          navigate(`/typing/${bookId}/${chapter}/${verse}`);
+        if (action === 'speak') {
+          setActiveModePref('speak');
+          trackEvent('open_favorite_verse_speak', { bookId, chapter, verse });
+          navigate(`/speak/${bookId}/${chapter}/${verse}`);
+          return;
+        }
+
+        if (action === 'draw' || action === 'meditate') {
+          setActiveModePref('draw');
+          trackEvent('open_favorite_verse_draw', { bookId, chapter, verse });
+          navigate(`/draw/${bookId}/${chapter}/${verse}`);
           return;
         }
 

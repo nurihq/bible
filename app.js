@@ -1,17 +1,27 @@
-import { Navbar } from './components/navbar.js?v=20261107_v11';
-import { Auth, syncLocalToCloud, getSingleVerseModePref, getShuffleVersesPref, getPreferredTranslation, getLocalStore, initFirebaseAuthObserver } from './api.js?v=20261107_v11';
-import { initGA, trackPageView } from './analytics.js?v=20261107_v11';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261107_v11';
-import { navigate, parseActiveRoute } from './router.js?v=20261107_v11';
-export { navigate, parseActiveRoute } from './router.js?v=20261107_v11';
+import { Navbar } from './components/navbar.js?v=20261108_v12';
+import {
+  Auth,
+  syncLocalToCloud,
+  getSingleVerseModePref,
+  getShuffleVersesPref,
+  getPreferredTranslation,
+  getActiveModePref,
+  setActiveModePref,
+  getLocalStore,
+  initFirebaseAuthObserver
+} from './api.js?v=20261108_v12';
+import { initGA, trackPageView } from './analytics.js?v=20261108_v12';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261108_v12';
+import { navigate, parseActiveRoute } from './router.js?v=20261108_v12';
+export { navigate, parseActiveRoute } from './router.js?v=20261108_v12';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261107_v11';
-import { renderLandingScreen } from './screens/home.js?v=20261107_v11';
-import { renderTypingScreen } from './screens/typing.js?v=20261107_v11';
-import { renderProgressScreen } from './screens/progress.js?v=20261107_v11';
-import { renderMeditationsScreen } from './screens/meditations.js?v=20261107_v11';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261107_v11';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261107_v11';
+import { renderSignInScreen } from './screens/signin.js?v=20261108_v12';
+import { renderLandingScreen } from './screens/home.js?v=20261108_v12';
+import { renderTypingScreen } from './screens/typing.js?v=20261108_v12';
+import { renderProgressScreen } from './screens/progress.js?v=20261108_v12';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261108_v12';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261108_v12';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261108_v12';
 
 class App {
   constructor() {
@@ -70,12 +80,12 @@ class App {
       syncLocalToCloud();
     }
 
-    // Auto-sync when returning to tab (without interrupting an active typing session)
+    // Auto-sync when returning to tab (without interrupting an active session)
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && Auth.isAuthenticated()) {
         syncLocalToCloud().then(() => {
           const { path } = parseActiveRoute();
-          if (path.startsWith('/typing')) return;
+          if (/^\/(?:typing|type|speak|draw|promises)/.test(path)) return;
           this.handleRoute();
         });
       }
@@ -118,19 +128,21 @@ class App {
   handleRoute() {
     const { path, query } = parseActiveRoute();
 
-    // Clean up active typing intervals when leaving the typing screen
-    if (!path.startsWith('/typing') && window.__bibleTypingCleanup) {
+    const isPracticeRoute = /^\/(?:typing|type|speak|draw|promises)(?:\/|$)/.test(path);
+
+    // Clean up active typing/speech intervals when leaving the practice screen
+    if (!isPracticeRoute && window.__bibleTypingCleanup) {
       window.__bibleTypingCleanup();
     }
-    if (path !== '/meditations' && window.__bibleMeditationsCleanup) {
-      window.__bibleMeditationsCleanup();
+    if (path !== '/drawings' && path !== '/meditations' && window.__bibleDrawingsCleanup) {
+      window.__bibleDrawingsCleanup();
     }
 
     // Re-render navbar (and global unauthenticated warning banner on non-landing/non-signin screens)
     this.navbar.render(this.navContainer, path);
 
     if (path === '/' || path === '') {
-      document.title = 'Promises to Creation — Bible Typing App & Scripture Reading Tracker';
+      document.title = 'Promises to Creation — Bible Typing, Speaking & Drawing App';
       trackPageView('/', document.title);
       renderLandingScreen(this.mainContainer);
       return;
@@ -138,7 +150,7 @@ class App {
 
     if (path === '/signin') {
       if (Auth.isAuthenticated()) {
-        navigate('/typing');
+        navigate(`/${getActiveModePref()}`);
         return;
       }
       document.title = 'Sign In | Promises to Creation';
@@ -147,78 +159,118 @@ class App {
       return;
     }
 
-    if (path === '/hub') {
-      navigate('/typing');
+    if (path === '/hub' || path === '/promises') {
+      navigate(`/${getActiveModePref()}`, { replace: true });
       return;
     }
 
-    if (path === '/typing') {
-      if (getSingleVerseModePref()) {
+    // Bare mode entry points: /typing, /type, /speak, /draw
+    const bareModeMatch = path.match(/^\/(typing|type|speak|draw)$/);
+    if (bareModeMatch) {
+      const rawMode = bareModeMatch[1];
+      const targetMode = rawMode === 'typing' ? getActiveModePref() : rawMode;
+      if (rawMode !== 'typing' && getActiveModePref() !== targetMode) {
+        setActiveModePref(targetMode);
+      }
+
+      if (targetMode === 'draw' || getSingleVerseModePref()) {
         if (getShuffleVersesPref()) {
           const randRef = getNextPreloadedRandomVerse(getPreferredTranslation() || 'ESV');
-          navigate(`/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
+          navigate(`/${targetMode}/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`, { replace: true });
           return;
         }
         const store = getLocalStore();
         const bId = store.lastBookId || 1;
         const ch = store.lastChapter || 1;
         const vr = store.lastVerse || 1;
-        navigate(`/typing/${bId}/${ch}/${vr}`);
+        navigate(`/${targetMode}/${bId}/${ch}/${vr}`, { replace: true });
         return;
       }
-      document.title = 'Bible Typing | Promises to Creation';
-      trackPageView('/typing', document.title);
-      renderTypingScreen(this.mainContainer, {});
+      const store = getLocalStore();
+      const bId = store.lastBookId || 1;
+      const ch = store.lastChapter || 1;
+      navigate(`/${targetMode}/${bId}/${ch}`, { replace: true });
       return;
     }
 
-    // Single-Verse Granularity Route: #/typing/:bookId/:chapter/:verse
-    const typingVerseMatch = path.match(/^\/typing\/(\d+)\/(\d+)\/(\d+)$/);
-    if (typingVerseMatch) {
-      const bookId = Number(typingVerseMatch[1]);
-      const chapter = Number(typingVerseMatch[2]);
-      const verse = Number(typingVerseMatch[3]);
+    // Single-Verse Granularity Route: /:mode/:bookId/:chapter/:verse
+    const verseMatch = path.match(/^\/(typing|type|speak|draw)\/(\d+)\/(\d+)\/(\d+)$/);
+    if (verseMatch) {
+      const rawMode = verseMatch[1];
+      const bookId = Number(verseMatch[2]);
+      const chapter = Number(verseMatch[3]);
+      const verse = Number(verseMatch[4]);
+      const mode = rawMode === 'typing' ? getActiveModePref() : rawMode;
+      if (rawMode !== 'typing' && getActiveModePref() !== mode) {
+        setActiveModePref(mode);
+      }
+      if (rawMode === 'typing') {
+        navigate(`/${mode}/${bookId}/${chapter}/${verse}`, { replace: true });
+        return;
+      }
       const book = getBookById(bookId);
-      document.title = `${book.name} ${chapter}:${verse} — Single Verse Typing | Promises to Creation`;
+      const modeTitle = mode === 'speak' ? 'Speak' : (mode === 'draw' ? 'Draw' : 'Type');
+      document.title = `${book.name} ${chapter}:${verse} — ${modeTitle} | Promises to Creation`;
       trackPageView(path, document.title);
       renderTypingScreen(this.mainContainer, {
         bookId,
         chapter,
         verse,
+        mode,
         singleVerseMode: true
       });
       return;
     }
 
-    // Full-Chapter Route (with optional ?verse=X starting verse): #/typing/:bookId/:chapter
-    const typingChapterMatch = path.match(/^\/typing\/(\d+)\/(\d+)$/);
-    if (typingChapterMatch) {
-      const bookId = Number(typingChapterMatch[1]);
-      const chapter = Number(typingChapterMatch[2]);
+    // Full-Chapter Route (with optional ?verse=X starting verse): /:mode/:bookId/:chapter
+    const chapterMatch = path.match(/^\/(typing|type|speak|draw)\/(\d+)\/(\d+)$/);
+    if (chapterMatch) {
+      const rawMode = chapterMatch[1];
+      const bookId = Number(chapterMatch[2]);
+      const chapter = Number(chapterMatch[3]);
       const startVerse = query.get('verse') ? Number(query.get('verse')) : null;
+      const mode = rawMode === 'typing' ? getActiveModePref() : rawMode;
+      if (rawMode !== 'typing' && getActiveModePref() !== mode) {
+        setActiveModePref(mode);
+      }
+      // Draw mode is always single-verse
+      if (mode === 'draw') {
+        navigate(`/draw/${bookId}/${chapter}/${startVerse || 1}`, { replace: true });
+        return;
+      }
+      if (rawMode === 'typing') {
+        navigate(`/${mode}/${bookId}/${chapter}${startVerse ? `?verse=${startVerse}` : ''}`, { replace: true });
+        return;
+      }
       const book = getBookById(bookId);
-      document.title = `${book.name} ${chapter}${startVerse ? ` (v. ${startVerse})` : ''} — Bible Typing | Promises to Creation`;
+      const modeTitle = mode === 'speak' ? 'Speak' : 'Type';
+      document.title = `${book.name} ${chapter}${startVerse ? ` (v. ${startVerse})` : ''} — ${modeTitle} | Promises to Creation`;
       trackPageView(path, document.title);
       renderTypingScreen(this.mainContainer, {
         bookId,
         chapter,
         startVerse,
+        mode,
         singleVerseMode: false
       });
       return;
     }
 
     if (path === '/progress') {
-      document.title = 'Typing Progress & Bible Tracking | Promises to Creation';
+      document.title = 'Progress & Bible Tracking | Promises to Creation';
       trackPageView('/progress', document.title);
       renderProgressScreen(this.mainContainer);
       return;
     }
 
-    if (path === '/meditations') {
-      document.title = 'Scripture Meditations | Promises to Creation';
-      trackPageView('/meditations', document.title);
-      renderMeditationsScreen(this.mainContainer);
+    if (path === '/drawings' || path === '/meditations') {
+      if (path === '/meditations') {
+        navigate('/drawings', { replace: true });
+        return;
+      }
+      document.title = 'Scripture Drawings | Promises to Creation';
+      trackPageView('/drawings', document.title);
+      renderDrawingsScreen(this.mainContainer);
       return;
     }
 

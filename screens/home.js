@@ -3,12 +3,13 @@ import {
   getGlobalTypingStats,
   getLocalStore,
   getPreferredTranslation,
+  getActiveModePref,
   getChapterProgressSummary,
   isVerseCovered,
   markVerseAsRead,
   toggleChapterRead,
   toggleVerseRead
-} from '../api.js?v=20261107_v11';
+} from '../api.js?v=20261108_v12';
 import {
   getBookById,
   getNextChapterRef,
@@ -19,9 +20,9 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261107_v11';
-import { trackEvent } from '../analytics.js?v=20261107_v11';
-import { navigate } from '../router.js?v=20261107_v11';
+} from '../bible-data.js?v=20261108_v12';
+import { trackEvent } from '../analytics.js?v=20261108_v12';
+import { navigate } from '../router.js?v=20261108_v12';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -759,6 +760,7 @@ export function renderLandingScreen(container) {
 
   function renderCard() {
     const isCompleted = isVerseCompletedForUser(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
+    const activeMode = getActiveModePref() || 'type';
 
     container.innerHTML = `
       <div class="hero-wrapper">
@@ -769,26 +771,26 @@ export function renderLandingScreen(container) {
 
         <h1 class="hero-title">Promises to Creation</h1>
         <p class="hero-subtitle">
-          Bible typing practice &amp; Scripture reading tracker
+          Bible typing, speaking &amp; drawing practice with Scripture tracking
         </p>
 
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" id="home-start-btn">
-            <span>Start Typing</span>
+            <span>Explore Promises</span>
             <span style="font-size: 1.15rem;">→</span>
           </button>
         </div>
 
         <!-- Daily Random Verse Card with Direct Read & Type Controls -->
         <div class="votd-card-wrapper">
-          <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to practice typing ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
+          <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to open ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
             <div class="votd-top-row">
               <div class="votd-ref-header">
                 <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
                 <span class="votd-ref-sub">${escapeHtml(activeTranslation)}</span>
                 ${currentVerse.theme ? `<span class="votd-tag">${escapeHtml(currentVerse.theme)}</span>` : ''}
               </div>
-              <span class="votd-action-hint">Type verse →</span>
+              <span class="votd-action-hint">Open verse →</span>
             </div>
 
             <div class="votd-quote">
@@ -806,13 +808,13 @@ export function renderLandingScreen(container) {
                 ${isCompleted ? '✓ Marked Read' : '📖 Mark Verse Read'}
               </button>
               <a
-                href="/typing/${currentVerse.bookId}/${currentVerse.chapter}"
+                href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
                 class="btn btn-secondary btn-sm"
                 id="votd-type-chapter-btn"
                 data-stop-card-nav="true"
-                title="Open and type the full chapter"
+                title="Open the full chapter"
               >
-                📖 Type Whole Ch.
+                📖 Open Whole Ch.
               </a>
             </div>
           </div>
@@ -825,11 +827,13 @@ export function renderLandingScreen(container) {
       votdCard.addEventListener('click', (e) => {
         if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;
         trackEvent('votd_card_click', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-        navigate(`/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+        const mode = getActiveModePref() || 'type';
+        navigate(`/${mode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
       });
       votdCard.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.target === votdCard) {
-          navigate(`/typing/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+          const mode = getActiveModePref() || 'type';
+          navigate(`/${mode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
         }
       });
     }
@@ -865,7 +869,7 @@ export function renderLandingScreen(container) {
     if (startBtn) {
       startBtn.addEventListener('click', () => {
         trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
-        navigate('/typing');
+        navigate('/promises');
       });
     }
   }
@@ -873,7 +877,7 @@ export function renderLandingScreen(container) {
   renderCard();
 }
 
-/** Legacy route fallback — Hub removed per user request: redirect directly to typing */
+/** Legacy route fallback — Hub removed per user request: redirect directly to promises */
 export function renderHubScreen() {
-  navigate('/typing');
+  navigate('/promises');
 }

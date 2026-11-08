@@ -6,16 +6,16 @@ import {
   deleteBookmark,
   restoreBookmarkHistory,
   deleteBookmarkHistoryEntry,
-  setMeditateModePref,
+  setActiveModePref,
   getPreferredTranslation
-} from '../api.js?v=20261107_v11';
+} from '../api.js?v=20261108_v12';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById
-} from '../bible-data.js?v=20261107_v11';
-import { trackEvent } from '../analytics.js?v=20261107_v11';
-import { navigate } from '../router.js?v=20261107_v11';
+} from '../bible-data.js?v=20261108_v12';
+import { trackEvent } from '../analytics.js?v=20261108_v12';
+import { navigate } from '../router.js?v=20261108_v12';
 
 function escapeHtml(str) {
   return String(str || '')
@@ -115,7 +115,7 @@ export function renderBookmarksScreen(container) {
               </svg>Scripture Bookmarks
             </h1>
             <p class="bookmarks-subtitle">
-              Custom markers that remember your place across the Bible. Jump right back into reading, typing, or meditating anytime, and see complete verse history.
+              Custom markers that remember your place across the Bible. Jump right back into reading, typing, speaking, or drawing anytime, and see complete verse history.
             </p>
           </div>
 
@@ -174,14 +174,14 @@ export function renderBookmarksScreen(container) {
             <h2 class="bookmarks-empty-title">No Bookmarks Saved Yet</h2>
             <p class="bookmarks-empty-desc">
               Bookmarks help you keep track of where you are in personal reading plans, study topics, or daily devotionals.
-              Click the bookmark ribbon icon next to favourite while typing, or create one below!
+              Click the bookmark ribbon icon next to favourite while practicing, or create one below!
             </p>
             <div class="bookmarks-empty-actions">
               <button type="button" class="btn btn-primary" id="empty-add-bookmark-btn">
                 + Create Your First Bookmark
               </button>
-              <a href="/typing" class="btn btn-secondary">
-                Start Typing Scripture
+              <a href="/promises" class="btn btn-secondary">
+                Open Promises
               </a>
             </div>
           </div>
@@ -367,7 +367,17 @@ export function renderBookmarksScreen(container) {
               data-ch="${bm.chapter}"
               data-vr="${bm.verse || 1}"
             >
-              ▶ Type Verse
+              ⌨️ Type
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm bookmark-speak-btn"
+              data-id="${escapeHtml(bm.id)}"
+              data-book="${bm.bookId}"
+              data-ch="${bm.chapter}"
+              data-vr="${bm.verse || 1}"
+            >
+              🗣️ Speak
             </button>
             <button
               type="button"
@@ -377,7 +387,7 @@ export function renderBookmarksScreen(container) {
               data-ch="${bm.chapter}"
               data-vr="${bm.verse || 1}"
             >
-              📖 Read Chapter
+              📖 Chapter
             </button>
             <button
               type="button"
@@ -387,7 +397,7 @@ export function renderBookmarksScreen(container) {
               data-ch="${bm.chapter}"
               data-vr="${bm.verse || 1}"
             >
-              🎨 Meditate
+              🎨 Draw
             </button>
           </div>
         </div>
@@ -579,8 +589,21 @@ export function renderBookmarksScreen(container) {
         const bookId = Number(btn.getAttribute('data-book'));
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
+        setActiveModePref('type');
         trackEvent('jump_bookmark_type', { bookId, chapter: ch, verse: vr });
-        navigate(`/typing/${bookId}/${ch}/${vr}`);
+        navigate(`/type/${bookId}/${ch}/${vr}`);
+      });
+    });
+
+    // Jump to speaking verse
+    container.querySelectorAll('.bookmark-speak-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bookId = Number(btn.getAttribute('data-book'));
+        const ch = Number(btn.getAttribute('data-ch'));
+        const vr = Number(btn.getAttribute('data-vr'));
+        setActiveModePref('speak');
+        trackEvent('jump_bookmark_speak', { bookId, chapter: ch, verse: vr });
+        navigate(`/speak/${bookId}/${ch}/${vr}`);
       });
     });
 
@@ -590,20 +613,21 @@ export function renderBookmarksScreen(container) {
         const bookId = Number(btn.getAttribute('data-book'));
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
+        setActiveModePref('type');
         trackEvent('jump_bookmark_chapter', { bookId, chapter: ch, verse: vr });
-        navigate(`/typing/${bookId}/${ch}?verse=${vr}`);
+        navigate(`/type/${bookId}/${ch}?verse=${vr}`);
       });
     });
 
-    // Meditate on bookmark verse
+    // Draw on bookmark verse
     container.querySelectorAll('.bookmark-meditate-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const bookId = Number(btn.getAttribute('data-book'));
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
-        setMeditateModePref(true);
-        trackEvent('jump_bookmark_meditate', { bookId, chapter: ch, verse: vr });
-        navigate(`/typing/${bookId}/${ch}/${vr}`);
+        setActiveModePref('draw');
+        trackEvent('jump_bookmark_draw', { bookId, chapter: ch, verse: vr });
+        navigate(`/draw/${bookId}/${ch}/${vr}`);
       });
     });
 
@@ -634,8 +658,9 @@ export function renderBookmarksScreen(container) {
         const bookId = Number(btn.getAttribute('data-book'));
         const ch = Number(btn.getAttribute('data-ch'));
         const vr = Number(btn.getAttribute('data-vr'));
+        setActiveModePref('type');
         trackEvent('jump_bookmark_history', { bookId, chapter: ch, verse: vr });
-        navigate(`/typing/${bookId}/${ch}/${vr}`);
+        navigate(`/type/${bookId}/${ch}/${vr}`);
       });
     });
 

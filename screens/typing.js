@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261107_v11';
+} from '../bible-data.js?v=20261108_v12';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -27,6 +27,8 @@ import {
   setAutoAdvancePref,
   getShuffleVersesPref,
   setShuffleVersesPref,
+  getActiveModePref,
+  setActiveModePref,
   getMeditateModePref,
   setMeditateModePref,
   getMeditatePalettePref,
@@ -40,13 +42,19 @@ import {
   setLastSelectedChapter,
   recordCompletedVerse,
   recordCompletedChapter,
+  recordSpokenVerse,
+  recordSpokenChapter,
   getGlobalTypingStats,
   getChapterProgressSummary,
   isVerseCompletedInRecord,
   isVerseRead,
   isVerseTyped,
+  isVerseSpoken,
   toggleChapterRead,
   toggleVerseRead,
+  saveVerseDrawing,
+  getVerseDrawing,
+  deleteVerseDrawing,
   saveVerseMeditation,
   getVerseMeditation,
   deleteVerseMeditation,
@@ -74,13 +82,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261107_v11';
+} from '../api.js?v=20261108_v12';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261107_v11';
-import { trackEvent } from '../analytics.js?v=20261107_v11';
-import { navigate } from '../router.js?v=20261107_v11';
+} from '../meditate-art.js?v=20261108_v12';
+import { trackEvent } from '../analytics.js?v=20261108_v12';
+import { navigate } from '../router.js?v=20261108_v12';
 
 function escapeHtml(str) {
   return String(str)
@@ -97,6 +105,106 @@ function formatDuration(ms) {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
+const NUMBER_WORDS_MAP = {
+  '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
+  '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine',
+  '10': 'ten', '11': 'eleven', '12': 'twelve', '13': 'thirteen', '14': 'fourteen',
+  '15': 'fifteen', '16': 'sixteen', '17': 'seventeen', '18': 'eighteen', '19': 'nineteen',
+  '20': 'twenty', '30': 'thirty', '40': 'forty', '50': 'fifty', '60': 'sixty',
+  '70': 'seventy', '80': 'eighty', '90': 'ninety', '100': 'hundred', '1000': 'thousand'
+};
+
+export function normalizeSpokenWord(raw) {
+  const cleaned = String(raw || '')
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02BC]/g, "'")
+    .replace(/^[^a-z0-9']+|[^a-z0-9']+$/g, '')
+    .replace(/'s$/g, 's')
+    .replace(/'/g, '');
+  return NUMBER_WORDS_MAP[cleaned] || cleaned;
+}
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+export function computeWordSimilarity(spokenRaw, targetClean) {
+  const spoken = normalizeSpokenWord(spokenRaw);
+  const target = normalizeSpokenWord(targetClean);
+  if (!target && !spoken) return 1;
+  if (!target || !spoken) return 0;
+  if (spoken === target) return 1;
+  const dist = editDistance(spoken, target);
+  const maxLen = Math.max(spoken.length, target.length, 1);
+  return Math.max(0, 1 - dist / maxLen);
+}
+
+export function isSpokenWordMatch(spokenRaw, targetClean) {
+  const spoken = normalizeSpokenWord(spokenRaw);
+  const target = normalizeSpokenWord(targetClean);
+  if (!target) return true;
+  if (!spoken) return false;
+  if (spoken === target) return true;
+  // Allow slight 1-character phonetic variation on longer words (6+ chars, e.g. biblical proper nouns)
+  if (target.length >= 6 && spoken.length >= 4 && editDistance(spoken, target) <= 1) {
+    return true;
+  }
+  return false;
+}
+
+export function evaluateSpokenWord(spokenRaw, targetClean, recognizerConfidence = 0.92) {
+  const spoken = normalizeSpokenWord(spokenRaw);
+  const target = normalizeSpokenWord(targetClean);
+  const rawConf = (typeof recognizerConfidence === 'number' && recognizerConfidence > 0)
+    ? recognizerConfidence
+    : 0.92;
+  const normConf = Math.min(1, Math.max(0.55, rawConf / 0.93));
+
+  if (!target) {
+    return { matched: true, exact: true, similarity: 1, pronunciationScore: 100, enunciationScore: 100 };
+  }
+  if (!spoken) {
+    return { matched: false, exact: false, similarity: 0, pronunciationScore: 0, enunciationScore: 25 };
+  }
+  const sim = computeWordSimilarity(spoken, target);
+  if (spoken === target) {
+    const enun = Math.round(Math.min(100, (normConf * 0.55 + 0.45) * 100));
+    return { matched: true, exact: true, similarity: 1, pronunciationScore: 100, enunciationScore: enun };
+  }
+  if (target.length >= 6 && spoken.length >= 4 && editDistance(spoken, target) <= 1) {
+    const enun = Math.round(Math.min(95, (normConf * 0.45 + sim * 0.55) * 92));
+    return { matched: true, exact: false, similarity: sim, pronunciationScore: 92, enunciationScore: enun };
+  }
+  const enun = Math.round(Math.max(20, sim * 68));
+  return { matched: false, exact: false, similarity: sim, pronunciationScore: 0, enunciationScore: enun };
+}
+
+export function getCadenceDescriptor(wpm) {
+  const val = Number(wpm) || 0;
+  if (val <= 0) return { label: '—', shortLabel: '', badgeClass: '' };
+  if (val < 85) return { label: 'Slow & Reflective', shortLabel: 'Reflective', badgeClass: 'is-sky' };
+  if (val < 110) return { label: 'Contemplative Pace', shortLabel: 'Contemplative', badgeClass: 'is-emerald' };
+  if (val <= 155) return { label: 'Natural Cadence', shortLabel: 'Natural', badgeClass: 'is-emerald' };
+  if (val <= 180) return { label: 'Brisk Pace', shortLabel: 'Brisk', badgeClass: 'is-lavender' };
+  return { label: 'Rapid / Rushed', shortLabel: 'Rapid', badgeClass: 'is-amber' };
+}
+
 export function renderTypingScreen(container, params = {}) {
   const store = getLocalStore();
   const initialBookId = Number(params.bookId) || store.lastBookId || 1;
@@ -111,10 +219,36 @@ export function renderTypingScreen(container, params = {}) {
   let showTypingStats = getShowTypingStatsPref();
   let autoAdvance = getAutoAdvancePref();
   let shuffleVerses = getShuffleVersesPref();
-  let meditateMode = getMeditateModePref();
+  let activeMode = ['type', 'speak', 'draw'].includes(params.mode) ? params.mode : getActiveModePref();
+  if (!singleVerseMode && activeMode === 'draw') {
+    activeMode = 'type';
+  }
+  let meditateMode = activeMode === 'draw';
   let meditatePalette = getMeditatePalettePref();
   let activePaletteIndex = 0;
   let currentArtworkTemplateIdx = Math.abs((book.id * 31 + initialChapter * 7 + (targetSingleVerseNum || 1))) % TOTAL_MEDITATE_ART_TEMPLATES;
+
+  // Speak mode state
+  let micEnabled = true; // Enabled by default when in Speak mode
+  let speechRecognition = null;
+  let speechSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  let wordsList = []; // [{ wordIdx, verse, vIdx, rawWord, cleanWord, startCharIdx, endCharIdx, nextCursorCharIdx, isLastWordOfVerse, wordEl }]
+  let charToWordIdxMap = [];
+  let currentWordIdx = 0;
+  let speechProcessedMap = new Map(); // resultIndex -> number of tokens processed
+  let speechInterimErrorTimer = null;
+  let speechAutoAdvanceTimer = null;
+  let spokenWordErrors = []; // [{ wordIdx, verse, expected, spoken }]
+  let verseSpokenWordErrors = [];
+  let spokenWordsEvaluated = 0;
+  let spokenWordsCorrect = 0;
+  let spokenPronunciationSum = 0;
+  let spokenEnunciationSum = 0;
+  let verseSpokenWordsEvaluated = 0;
+  let verseSpokenWordsCorrect = 0;
+  let verseSpokenPronunciationSum = 0;
+  let verseSpokenEnunciationSum = 0;
+  let spokenWordStatusMap = new Map(); // wordIdx -> 'correct' | 'error'
 
   setLastSelectedChapter(book.id, initialChapter, targetSingleVerseNum || requestedStartVerse || null);
 
@@ -134,7 +268,7 @@ export function renderTypingScreen(container, params = {}) {
   document.documentElement.classList.add('typing-active-view');
   document.body.classList.add('typing-active-view');
 
-  // Active typing session state
+  // Active typing/speaking session state
   let allChapterVerses = []; // Full chapter verses from API
   let verses = []; // Verses rendered in viewport (either all chapter verses or 1 verse in singleVerseMode)
   let verseRanges = []; // [{ verse, vIdx, startCharIdx, wordEndIdx, endCharIdx, charCount, wordCount, verseBlockEl, supEl }]
@@ -143,7 +277,7 @@ export function renderTypingScreen(container, params = {}) {
   let charToVerseIdxMap = [];
   let charEls = [];
   let completedVerseSet = new Set(); // Set of verse numbers completed in this chapter
-  let sittingTypedVersesSet = new Set(); // Set of verse numbers typed during this sitting
+  let sittingTypedVersesSet = new Set(); // Set of verse numbers typed/spoken during this sitting
 
   let cursorIdx = 0;
   let errorBuffer = [];
@@ -161,13 +295,33 @@ export function renderTypingScreen(container, params = {}) {
   let verseCorrectKeystrokes = 0;
   let verseMistakes = 0;
   let lastSkipJumpTime = 0;
-  let sittingSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let sittingSessionId = `${activeMode === 'speak' ? 'spk' : 's'}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   let lastTrackedCursorVerse = null;
 
   function clearTimer() {
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
+    }
+    if (speechAutoAdvanceTimer) {
+      clearTimeout(speechAutoAdvanceTimer);
+      speechAutoAdvanceTimer = null;
+    }
+  }
+
+  function stopSpeechRecognition() {
+    if (speechInterimErrorTimer) {
+      clearTimeout(speechInterimErrorTimer);
+      speechInterimErrorTimer = null;
+    }
+    if (speechRecognition) {
+      try {
+        speechRecognition.onresult = null;
+        speechRecognition.onerror = null;
+        speechRecognition.onend = null;
+        speechRecognition.stop();
+      } catch (_) {}
+      speechRecognition = null;
     }
   }
 
@@ -178,6 +332,7 @@ export function renderTypingScreen(container, params = {}) {
   let onWindowWheel = null;
   function cleanup() {
     clearTimer();
+    stopSpeechRecognition();
     document.documentElement.classList.remove('typing-active-view');
     document.body.classList.remove('typing-active-view');
     if (onWindowKeydown) {
@@ -220,17 +375,21 @@ export function renderTypingScreen(container, params = {}) {
   function getProgressBadgeHtml() {
     const summary = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
     const totalV = summary.totalVerses || allChapterVerses.length || 0;
-    const doneV = summary.completedVersesCount;
     const trText = activeTranslation ? ` · ${getTranslationByCode(activeTranslation).shortName}` : '';
 
     if (singleVerseMode && targetSingleVerseNum) {
       const vRec = summary.record?.completedVerses?.[String(targetSingleVerseNum)];
       const vIsRead = Boolean(summary.isFullyRead || vRec?.isRead);
-      const vIsTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (vRec?.count && vRec.count > 0));
-      if (vIsRead && vIsTyped) {
+      const vIsSpoken = Boolean(summary.isFullySpoken || vRec?.isSpoken);
+      const vIsTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && vRec?.count && vRec.count > 0));
+      const modesDone = [];
+      if (vIsRead) modesDone.push('Read');
+      if (vIsTyped) modesDone.push('Typed');
+      if (vIsSpoken) modesDone.push('Spoken');
+      if (modesDone.length >= 2) {
         return `
-          <span class="chapter-completed-pill is-both" title="Verse ${targetSingleVerseNum} read and typed!">
-            ✓ Verse ${targetSingleVerseNum} Read &amp; Typed${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
+          <span class="chapter-completed-pill is-both" title="Verse ${targetSingleVerseNum} completed (${modesDone.join(' & ')})!">
+            ✓ Verse ${targetSingleVerseNum} ${modesDone.join(' &amp;')}${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
           </span>
         `;
       }
@@ -238,6 +397,13 @@ export function renderTypingScreen(container, params = {}) {
         return `
           <span class="chapter-completed-pill is-done" title="Verse ${targetSingleVerseNum} completed in typing engine!">
             ✓ Verse ${targetSingleVerseNum} Typed${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
+          </span>
+        `;
+      }
+      if (vIsSpoken) {
+        return `
+          <span class="chapter-completed-pill is-spoken" title="Verse ${targetSingleVerseNum} completed in speak mode!">
+            🗣️ Verse ${targetSingleVerseNum} Spoken
           </span>
         `;
       }
@@ -252,14 +418,18 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     if (summary.isBoth) {
+      const parts = [];
+      if (summary.isFullyRead) parts.push('Read');
+      if (summary.isFullyTyped) parts.push('Typed');
+      if (summary.isFullySpoken) parts.push('Spoken');
       return `
-        <span class="chapter-completed-pill is-both" title="All ${totalV} verses read and typed!">
-          ✓ Read &amp; Typed (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
+        <span class="chapter-completed-pill is-both" title="All ${totalV} verses completed (${parts.join(' & ')})!">
+          ✓ ${parts.join(' &amp; ')} (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
         </span>
       `;
     }
 
-    if (summary.isTypedOnly || (summary.isFullyTyped && !summary.isFullyRead)) {
+    if (summary.isTypedOnly || (summary.isFullyTyped && !summary.isFullyRead && !summary.isFullySpoken)) {
       return `
         <span class="chapter-completed-pill is-done" title="All ${totalV} verses typed!">
           ✓ Typed (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
@@ -267,7 +437,15 @@ export function renderTypingScreen(container, params = {}) {
       `;
     }
 
-    if (summary.isReadOnly || (summary.isFullyRead && !summary.isFullyTyped)) {
+    if (summary.isSpokenOnly || (summary.isFullySpoken && !summary.isFullyRead && !summary.isFullyTyped)) {
+      return `
+        <span class="chapter-completed-pill is-spoken" title="All ${totalV} verses spoken!">
+          🗣️ Spoken (${totalV}/${totalV}v)${trText}
+        </span>
+      `;
+    }
+
+    if (summary.isReadOnly || (summary.isFullyRead && !summary.isFullyTyped && !summary.isFullySpoken)) {
       return `
         <span class="chapter-completed-pill is-read" title="All ${totalV} verses marked as read!">
           📖 Read (${totalV}/${totalV}v)
@@ -276,6 +454,12 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     return '';
+  }
+
+  function getModeBtnLabelHtml(mode) {
+    if (mode === 'draw') return '🎨 Mode: Draw';
+    if (mode === 'speak') return '🗣️ Mode: Speak';
+    return '⌨️ Mode: Type';
   }
 
   const initialVerseNum = singleVerseMode ? (targetSingleVerseNum || 1) : (requestedStartVerse || 1);
@@ -303,12 +487,24 @@ export function renderTypingScreen(container, params = {}) {
               <span class="summary-tr-tag" id="telemetry-translation-tag">${getTranslationByCode(activeTranslation).shortName}</span>
             </div>
             <button class="btn btn-secondary btn-sm summary-step-btn" id="next-step-btn" title="Next ${singleVerseMode ? 'Verse' : 'Chapter'}">›</button>
-            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance && !meditateMode ? '' : 'hidden'}>
+            <button type="button" class="btn btn-secondary btn-sm advance-step-btn" id="advance-step-btn" title="Advance to next verse (or press Enter)" ${singleVerseMode && !autoAdvance && activeMode !== 'draw' ? '' : 'hidden'}>
               ${(singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›'}
             </button>
-            <button type="button" class="btn btn-secondary btn-sm meditate-mark-read-btn" id="meditate-mark-read-btn" title="Mark this verse as read" ${singleVerseMode && meditateMode ? '' : 'hidden'}>
+            <button type="button" class="btn btn-secondary btn-sm meditate-mark-read-btn" id="meditate-mark-read-btn" title="Mark this verse as read" ${singleVerseMode && activeMode === 'draw' ? '' : 'hidden'}>
               <span id="meditate-mark-read-label">📖 Mark Read</span>
             </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm speak-mic-toggle-btn ${micEnabled ? 'is-mic-active' : ''}"
+              id="speak-mic-toggle-btn"
+              title="Toggle microphone for Speak Mode"
+              ${activeMode === 'speak' ? '' : 'hidden'}
+            >
+              <span id="speak-mic-toggle-label">${micEnabled ? '🎙️ Mic On' : '🔇 Mic Off'}</span>
+            </button>
+            <span class="speak-status-pill" id="speak-status-pill" ${activeMode === 'speak' ? '' : 'hidden'}>
+              Speak each word aloud...
+            </span>
             <span id="telemetry-completed-badge">${getProgressBadgeHtml()}</span>
           </div>
 
@@ -337,32 +533,35 @@ export function renderTypingScreen(container, params = {}) {
               type="button"
               class="btn btn-secondary btn-sm summary-action-btn single-verse-read-chapter-btn"
               id="single-verse-read-chapter-btn"
-              title="Open and read the full chapter (${escapeHtml(book.name)} ${initialChapter})"
+              title="Open the full chapter (${escapeHtml(book.name)} ${initialChapter})"
               ${singleVerseMode ? '' : 'hidden'}
             >
               📖 Read Full Chapter
             </button>
-            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-options-btn" id="typing-options-btn" title="Typing Options & Actions">
-              ⚙️ Options
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-mode-btn" id="typing-mode-btn" title="Select Mode (Type, Draw, Speak) &amp; Mode Settings">
+              <span id="typing-mode-btn-label">${getModeBtnLabelHtml(activeMode)}</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-actions-btn" id="typing-actions-btn" title="General Options &amp; Actions">
+              ⚡ Actions
             </button>
           </div>
         </div>
 
-        <!-- Line 2: Live Metrics / Telemetry (Toggled via Typing Options modal) -->
-        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${(showTypingStats && !(singleVerseMode && meditateMode)) ? '' : 'hidden'}>
+        <!-- Line 2: Live Metrics / Telemetry (Toggled via Actions modal, shown in Type & Speak modes) -->
+        <div class="summary-line summary-line-bottom" id="typing-summary-stats-line" ${(showTypingStats && activeMode !== 'draw') ? '' : 'hidden'}>
           <div class="summary-metrics-group">
             <div class="summary-stat-box">
-              <span class="stat-lbl">WPM</span>
-              <span class="stat-num" id="live-wpm">0</span>
+              <span class="stat-lbl" id="live-stat-lbl-1">${activeMode === 'speak' ? 'Cadence' : 'WPM'}</span>
+              <span class="stat-num" id="live-wpm">${activeMode === 'speak' ? '0 WPM' : '0'}</span>
             </div>
             <div class="summary-stat-divider">·</div>
             <div class="summary-stat-box">
-              <span class="stat-lbl">CPM</span>
-              <span class="stat-num" id="live-cpm">0</span>
+              <span class="stat-lbl" id="live-stat-lbl-2">${activeMode === 'speak' ? 'Pronunciation' : 'CPM'}</span>
+              <span class="stat-num" id="live-cpm">${activeMode === 'speak' ? '100%' : '0'}</span>
             </div>
             <div class="summary-stat-divider">·</div>
             <div class="summary-stat-box">
-              <span class="stat-lbl">Accuracy</span>
+              <span class="stat-lbl" id="live-stat-lbl-3">${activeMode === 'speak' ? 'Enunciation' : 'Accuracy'}</span>
               <span class="stat-num" id="live-acc">100%</span>
             </div>
             <div class="summary-stat-divider">·</div>
@@ -379,12 +578,12 @@ export function renderTypingScreen(container, params = {}) {
         </div>
       </div>
 
-      <!-- Strict Backspace Error Banner (Only shown when an active mistake needs Backspace) -->
+      <!-- Strict Backspace Error Banner (Only shown when an active typing mistake needs Backspace) -->
       <div class="typing-error-alert" id="typing-error-alert" hidden>
         <span>⌫ Mistyped character — press <strong>Backspace</strong> to fix before continuing</span>
       </div>
 
-      <!-- Main Scripture Typing Viewport (fills remaining viewport height) -->
+      <!-- Main Scripture Viewport (fills remaining viewport height) -->
       <div class="typing-viewport-wrapper" id="typing-viewport-wrapper">
         <input
           type="text"
@@ -398,20 +597,23 @@ export function renderTypingScreen(container, params = {}) {
         />
 
         <div class="typing-focus-banner" id="typing-focus-banner" hidden>
-          <span>⌨️ Click any verse or press any key to resume typing</span>
+          <span id="typing-focus-banner-text">${activeMode === 'speak' ? '🎙️ Click any word or enable microphone to speak aloud' : '⌨️ Click any verse or press any key to resume typing'}</span>
         </div>
 
-        <div class="typing-passage-scroll" id="typing-passage-scroll" ${singleVerseMode && meditateMode ? 'hidden' : ''}>
+        <div class="typing-passage-scroll" id="typing-passage-scroll" ${singleVerseMode && activeMode === 'draw' ? 'hidden' : ''}>
           <div class="typing-passage-content" id="typing-passage-content">
             <div class="typing-loading-state">
               <div class="loading-spinner"></div>
               <p>Loading ${book.name} ${initialChapter}${singleVerseMode ? `:${targetSingleVerseNum}` : ''} (${getTranslationByCode(activeTranslation).shortName})...</p>
             </div>
           </div>
+
+          <!-- End-of-Verse Speech Summary & Pronunciation Errors Card (Shown at end of Single Verse in Speak Mode) -->
+          <div class="speak-end-summary-card" id="speak-end-summary-card" hidden></div>
         </div>
 
-        <!-- Meditate Mode Interactive Artwork & Verse Canvas (Full Height, No Scroll) -->
-        <div class="meditate-canvas-wrapper" id="meditate-canvas-wrapper" ${singleVerseMode && meditateMode ? '' : 'hidden'}></div>
+        <!-- Draw Mode Interactive Artwork & Verse Canvas (Full Height, No Scroll) -->
+        <div class="meditate-canvas-wrapper" id="meditate-canvas-wrapper" ${singleVerseMode && activeMode === 'draw' ? '' : 'hidden'}></div>
       </div>
 
       <!-- Chapter / Verse Completion Modal -->
@@ -427,17 +629,17 @@ export function renderTypingScreen(container, params = {}) {
 
           <div class="completion-highlights" id="completion-highlights"></div>
 
-          <div class="completion-stats-grid">
-            <div class="completion-stat-item">
-              <span class="c-stat-label">Speed (WPM)</span>
+          <div class="completion-stats-grid" id="completion-stats-grid">
+            <div class="completion-stat-item" id="comp-wpm-box">
+              <span class="c-stat-label" id="comp-lbl-wpm">${activeMode === 'speak' ? 'Cadence (WPM)' : 'Speed (WPM)'}</span>
               <span class="c-stat-val" id="comp-wpm">0</span>
             </div>
-            <div class="completion-stat-item">
-              <span class="c-stat-label">Speed (CPM)</span>
+            <div class="completion-stat-item" id="comp-cpm-box">
+              <span class="c-stat-label" id="comp-lbl-cpm">${activeMode === 'speak' ? 'Pronunciation' : 'Speed (CPM)'}</span>
               <span class="c-stat-val" id="comp-cpm">0</span>
             </div>
             <div class="completion-stat-item">
-              <span class="c-stat-label">Accuracy</span>
+              <span class="c-stat-label" id="comp-lbl-acc">${activeMode === 'speak' ? 'Enunciation' : 'Accuracy'}</span>
               <span class="c-stat-val" id="comp-acc">100%</span>
             </div>
             <div class="completion-stat-item">
@@ -445,7 +647,7 @@ export function renderTypingScreen(container, params = {}) {
               <span class="c-stat-val" id="comp-verses">0</span>
             </div>
             <div class="completion-stat-item">
-              <span class="c-stat-label">Characters</span>
+              <span class="c-stat-label" id="comp-lbl-chars">${activeMode === 'speak' ? 'Words Spoken' : 'Characters'}</span>
               <span class="c-stat-val" id="comp-chars">0</span>
             </div>
             <div class="completion-stat-item">
@@ -454,11 +656,13 @@ export function renderTypingScreen(container, params = {}) {
             </div>
           </div>
 
+          <div class="completion-speech-errors" id="completion-speech-errors" hidden></div>
+
           <div class="completion-reach-summary" id="completion-reach-summary"></div>
 
           <div class="completion-actions" id="completion-actions">
             <button class="btn btn-secondary" id="comp-retry-btn">
-              ↺ Type Again
+              ↺ ${activeMode === 'speak' ? 'Speak Again' : 'Type Again'}
             </button>
             ${singleVerseMode ? `
               <button class="btn btn-secondary" id="comp-open-chapter-btn">
@@ -476,17 +680,79 @@ export function renderTypingScreen(container, params = {}) {
         </div>
       </div>
 
-      <!-- Typing Options Modal Backdrop -->
-      <div class="typing-options-backdrop" id="typing-options-backdrop" hidden>
-        <div class="typing-options-card" role="dialog" aria-modal="true" aria-labelledby="typing-options-title">
+      <!-- 1. Mode Selection Modal (Base Layer of Stacked Modals) -->
+      <div class="typing-options-backdrop mode-select-backdrop" id="mode-select-backdrop" hidden>
+        <div class="typing-options-card mode-select-card" role="dialog" aria-modal="true" aria-labelledby="mode-select-title">
           <div class="typing-options-header">
-            <h2 class="typing-options-title" id="typing-options-title">⚙️ Typing Options</h2>
-            <button type="button" class="options-close-btn" id="options-close-btn" aria-label="Close options">✕</button>
+            <h2 class="typing-options-title" id="mode-select-title">Mode</h2>
+            <button type="button" class="options-close-btn" id="mode-select-close-btn" aria-label="Close mode modal">✕</button>
           </div>
 
-          <div class="typing-options-body">
+          <div class="typing-options-body mode-radio-list" role="radiogroup" aria-label="Select Mode">
+            <!-- Mode 1: Type -->
+            <div class="mode-radio-item ${activeMode === 'type' ? 'is-selected' : ''}" data-mode-item="type">
+              <label class="mode-radio-label" for="mode-radio-type">
+                <input type="radio" name="bible-mode-radio" id="mode-radio-type" value="type" class="mode-radio-input" ${activeMode === 'type' ? 'checked' : ''} />
+                <span class="mode-radio-custom"></span>
+                <span class="mode-radio-info">
+                  <strong class="mode-radio-name">⌨️ Type</strong>
+                  <span class="mode-radio-desc">Type scripture character by character (${singleVerseMode ? 'Single Verse' : 'Chapter'})</span>
+                </span>
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm mode-settings-gear-btn" data-open-mode-settings="type" title="Type Mode Settings" aria-label="Type Mode Settings">
+                ⚙️
+              </button>
+            </div>
+
+            <!-- Mode 2: Draw -->
+            <div class="mode-radio-item ${activeMode === 'draw' ? 'is-selected' : ''}" data-mode-item="draw">
+              <label class="mode-radio-label" for="mode-radio-draw">
+                <input type="radio" name="bible-mode-radio" id="mode-radio-draw" value="draw" class="mode-radio-input" ${activeMode === 'draw' ? 'checked' : ''} />
+                <span class="mode-radio-custom"></span>
+                <span class="mode-radio-info">
+                  <strong class="mode-radio-name">🎨 Draw</strong>
+                  <span class="mode-radio-desc">Color-by-numbers scripture artwork (Single Verse)</span>
+                </span>
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm mode-settings-gear-btn" data-open-mode-settings="draw" title="Draw Mode Settings" aria-label="Draw Mode Settings">
+                ⚙️
+              </button>
+            </div>
+
+            <!-- Mode 3: Speak -->
+            <div class="mode-radio-item ${activeMode === 'speak' ? 'is-selected' : ''}" data-mode-item="speak">
+              <label class="mode-radio-label" for="mode-radio-speak">
+                <input type="radio" name="bible-mode-radio" id="mode-radio-speak" value="speak" class="mode-radio-input" ${activeMode === 'speak' ? 'checked' : ''} />
+                <span class="mode-radio-custom"></span>
+                <span class="mode-radio-info">
+                  <strong class="mode-radio-name">🗣️ Speak</strong>
+                  <span class="mode-radio-desc">Speak scripture aloud word by word (${singleVerseMode ? 'Single Verse' : 'Chapter'})</span>
+                </span>
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm mode-settings-gear-btn" data-open-mode-settings="speak" title="Speak Mode Settings" aria-label="Speak Mode Settings">
+                ⚙️
+              </button>
+            </div>
+          </div>
+
+          <div class="typing-options-footer">
+            <button type="button" class="btn btn-primary btn-sm" id="mode-select-done-btn">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Per-Mode Settings Modal (Stacked on top of Mode Modal) -->
+      <div class="typing-options-backdrop mode-settings-backdrop" id="mode-settings-backdrop" hidden>
+        <div class="typing-options-card mode-settings-card" role="dialog" aria-modal="true" aria-labelledby="mode-settings-title">
+          <div class="typing-options-header">
+            <h2 class="typing-options-title" id="mode-settings-title">⚙️ Mode Settings</h2>
+            <button type="button" class="options-close-btn" id="mode-settings-close-btn" aria-label="Close mode settings">✕</button>
+          </div>
+
+          <!-- Type / Speak Settings Body -->
+          <div class="typing-options-body" id="mode-settings-type-speak-body">
             <!-- Mode Tabs: Chapter Mode vs Single Verse Mode -->
-            <div class="modal-mode-tabs" role="tablist" aria-label="Typing Mode">
+            <div class="modal-mode-tabs" role="tablist" aria-label="Passage Scope">
               <button type="button" class="modal-mode-tab ${!singleVerseMode ? 'active' : ''}" id="tab-btn-chapter" role="tab" aria-selected="${!singleVerseMode}">
                 Chapter Mode
               </button>
@@ -495,74 +761,106 @@ export function renderTypingScreen(container, params = {}) {
               </button>
             </div>
 
-            <!-- Mode Panels Wrapper (fixed height to prevent layout jumps) -->
+            <!-- Mode Panels Wrapper -->
             <div class="modal-tab-panels-wrapper">
               <!-- Panel: Chapter Mode -->
               <div class="modal-tab-panel ${!singleVerseMode ? 'active' : ''}" id="panel-chapter-mode" role="tabpanel">
-                <!-- Toggle: Skip Completed Verses (Only configurable under Chapter Mode) -->
                 <label class="typing-option-row" for="toggle-skip-done-checkbox">
                   <span class="option-title">Skip Completed Verses</span>
                   <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
                 </label>
-
-                <!-- Action: Mark Chapter Read -->
-                <div class="typing-option-row option-action-row" id="modal-mark-ch-row">
-                  <span class="option-title">${book.name} ${initialChapter}</span>
-                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
-                    <span id="modal-mark-ch-read-label">📖 Mark Read</span>
-                  </button>
-                </div>
               </div>
 
               <!-- Panel: Single Verse Mode -->
               <div class="modal-tab-panel ${singleVerseMode ? 'active' : ''}" id="panel-single-mode" role="tabpanel">
-                <!-- Toggle: Auto-Advance (Under Single Verse Mode) -->
                 <label class="typing-option-row" for="toggle-auto-advance-checkbox">
                   <span class="option-title">Auto-Advance</span>
                   <input type="checkbox" id="toggle-auto-advance-checkbox" class="option-switch" ${autoAdvance ? 'checked' : ''} />
                 </label>
 
-                <!-- Toggle: Shuffle Verses (Entire Bible) -->
                 <label class="typing-option-row" id="toggle-shuffle-row" for="toggle-shuffle-checkbox">
                   <span class="option-title">Shuffle Next Verses (Entire Bible)</span>
                   <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
                 </label>
+              </div>
+            </div>
+          </div>
 
-                <!-- Toggle: Meditate Mode (Coloring Canvas) -->
-                <label class="typing-option-row" id="toggle-meditate-mode-row" for="toggle-meditate-mode-checkbox">
-                  <span class="option-title">Meditate Mode (Coloring Canvas)</span>
-                  <input type="checkbox" id="toggle-meditate-mode-checkbox" class="option-switch" ${meditateMode ? 'checked' : ''} />
-                </label>
+          <!-- Draw Settings Body -->
+          <div class="typing-options-body" id="mode-settings-draw-body" hidden>
+            <label class="typing-option-row" for="toggle-draw-auto-advance-checkbox">
+              <span class="option-title">Auto-Advance When Marking Read</span>
+              <input type="checkbox" id="toggle-draw-auto-advance-checkbox" class="option-switch" ${autoAdvance ? 'checked' : ''} />
+            </label>
 
-                <!-- Action: Mark Verse Read -->
-                <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
-                  <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
-                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
-                    <span id="modal-mark-verse-read-label">📖 Mark Read</span>
-                  </button>
-                </div>
+            <label class="typing-option-row" for="toggle-draw-shuffle-checkbox">
+              <span class="option-title">Shuffle Next Verses (Entire Bible)</span>
+              <input type="checkbox" id="toggle-draw-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
+            </label>
+
+            <div class="typing-option-row option-action-row">
+              <span class="option-title">Default Artwork Typography</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="draw-reset-typography-btn">↺ Reset Font &amp; Size</button>
+            </div>
+          </div>
+
+          <div class="typing-options-footer">
+            <button type="button" class="btn btn-primary btn-sm" id="mode-settings-done-btn">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Actions Modal (General Options & Mark as Read) -->
+      <div class="typing-options-backdrop typing-actions-backdrop" id="typing-actions-backdrop" hidden>
+        <div class="typing-options-card typing-actions-card" role="dialog" aria-modal="true" aria-labelledby="typing-actions-title">
+          <div class="typing-options-header">
+            <h2 class="typing-options-title" id="typing-actions-title">⚡ Actions</h2>
+            <button type="button" class="options-close-btn" id="actions-close-btn" aria-label="Close actions">✕</button>
+          </div>
+
+          <div class="typing-options-body">
+            <!-- Mark as Read section (shown when not already on the main summary bar for that mode) -->
+            <div id="actions-mark-read-section" ${singleVerseMode && activeMode === 'draw' ? 'hidden' : ''}>
+              <div class="typing-options-section-divider" style="margin-top: 0;">
+                <span>Mark as Read</span>
+              </div>
+
+              <!-- Mark Current Verse Read -->
+              <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
+                <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
+                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
+                  <span id="modal-mark-verse-read-label">📖 Mark Read</span>
+                </button>
+              </div>
+
+              <!-- Mark Entire Chapter Read (shown in Chapter Mode) -->
+              <div class="typing-option-row option-action-row" id="modal-mark-ch-row" ${singleVerseMode ? 'hidden' : ''}>
+                <span class="option-title">${book.name} ${initialChapter} (Full Chapter)</span>
+                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
+                  <span id="modal-mark-ch-read-label">📖 Mark Read</span>
+                </button>
               </div>
             </div>
 
             <div class="typing-options-section-divider">
-              <span>General</span>
+              <span>General Options</span>
             </div>
 
             <!-- Toggle: Live Stats Bar -->
-            <label class="typing-option-row" for="toggle-stats-checkbox">
+            <label class="typing-option-row" id="actions-stats-row" for="toggle-stats-checkbox" ${activeMode === 'draw' ? 'hidden' : ''}>
               <span class="option-title">Show Live Stats Bar</span>
               <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
             </label>
 
             <!-- Action: Restart Passage -->
-            <div class="typing-option-row option-action-row">
+            <div class="typing-option-row option-action-row" id="actions-restart-row" ${activeMode === 'draw' ? 'hidden' : ''}>
               <span class="option-title">Cursor Position</span>
               <button type="button" class="btn btn-secondary btn-sm" id="modal-restart-btn">↺ Reset to Start</button>
             </div>
           </div>
 
           <div class="typing-options-footer">
-            <button type="button" class="btn btn-primary btn-sm" id="options-done-btn">Done</button>
+            <button type="button" class="btn btn-primary btn-sm" id="actions-done-btn">Done</button>
           </div>
         </div>
       </div>
@@ -624,18 +922,41 @@ export function renderTypingScreen(container, params = {}) {
   const singleFavBtn = container.querySelector('#single-verse-fav-btn');
   const singleFavIcon = container.querySelector('#single-verse-fav-icon');
   const readFullChapterBtn = container.querySelector('#single-verse-read-chapter-btn');
-  const optionsBtn = container.querySelector('#typing-options-btn');
-  const optionsBackdrop = container.querySelector('#typing-options-backdrop');
-  const optionsCloseBtn = container.querySelector('#options-close-btn');
-  const optionsDoneBtn = container.querySelector('#options-done-btn');
+  const modeBtn = container.querySelector('#typing-mode-btn');
+  const modeBtnLabel = container.querySelector('#typing-mode-btn-label');
+  const actionsBtn = container.querySelector('#typing-actions-btn');
+  const speakMicToggleBtn = container.querySelector('#speak-mic-toggle-btn');
+  const speakMicToggleLabel = container.querySelector('#speak-mic-toggle-label');
+  const speakStatusPill = container.querySelector('#speak-status-pill');
+
+  // Mode Modal (Base) & Mode Settings Modal (Stacked)
+  const modeSelectBackdrop = container.querySelector('#mode-select-backdrop');
+  const modeSelectCloseBtn = container.querySelector('#mode-select-close-btn');
+  const modeSelectDoneBtn = container.querySelector('#mode-select-done-btn');
+  const modeSettingsBackdrop = container.querySelector('#mode-settings-backdrop');
+  const modeSettingsTitle = container.querySelector('#mode-settings-title');
+  const modeSettingsCloseBtn = container.querySelector('#mode-settings-close-btn');
+  const modeSettingsDoneBtn = container.querySelector('#mode-settings-done-btn');
+  const modeSettingsTypeSpeakBody = container.querySelector('#mode-settings-type-speak-body');
+  const modeSettingsDrawBody = container.querySelector('#mode-settings-draw-body');
+
+  // Actions Modal
+  const actionsBackdrop = container.querySelector('#typing-actions-backdrop');
+  const actionsCloseBtn = container.querySelector('#actions-close-btn');
+  const actionsDoneBtn = container.querySelector('#actions-done-btn');
+  const actionsMarkReadSection = container.querySelector('#actions-mark-read-section');
+  const actionsStatsRow = container.querySelector('#actions-stats-row');
+  const actionsRestartRow = container.querySelector('#actions-restart-row');
+
   const tabBtnChapter = container.querySelector('#tab-btn-chapter');
   const tabBtnSingle = container.querySelector('#tab-btn-single');
   const panelChapterMode = container.querySelector('#panel-chapter-mode');
   const panelSingleMode = container.querySelector('#panel-single-mode');
-  const toggleShuffleRow = container.querySelector('#toggle-shuffle-row');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
   const toggleAutoAdvanceCheckbox = container.querySelector('#toggle-auto-advance-checkbox');
-  const toggleMeditateCheckbox = container.querySelector('#toggle-meditate-mode-checkbox');
+  const toggleDrawAutoAdvanceCheckbox = container.querySelector('#toggle-draw-auto-advance-checkbox');
+  const toggleDrawShuffleCheckbox = container.querySelector('#toggle-draw-shuffle-checkbox');
+  const drawResetTypographyBtn = container.querySelector('#draw-reset-typography-btn');
   const meditateMarkReadBtn = container.querySelector('#meditate-mark-read-btn');
   const meditateMarkReadLbl = container.querySelector('#meditate-mark-read-label');
   const toggleStatsCheckbox = container.querySelector('#toggle-stats-checkbox');
@@ -648,6 +969,7 @@ export function renderTypingScreen(container, params = {}) {
   const viewportWrapper = container.querySelector('#typing-viewport-wrapper');
   const meditateCanvasWrapper = container.querySelector('#meditate-canvas-wrapper');
   const focusBanner = container.querySelector('#typing-focus-banner');
+  const focusBannerText = container.querySelector('#typing-focus-banner-text');
   const passageScroll = container.querySelector('#typing-passage-scroll');
   const passageContent = container.querySelector('#typing-passage-content');
   const errorAlert = container.querySelector('#typing-error-alert');
@@ -657,12 +979,22 @@ export function renderTypingScreen(container, params = {}) {
   const liveAccEl = container.querySelector('#live-acc');
   const liveVerseEl = container.querySelector('#live-verse');
   const liveTimeEl = container.querySelector('#live-time');
-  const telemetrySubStatusEl = null; // integrated into compact badges and modals
+  const telemetrySubStatusEl = null;
   const completionBackdrop = container.querySelector('#completion-modal-backdrop');
 
   let pendingSingleVerseSwitch = null;
 
-  // ── 1. Typing Options Modal Controls ───────────────────────────
+  function isAnyModalOpen() {
+    return Boolean(
+      (modeSelectBackdrop && !modeSelectBackdrop.hidden) ||
+      (modeSettingsBackdrop && !modeSettingsBackdrop.hidden) ||
+      (actionsBackdrop && !actionsBackdrop.hidden) ||
+      (bookmarkBackdrop && !bookmarkBackdrop.hidden) ||
+      (completionBackdrop && !completionBackdrop.hidden)
+    );
+  }
+
+  // ── 1. Mode Modal, Stacked Mode Settings Modal & Actions Modal ──
   function setModalTab(isSingle) {
     if (tabBtnChapter) {
       tabBtnChapter.classList.toggle('active', !isSingle);
@@ -681,114 +1013,283 @@ export function renderTypingScreen(container, params = {}) {
       panelSingleMode.classList.toggle('active', isSingle);
       panelSingleMode.removeAttribute('hidden');
     }
-
-    updateReadButtons();
   }
 
-  function selectMode(isSingle) {
+  function selectScopeMode(isSingle) {
     pendingSingleVerseSwitch = isSingle;
     setSingleVerseModePref(isSingle);
     setModalTab(isSingle);
 
     if (advanceStepBtn) {
-      advanceStepBtn.hidden = !isSingle || autoAdvance;
+      advanceStepBtn.hidden = !isSingle || autoAdvance || activeMode === 'draw';
       advanceStepBtn.textContent = (isSingle && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+    }
+    // Update descriptions in Mode Modal
+    container.querySelectorAll('.mode-radio-item').forEach(item => {
+      const m = item.getAttribute('data-mode-item');
+      const desc = item.querySelector('.mode-radio-desc');
+      if (desc && m === 'type') {
+        desc.textContent = `Type scripture character by character (${isSingle ? 'Single Verse' : 'Chapter'})`;
+      } else if (desc && m === 'speak') {
+        desc.textContent = `Speak scripture aloud word by word (${isSingle ? 'Single Verse' : 'Chapter'})`;
+      }
+    });
+  }
+
+  function syncModeRadioUI() {
+    container.querySelectorAll('.mode-radio-item').forEach(item => {
+      const m = item.getAttribute('data-mode-item');
+      const isSel = m === activeMode;
+      item.classList.toggle('is-selected', isSel);
+      const radio = item.querySelector('.mode-radio-input');
+      if (radio) radio.checked = isSel;
+    });
+    if (modeBtnLabel) {
+      modeBtnLabel.textContent = getModeBtnLabelHtml(activeMode);
+    }
+    const navPromisesBtn = document.getElementById('nav-promises-btn');
+    if (navPromisesBtn) {
+      navPromisesBtn.setAttribute('href', `/${activeMode}`);
     }
   }
 
-  function openOptionsModal() {
-    pendingSingleVerseSwitch = null;
-    setModalTab(singleVerseMode);
+  function switchActiveMode(newMode) {
+    if (!['type', 'draw', 'speak'].includes(newMode)) return;
+    const prevMode = activeMode;
+    activeMode = newMode;
+    meditateMode = activeMode === 'draw';
+    setActiveModePref(activeMode);
+    syncModeRadioUI();
+    trackEvent('switch_mode', { mode: activeMode, prevMode });
 
-    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
-    if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
-    if (toggleMeditateCheckbox) toggleMeditateCheckbox.checked = meditateMode;
-    if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
-    if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
-    updateReadButtons();
-    if (optionsBackdrop) optionsBackdrop.hidden = false;
+    // If switching to Draw mode while in Chapter mode, transition to Single Verse mode on current verse
+    if (activeMode === 'draw' && !singleVerseMode) {
+      setSingleVerseModePref(true);
+      const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+      const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : 1;
+      navigate(`/draw/${book.id}/${initialChapter}/${vNum}`, { replace: true });
+      return;
+    }
+
+    // Update URL cleanly without reloading browser page
+    const cleanTargetUrl = singleVerseMode
+      ? `/${activeMode}/${book.id}/${initialChapter}/${targetSingleVerseNum || 1}`
+      : `/${activeMode}/${book.id}/${initialChapter}`;
+    if (window.location.pathname !== cleanTargetUrl) {
+      window.history.replaceState(null, '', cleanTargetUrl);
+    }
+    const modeTitle = activeMode === 'speak' ? 'Speak' : (activeMode === 'draw' ? 'Draw' : 'Type');
+    document.title = `${book.name} ${initialChapter}${singleVerseMode ? `:${targetSingleVerseNum}` : ''} — ${modeTitle} | Promises to Creation`;
+
+    if (activeMode === 'speak') {
+      micEnabled = true;
+    }
+    applyMeditateModeState();
   }
 
-  function closeOptionsModal() {
-    if (optionsBackdrop) optionsBackdrop.hidden = true;
-    if (pendingSingleVerseSwitch !== null && pendingSingleVerseSwitch !== singleVerseMode) {
+  function openModeSelectModal() {
+    pendingSingleVerseSwitch = null;
+    syncModeRadioUI();
+    if (modeSelectBackdrop) modeSelectBackdrop.hidden = false;
+  }
+
+  function applyPendingScopeSwitchIfNeeded() {
+    if (pendingSingleVerseSwitch !== null && pendingSingleVerseSwitch !== singleVerseMode && activeMode !== 'draw') {
       const isSingle = pendingSingleVerseSwitch;
       pendingSingleVerseSwitch = null;
       if (isSingle) {
         if (shuffleVerses) {
           const randRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum || 1 });
-          navigate(`/typing/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
+          navigate(`/${activeMode}/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
         } else {
           const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
           const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1);
-          navigate(`/typing/${book.id}/${initialChapter}/${vNum}`);
+          navigate(`/${activeMode}/${book.id}/${initialChapter}/${vNum}`);
         }
       } else {
         const vNum = targetSingleVerseNum || 1;
-        navigate(`/typing/${book.id}/${initialChapter}?verse=${vNum}`);
+        navigate(`/${activeMode}/${book.id}/${initialChapter}?verse=${vNum}`);
       }
-      return;
+      return true;
     }
+    return false;
+  }
+
+  function closeModeSelectModal() {
+    if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = true;
+    if (modeSelectBackdrop) modeSelectBackdrop.hidden = true;
+    if (applyPendingScopeSwitchIfNeeded()) return;
     focusTypingInput();
   }
 
-  if (optionsBtn) {
-    optionsBtn.addEventListener('click', () => {
-      openOptionsModal();
+  function openModeSettingsModal(targetMode) {
+    const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
+    setModalTab(isSingle);
+    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
+    if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
+    if (toggleDrawAutoAdvanceCheckbox) toggleDrawAutoAdvanceCheckbox.checked = autoAdvance;
+    if (toggleDrawShuffleCheckbox) toggleDrawShuffleCheckbox.checked = shuffleVerses;
+    if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
+
+    if (targetMode === 'draw') {
+      if (modeSettingsTitle) modeSettingsTitle.textContent = '🎨 Draw Mode Settings';
+      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = true;
+      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = false;
+    } else if (targetMode === 'speak') {
+      if (modeSettingsTitle) modeSettingsTitle.textContent = '🗣️ Speak Mode Settings';
+      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
+      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
+    } else {
+      if (modeSettingsTitle) modeSettingsTitle.textContent = '⌨️ Type Mode Settings';
+      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
+      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
+    }
+
+    if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = false;
+  }
+
+  function closeModeSettingsModal() {
+    if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = true;
+  }
+
+  function openActionsModal() {
+    if (toggleStatsCheckbox) toggleStatsCheckbox.checked = showTypingStats;
+    if (actionsMarkReadSection) {
+      actionsMarkReadSection.hidden = Boolean(singleVerseMode && activeMode === 'draw');
+    }
+    if (actionsStatsRow) {
+      actionsStatsRow.hidden = activeMode === 'draw';
+    }
+    if (actionsRestartRow) {
+      actionsRestartRow.hidden = activeMode === 'draw';
+    }
+    updateReadButtons();
+    if (actionsBackdrop) actionsBackdrop.hidden = false;
+  }
+
+  function closeActionsModal() {
+    if (actionsBackdrop) actionsBackdrop.hidden = true;
+    focusTypingInput();
+  }
+
+  if (modeBtn) {
+    modeBtn.addEventListener('click', () => openModeSelectModal());
+  }
+  if (modeSelectCloseBtn) {
+    modeSelectCloseBtn.addEventListener('click', () => closeModeSelectModal());
+  }
+  if (modeSelectDoneBtn) {
+    modeSelectDoneBtn.addEventListener('click', () => closeModeSelectModal());
+  }
+  if (modeSelectBackdrop) {
+    modeSelectBackdrop.addEventListener('click', (e) => {
+      if (e.target === modeSelectBackdrop) closeModeSelectModal();
     });
   }
 
-  if (optionsCloseBtn) {
-    optionsCloseBtn.addEventListener('click', () => {
-      closeOptionsModal();
-    });
-  }
-
-  if (optionsDoneBtn) {
-    optionsDoneBtn.addEventListener('click', () => {
-      closeOptionsModal();
-    });
-  }
-
-  if (optionsBackdrop) {
-    optionsBackdrop.addEventListener('click', (e) => {
-      if (e.target === optionsBackdrop) {
-        closeOptionsModal();
+  // Radio selection inside Mode Modal
+  container.querySelectorAll('.mode-radio-input').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        switchActiveMode(e.target.value);
       }
+    });
+  });
+
+  // Settings gear buttons inside Mode Modal (opens Stacked Mode Settings Modal)
+  container.querySelectorAll('.mode-settings-gear-btn').forEach(gearBtn => {
+    gearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetMode = gearBtn.getAttribute('data-open-mode-settings') || activeMode;
+      openModeSettingsModal(targetMode);
+    });
+  });
+
+  if (modeSettingsCloseBtn) {
+    modeSettingsCloseBtn.addEventListener('click', () => closeModeSettingsModal());
+  }
+  if (modeSettingsDoneBtn) {
+    modeSettingsDoneBtn.addEventListener('click', () => closeModeSettingsModal());
+  }
+  if (modeSettingsBackdrop) {
+    modeSettingsBackdrop.addEventListener('click', (e) => {
+      if (e.target === modeSettingsBackdrop) closeModeSettingsModal();
+    });
+  }
+
+  if (actionsBtn) {
+    actionsBtn.addEventListener('click', () => openActionsModal());
+  }
+  if (actionsCloseBtn) {
+    actionsCloseBtn.addEventListener('click', () => closeActionsModal());
+  }
+  if (actionsDoneBtn) {
+    actionsDoneBtn.addEventListener('click', () => closeActionsModal());
+  }
+  if (actionsBackdrop) {
+    actionsBackdrop.addEventListener('click', (e) => {
+      if (e.target === actionsBackdrop) closeActionsModal();
     });
   }
 
   if (tabBtnChapter) {
     tabBtnChapter.addEventListener('click', () => {
-      selectMode(false);
+      selectScopeMode(false);
     });
   }
 
   if (tabBtnSingle) {
     tabBtnSingle.addEventListener('click', () => {
-      selectMode(true);
+      selectScopeMode(true);
     });
   }
+
+  const syncShuffleToggle = (enabled) => {
+    shuffleVerses = Boolean(enabled);
+    setShuffleVersesPref(shuffleVerses);
+    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
+    if (toggleDrawShuffleCheckbox) toggleDrawShuffleCheckbox.checked = shuffleVerses;
+    trackEvent('toggle_shuffle', { enabled: shuffleVerses });
+    if (advanceStepBtn) {
+      advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+    }
+  };
 
   if (toggleShuffleCheckbox) {
-    toggleShuffleCheckbox.addEventListener('change', () => {
-      shuffleVerses = toggleShuffleCheckbox.checked;
-      setShuffleVersesPref(shuffleVerses);
-      trackEvent('toggle_shuffle', { enabled: shuffleVerses });
-      if (advanceStepBtn) {
-        advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
-      }
-    });
+    toggleShuffleCheckbox.addEventListener('change', () => syncShuffleToggle(toggleShuffleCheckbox.checked));
+  }
+  if (toggleDrawShuffleCheckbox) {
+    toggleDrawShuffleCheckbox.addEventListener('change', () => syncShuffleToggle(toggleDrawShuffleCheckbox.checked));
   }
 
+  const syncAutoAdvanceToggle = (enabled) => {
+    autoAdvance = Boolean(enabled);
+    setAutoAdvancePref(autoAdvance);
+    if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
+    if (toggleDrawAutoAdvanceCheckbox) toggleDrawAutoAdvanceCheckbox.checked = autoAdvance;
+    trackEvent('toggle_auto_advance', { enabled: autoAdvance });
+    if (advanceStepBtn) {
+      const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
+      advanceStepBtn.hidden = !isSingle || autoAdvance || activeMode === 'draw';
+    }
+  };
+
   if (toggleAutoAdvanceCheckbox) {
-    toggleAutoAdvanceCheckbox.addEventListener('change', () => {
-      autoAdvance = toggleAutoAdvanceCheckbox.checked;
-      setAutoAdvancePref(autoAdvance);
-      trackEvent('toggle_auto_advance', { enabled: autoAdvance });
-      if (advanceStepBtn) {
-        const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
-        advanceStepBtn.hidden = !isSingle || autoAdvance;
+    toggleAutoAdvanceCheckbox.addEventListener('change', () => syncAutoAdvanceToggle(toggleAutoAdvanceCheckbox.checked));
+  }
+  if (toggleDrawAutoAdvanceCheckbox) {
+    toggleDrawAutoAdvanceCheckbox.addEventListener('change', () => syncAutoAdvanceToggle(toggleDrawAutoAdvanceCheckbox.checked));
+  }
+
+  if (drawResetTypographyBtn) {
+    drawResetTypographyBtn.addEventListener('click', () => {
+      setMeditateFontPref(DEFAULT_MEDITATE_FONT);
+      setMeditateFontSizePref(DEFAULT_MEDITATE_FONT_SIZE);
+      setMeditateFontCasePref(DEFAULT_MEDITATE_FONT_CASE);
+      setMeditateFontColorPref(DEFAULT_MEDITATE_FONT_COLOR);
+      setMeditateBoxWidthPref(DEFAULT_MEDITATE_BOX_WIDTH);
+      if (activeMode === 'draw') {
+        renderMeditateModeCanvas();
       }
     });
   }
@@ -806,7 +1307,7 @@ export function renderTypingScreen(container, params = {}) {
       setShowTypingStatsPref(showTypingStats);
       trackEvent('toggle_typing_stats', { enabled: showTypingStats });
       if (summaryStatsLine) {
-        summaryStatsLine.hidden = !showTypingStats;
+        summaryStatsLine.hidden = !showTypingStats || activeMode === 'draw';
       }
     });
   }
@@ -819,12 +1320,15 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
-  if (toggleMeditateCheckbox) {
-    toggleMeditateCheckbox.addEventListener('change', () => {
-      meditateMode = toggleMeditateCheckbox.checked;
-      setMeditateModePref(meditateMode);
-      trackEvent('toggle_meditate_mode', { enabled: meditateMode });
-      applyMeditateModeState();
+  if (speakMicToggleBtn) {
+    speakMicToggleBtn.addEventListener('click', () => {
+      micEnabled = !micEnabled;
+      updateSpeakMicUI();
+      if (micEnabled && activeMode === 'speak' && !isCompleted) {
+        startSpeechRecognition();
+      } else {
+        stopSpeechRecognition();
+      }
     });
   }
 
@@ -908,6 +1412,12 @@ export function renderTypingScreen(container, params = {}) {
       toggleVerseRead(book.id, initialChapter, vNum, activeTranslation);
       trackEvent('toggle_verse_read', { bookId: book.id, chapter: initialChapter, verse: vNum });
       updateReadButtons();
+      if (singleVerseMode && autoAdvance) {
+        closeActionsModal();
+        setTimeout(() => {
+          navigateNextStep();
+        }, 350);
+      }
     });
   }
 
@@ -918,7 +1428,7 @@ export function renderTypingScreen(container, params = {}) {
         ? targetSingleVerseNum
         : ((curVIdx >= 0 && verseRanges[curVIdx]) ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1));
       toggleVerseRead(book.id, initialChapter, vNum, activeTranslation);
-      trackEvent('toggle_verse_read_meditate', { bookId: book.id, chapter: initialChapter, verse: vNum });
+      trackEvent('toggle_verse_read_draw', { bookId: book.id, chapter: initialChapter, verse: vNum });
       updateReadButtons();
       if (autoAdvance) {
         setTimeout(() => {
@@ -995,12 +1505,17 @@ export function renderTypingScreen(container, params = {}) {
     readFullChapterBtn.addEventListener('click', () => {
       const vNum = targetSingleVerseNum || 1;
       setSingleVerseModePref(false);
+      const targetChapterMode = activeMode === 'draw' ? 'type' : activeMode;
+      if (activeMode === 'draw') {
+        setActiveModePref('type');
+      }
       trackEvent('single_verse_read_full_chapter_click', {
         bookId: book.id,
         chapter: initialChapter,
-        verse: vNum
+        verse: vNum,
+        mode: targetChapterMode
       });
-      navigate(`/typing/${book.id}/${initialChapter}?verse=${vNum}`);
+      navigate(`/${targetChapterMode}/${book.id}/${initialChapter}?verse=${vNum}`);
     });
   }
 
@@ -1246,17 +1761,17 @@ export function renderTypingScreen(container, params = {}) {
         const prev = popRandomVerseHistory();
         if (prev) {
           pushRandomVerseForward({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-          navigate(`/typing/${prev.bookId}/${prev.chapter}/${prev.verse}`);
+          navigate(`/${activeMode}/${prev.bookId}/${prev.chapter}/${prev.verse}`);
           return;
         }
       }
       if (targetSingleVerseNum > 1) {
-        navigate(`/typing/${book.id}/${initialChapter}/${targetSingleVerseNum - 1}`);
+        navigate(`/${activeMode}/${book.id}/${initialChapter}/${targetSingleVerseNum - 1}`);
       } else {
-        navigate(`/typing/${prevChapterRef.bookId}/${prevChapterRef.chapter}/1`);
+        navigate(`/${activeMode}/${prevChapterRef.bookId}/${prevChapterRef.chapter}/1`);
       }
     } else {
-      navigate(`/typing/${prevChapterRef.bookId}/${prevChapterRef.chapter}`);
+      navigate(`/${activeMode}/${prevChapterRef.bookId}/${prevChapterRef.chapter}`);
     }
   }
 
@@ -1266,7 +1781,7 @@ export function renderTypingScreen(container, params = {}) {
         const fwd = popRandomVerseForward();
         if (fwd) {
           pushRandomVerseHistory({ bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-          navigate(`/typing/${fwd.bookId}/${fwd.chapter}/${fwd.verse}`);
+          navigate(`/${activeMode}/${fwd.bookId}/${fwd.chapter}/${fwd.verse}`);
           return;
         }
 
@@ -1275,23 +1790,38 @@ export function renderTypingScreen(container, params = {}) {
 
         // Use preloaded random verse for instantaneous transition
         const nextRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
-        navigate(`/typing/${nextRef.bookId}/${nextRef.chapter}/${nextRef.verse}`);
+        navigate(`/${activeMode}/${nextRef.bookId}/${nextRef.chapter}/${nextRef.verse}`);
         return;
       }
 
       const maxV = allChapterVerses.length || targetSingleVerseNum;
       if (targetSingleVerseNum < maxV) {
-        navigate(`/typing/${book.id}/${initialChapter}/${targetSingleVerseNum + 1}`);
+        navigate(`/${activeMode}/${book.id}/${initialChapter}/${targetSingleVerseNum + 1}`);
       } else {
-        navigate(`/typing/${nextChapterRef.bookId}/${nextChapterRef.chapter}/1`);
+        navigate(`/${activeMode}/${nextChapterRef.bookId}/${nextChapterRef.chapter}/1`);
       }
     } else {
-      navigate(`/typing/${nextChapterRef.bookId}/${nextChapterRef.chapter}`);
+      navigate(`/${activeMode}/${nextChapterRef.bookId}/${nextChapterRef.chapter}`);
     }
   }
 
   if (prevStepBtn) prevStepBtn.addEventListener('click', navigatePrevStep);
   if (nextStepBtn) nextStepBtn.addEventListener('click', navigateNextStep);
+
+  function syncLiveStatsLabels() {
+    const lbl1 = container.querySelector('#live-stat-lbl-1');
+    const lbl2 = container.querySelector('#live-stat-lbl-2');
+    const lbl3 = container.querySelector('#live-stat-lbl-3');
+    if (activeMode === 'speak') {
+      if (lbl1) lbl1.textContent = 'Cadence';
+      if (lbl2) lbl2.textContent = 'Pronunciation';
+      if (lbl3) lbl3.textContent = 'Enunciation';
+    } else {
+      if (lbl1) lbl1.textContent = 'WPM';
+      if (lbl2) lbl2.textContent = 'CPM';
+      if (lbl3) lbl3.textContent = 'Accuracy';
+    }
+  }
 
   function restartTyping() {
     clearTimer();
@@ -1302,17 +1832,34 @@ export function renderTypingScreen(container, params = {}) {
     mistakes = 0;
     errorBuffer = [];
     isCompleted = false;
+    spokenWordErrors = [];
+    spokenWordsEvaluated = 0;
+    spokenWordsCorrect = 0;
+    spokenPronunciationSum = 0;
+    spokenEnunciationSum = 0;
+    spokenWordStatusMap.clear();
+    speechProcessedMap.clear();
     resetActiveVerseTelemetry();
 
-    if (liveWpmEl) liveWpmEl.textContent = '0';
-    if (liveCpmEl) liveCpmEl.textContent = '0';
+    const speakEndCard = container.querySelector('#speak-end-summary-card');
+    if (speakEndCard) {
+      speakEndCard.hidden = true;
+      speakEndCard.innerHTML = '';
+    }
+    wordsList.forEach(w => {
+      if (w.wordEl) w.wordEl.classList.remove('is-speak-error', 'is-speak-active');
+    });
+
+    syncLiveStatsLabels();
+    if (liveWpmEl) liveWpmEl.textContent = activeMode === 'speak' ? '0 WPM' : '0';
+    if (liveCpmEl) liveCpmEl.textContent = activeMode === 'speak' ? '100%' : '0';
     if (liveAccEl) liveAccEl.textContent = '100%';
     if (liveTimeEl) liveTimeEl.textContent = '0:00';
     if (errorAlert) errorAlert.hidden = true;
     if (completionBackdrop) completionBackdrop.hidden = true;
     if (viewportWrapper) viewportWrapper.classList.remove('has-active-error');
     if (advanceStepBtn) {
-      advanceStepBtn.hidden = !singleVerseMode || autoAdvance;
+      advanceStepBtn.hidden = !singleVerseMode || autoAdvance || activeMode === 'draw';
       advanceStepBtn.classList.remove('btn-primary', 'is-ready');
       advanceStepBtn.classList.add('btn-secondary');
       advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
@@ -1332,13 +1879,18 @@ export function renderTypingScreen(container, params = {}) {
     if (passageScroll) {
       passageScroll.scrollTop = 0;
     }
-    focusTypingInput();
+    if (activeMode === 'speak' && micEnabled) {
+      stopSpeechRecognition();
+      startSpeechRecognition();
+    } else {
+      focusTypingInput();
+    }
   }
 
   if (modalRestartBtn) {
     modalRestartBtn.addEventListener('click', () => {
-      closeOptionsModal();
-      trackEvent('restart_bible_chapter', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum });
+      closeActionsModal();
+      trackEvent('restart_bible_chapter', { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum, mode: activeMode });
       restartTyping();
     });
   }
@@ -1349,6 +1901,11 @@ export function renderTypingScreen(container, params = {}) {
     verseKeystrokes = 0;
     verseCorrectKeystrokes = 0;
     verseMistakes = 0;
+    verseSpokenWordErrors = [];
+    verseSpokenWordsEvaluated = 0;
+    verseSpokenWordsCorrect = 0;
+    verseSpokenPronunciationSum = 0;
+    verseSpokenEnunciationSum = 0;
   }
 
   function findNextIncompleteVerseIdx(fromVIdx, wrapAround = false) {
@@ -1371,10 +1928,15 @@ export function renderTypingScreen(container, params = {}) {
     const vRange = verseRanges.find(vr => vr.verse === Number(verseNum));
     if (!vRange) return false;
 
-    const prevCursor = cursorIdx;
-    const prevErrLen = errorBuffer.length;
     errorBuffer = [];
     cursorIdx = vRange.startCharIdx;
+    const mappedWordIdx = charToWordIdxMap[cursorIdx];
+    if (typeof mappedWordIdx === 'number' && mappedWordIdx >= 0) {
+      currentWordIdx = mappedWordIdx;
+    } else {
+      const firstWordInVerse = wordsList.findIndex(w => w.verse === Number(verseNum));
+      currentWordIdx = firstWordInVerse >= 0 ? firstWordInVerse : 0;
+    }
     resetActiveVerseTelemetry();
 
     if (options.isSkipJump) {
@@ -1389,7 +1951,9 @@ export function renderTypingScreen(container, params = {}) {
       telemetrySubStatusEl.innerHTML = options.statusMessage;
     }
 
-    focusTypingInput();
+    if (activeMode !== 'speak') {
+      focusTypingInput();
+    }
     return true;
   }
 
@@ -1410,8 +1974,13 @@ export function renderTypingScreen(container, params = {}) {
       for (let cIdx = vr.startCharIdx; cIdx <= vr.endCharIdx; cIdx++) {
         const el = charEls[cIdx];
         if (!el) continue;
-        el.classList.remove('is-current', 'is-error', 'is-error-caret');
-        if (isVDone) {
+        el.classList.remove('is-current', 'is-error', 'is-error-caret', 'is-speak-error');
+        const wIdx = charToWordIdxMap[cIdx];
+        const wordStatus = typeof wIdx === 'number' ? spokenWordStatusMap.get(wIdx) : null;
+        if (wordStatus === 'error' && activeMode === 'speak') {
+          el.classList.remove('is-correct');
+          el.classList.add('is-speak-error');
+        } else if (isVDone) {
           el.classList.add('is-correct');
         } else if (vr === currentVR && cIdx < cursorIdx) {
           el.classList.add('is-correct');
@@ -1420,9 +1989,51 @@ export function renderTypingScreen(container, params = {}) {
         }
       }
     }
+
+    wordsList.forEach(w => {
+      if (!w.wordEl) return;
+      const st = spokenWordStatusMap.get(w.wordIdx);
+      w.wordEl.classList.toggle('is-speak-error', activeMode === 'speak' && st === 'error');
+      w.wordEl.classList.toggle('is-speak-active', activeMode === 'speak' && !isCompleted && w.wordIdx === currentWordIdx);
+    });
   }
 
-  // ── 7. Passage DOM Builder & Typing Engine ─────────────────────
+  // ── 7. Passage DOM Builder & Typing / Speaking Engine ──────────
+  function updateVerseSup(supEl, vNum) {
+    if (!supEl) return;
+    const summary = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
+    const vRec = summary.record?.completedVerses?.[String(vNum)];
+    const isVRead = Boolean(summary.isFullyRead || vRec?.isRead);
+    const isVSpoken = Boolean(summary.isFullySpoken || vRec?.isSpoken);
+    const isVTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!isVSpoken && !isVRead && vRec?.count && vRec.count > 0));
+    const modesCount = (isVRead ? 1 : 0) + (isVTyped ? 1 : 0) + (isVSpoken ? 1 : 0);
+    let cls = 'verse-num';
+    let txt = String(vNum);
+    let tip = `Verse ${vNum}`;
+    if (modesCount >= 2) {
+      cls += ' is-both';
+      txt = `✓ ${vNum}`;
+      tip = `Verse ${vNum} — Completed in multiple modes! Click to toggle read status.`;
+    } else if (isVTyped) {
+      cls += ' is-done';
+      txt = `✓ ${vNum}`;
+      tip = `Verse ${vNum} — Typed in typing engine. Click to toggle read status.`;
+    } else if (isVSpoken) {
+      cls += ' is-spoken';
+      txt = `🗣️ ${vNum}`;
+      tip = `Verse ${vNum} — Spoken aloud. Click to toggle read status.`;
+    } else if (isVRead) {
+      cls += ' is-read';
+      txt = `📖 ${vNum}`;
+      tip = `Verse ${vNum} — Marked as read. Click to toggle read status.`;
+    } else {
+      tip = `Verse ${vNum} — Click to mark as read.`;
+    }
+    supEl.className = cls;
+    supEl.textContent = txt;
+    supEl.title = tip;
+  }
+
   function buildPassageDOM(loadedChapterVerses) {
     allChapterVerses = loadedChapterVerses;
     const { set: storedDoneSet } = loadCompletedVersesFromStore();
@@ -1440,6 +2051,16 @@ export function renderTypingScreen(container, params = {}) {
     charToVerseMap = [];
     charToVerseIdxMap = [];
     charEls = [];
+    wordsList = [];
+    charToWordIdxMap = [];
+    currentWordIdx = 0;
+    spokenWordErrors = [];
+    spokenWordsEvaluated = 0;
+    spokenWordsCorrect = 0;
+    spokenPronunciationSum = 0;
+    spokenEnunciationSum = 0;
+    spokenWordStatusMap.clear();
+    speechProcessedMap.clear();
     cursorIdx = 0;
     errorBuffer = [];
     startTime = null;
@@ -1449,37 +2070,14 @@ export function renderTypingScreen(container, params = {}) {
     mistakes = 0;
     isCompleted = false;
     sittingTypedVersesSet = new Set();
-    sittingSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    sittingSessionId = `${activeMode === 'speak' ? 'spk' : 's'}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     resetActiveVerseTelemetry();
     clearTimer();
 
-    function updateVerseSup(supEl, vNum) {
-      if (!supEl) return;
-      const summary = getChapterProgressSummary(book.id, initialChapter, activeTranslation);
-      const vRec = summary.record?.completedVerses?.[String(vNum)];
-      const isVRead = Boolean(summary.isFullyRead || vRec?.isRead);
-      const isVTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (vRec?.count && vRec.count > 0));
-      let cls = 'verse-num';
-      let txt = String(vNum);
-      let tip = `Verse ${vNum}`;
-      if (isVRead && isVTyped) {
-        cls += ' is-both';
-        txt = `✓ ${vNum}`;
-        tip = `Verse ${vNum} — Read & Typed! Click to toggle read status.`;
-      } else if (isVTyped) {
-        cls += ' is-done';
-        txt = `✓ ${vNum}`;
-        tip = `Verse ${vNum} — Typed in typing engine. Click to toggle read status.`;
-      } else if (isVRead) {
-        cls += ' is-read';
-        txt = `📖 ${vNum}`;
-        tip = `Verse ${vNum} — Marked as read. Click to toggle read status.`;
-      } else {
-        tip = `Verse ${vNum} — Click to mark as read.`;
-      }
-      supEl.className = cls;
-      supEl.textContent = txt;
-      supEl.title = tip;
+    const speakEndCard = container.querySelector('#speak-end-summary-card');
+    if (speakEndCard) {
+      speakEndCard.hidden = true;
+      speakEndCard.innerHTML = '';
     }
 
     const fragment = document.createDocumentFragment();
@@ -1492,7 +2090,7 @@ export function renderTypingScreen(container, params = {}) {
       verseBlock.setAttribute('data-verse', String(v.verse));
       verseBlock.title = singleVerseMode
         ? `${book.name} ${initialChapter}:${v.verse}`
-        : `Verse ${v.verse}${isVDone ? ' (✓ Completed)' : ''} — Click to start typing at Verse ${v.verse}`;
+        : `Verse ${v.verse}${isVDone ? ' (✓ Completed)' : ''} — Click to start at Verse ${v.verse}`;
 
       const startCharIdx = globalCharIdx;
       let supElement = null;
@@ -1501,6 +2099,8 @@ export function renderTypingScreen(container, params = {}) {
       words.forEach((word, wIdx) => {
         const wordSpan = document.createElement('span');
         wordSpan.className = 't-word';
+        const thisWordGlobalIdx = wordsList.length;
+        wordSpan.setAttribute('data-word-idx', String(thisWordGlobalIdx));
 
         // Attach visible (non-typed) verse number superscript right before the first word of the verse
         if (wIdx === 0) {
@@ -1556,6 +2156,7 @@ export function renderTypingScreen(container, params = {}) {
           }
         }
 
+        const wordStartCharIdx = globalCharIdx;
         for (let i = 0; i < word.length; i++) {
           const ch = word[i];
           const charSpan = document.createElement('span');
@@ -1567,9 +2168,11 @@ export function renderTypingScreen(container, params = {}) {
           targetChars.push(ch);
           charToVerseMap.push(v.verse);
           charToVerseIdxMap.push(vIdx);
+          charToWordIdxMap.push(thisWordGlobalIdx);
           charEls.push(charSpan);
           globalCharIdx++;
         }
+        const wordEndCharIdx = globalCharIdx - 1;
 
         verseBlock.appendChild(wordSpan);
 
@@ -1585,9 +2188,23 @@ export function renderTypingScreen(container, params = {}) {
           targetChars.push(' ');
           charToVerseMap.push(v.verse);
           charToVerseIdxMap.push(vIdx);
+          charToWordIdxMap.push(thisWordGlobalIdx);
           charEls.push(spaceSpan);
           globalCharIdx++;
         }
+
+        wordsList.push({
+          wordIdx: thisWordGlobalIdx,
+          verse: v.verse,
+          vIdx,
+          rawWord: word,
+          cleanWord: normalizeSpokenWord(word),
+          startCharIdx: wordStartCharIdx,
+          endCharIdx: wordEndCharIdx,
+          nextCursorCharIdx: globalCharIdx,
+          isLastWordOfVerse,
+          wordEl: wordSpan
+        });
       });
 
       const endCharIdx = globalCharIdx - 1;
@@ -1612,7 +2229,7 @@ export function renderTypingScreen(container, params = {}) {
           e.stopPropagation();
           jumpToVerse(v.verse, {
             manualClick: true,
-            statusMessage: `📍 Jumped to <strong>${book.name} ${initialChapter}:${v.verse}</strong> — start typing, or click <strong>🎯 Single Verse</strong> to isolate v. ${v.verse}.`
+            statusMessage: `📍 Jumped to <strong>${book.name} ${initialChapter}:${v.verse}</strong>.`
           });
         });
       }
@@ -1647,8 +2264,9 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     // Reset telemetry UI
-    liveWpmEl.textContent = '0';
-    liveCpmEl.textContent = '0';
+    syncLiveStatsLabels();
+    liveWpmEl.textContent = activeMode === 'speak' ? '0 WPM' : '0';
+    liveCpmEl.textContent = activeMode === 'speak' ? '100%' : '0';
     liveAccEl.textContent = '100%';
     liveTimeEl.textContent = '0:00';
     errorAlert.hidden = true;
@@ -1657,19 +2275,46 @@ export function renderTypingScreen(container, params = {}) {
 
     jumpToVerse(initialTargetVerseNum, {
       statusMessage: initialSkipNotice || (singleVerseMode
-        ? `Single-verse mode — type Verse ${targetSingleVerseNum}, or click "Open Entire Chapter" to view all ${allChapterVerses.length} verses.`
-        : `Click any verse in the chapter to start typing from that verse. Completed verses are remembered automatically.`)
+        ? `Single-verse mode — ${activeMode === 'speak' ? 'speak' : 'type'} Verse ${targetSingleVerseNum}, or click "Read Full Chapter" to view all ${allChapterVerses.length} verses.`
+        : `Click any verse in the chapter to start from that verse. Completed verses are remembered automatically.`)
     });
 
     applyMeditateModeState();
   }
 
-  // ── Meditate Mode (Coloring Canvas & Verse Sanctuary) ─────────
+  function updateSpeakMicUI() {
+    if (!speakMicToggleBtn) return;
+    const isSpeak = activeMode === 'speak';
+    speakMicToggleBtn.hidden = !isSpeak;
+    speakMicToggleBtn.classList.toggle('is-mic-active', Boolean(isSpeak && micEnabled));
+    if (speakMicToggleLbl) {
+      speakMicToggleLbl.textContent = micEnabled ? '🎙️ Mic On' : '🔇 Mic Off';
+    }
+    if (speakStatusPill) {
+      speakStatusPill.hidden = !isSpeak;
+      if (isSpeak) {
+        if (!speechSupported) {
+          speakStatusPill.textContent = '⚠️ Speech recognition unsupported in this browser (try Chrome/Edge/Safari)';
+          speakStatusPill.classList.add('is-error');
+        } else if (!micEnabled) {
+          speakStatusPill.textContent = 'Mic paused — click "Mic On" to resume speaking';
+          speakStatusPill.classList.remove('is-error');
+        } else {
+          speakStatusPill.textContent = '🎙️ Listening — speak each word naturally...';
+          speakStatusPill.classList.remove('is-error');
+        }
+      }
+    }
+  }
+
+  // ── Draw Mode (Coloring Canvas & Verse Sanctuary) & Mode State ─
   function applyMeditateModeState() {
-    const isMeditate = Boolean(singleVerseMode && meditateMode);
+    const isMeditate = Boolean(singleVerseMode && activeMode === 'draw');
+    const isSpeak = activeMode === 'speak';
 
     if (viewportWrapper) {
       viewportWrapper.classList.toggle('is-meditate-active', isMeditate);
+      viewportWrapper.classList.toggle('is-speak-active', isSpeak);
     }
 
     if (advanceStepBtn) {
@@ -1680,29 +2325,54 @@ export function renderTypingScreen(container, params = {}) {
       meditateMarkReadBtn.hidden = !isMeditate;
     }
 
+    syncLiveStatsLabels();
     if (summaryStatsLine) {
       summaryStatsLine.hidden = isMeditate || !showTypingStats;
     }
 
-    if (focusBanner && isMeditate) {
+    if (focusBannerText) {
+      focusBannerText.textContent = isSpeak
+        ? '🎙️ Speak aloud into your microphone to advance word by word'
+        : '⌨️ Click any verse or press any key to resume typing';
+    }
+
+    if (focusBanner && (isMeditate || isSpeak)) {
       focusBanner.hidden = true;
     }
 
-    if (errorAlert && isMeditate) {
+    if (errorAlert && (isMeditate || isSpeak)) {
       errorAlert.hidden = true;
     }
 
+    updateSpeakMicUI();
+
     if (isMeditate) {
+      stopSpeechRecognition();
       if (passageScroll) passageScroll.hidden = true;
       if (meditateCanvasWrapper) {
         meditateCanvasWrapper.hidden = false;
         renderMeditateModeCanvas();
       }
-    } else {
+    } else if (isSpeak) {
       if (passageScroll) passageScroll.hidden = false;
       if (meditateCanvasWrapper) {
         meditateCanvasWrapper.hidden = true;
       }
+      refreshAllCharClasses();
+      updateCursorAndErrorClasses(cursorIdx, 0);
+      if (micEnabled && !isCompleted) {
+        startSpeechRecognition();
+      } else {
+        stopSpeechRecognition();
+      }
+    } else {
+      stopSpeechRecognition();
+      if (passageScroll) passageScroll.hidden = false;
+      if (meditateCanvasWrapper) {
+        meditateCanvasWrapper.hidden = true;
+      }
+      refreshAllCharClasses();
+      updateCursorAndErrorClasses(cursorIdx, 0);
       focusTypingInput();
     }
   }
@@ -2365,6 +3035,27 @@ export function renderTypingScreen(container, params = {}) {
     elapsedMs = performance.now() - startTime;
     const minutes = Math.max(elapsedMs / 60000, 1 / 600);
 
+    if (activeMode === 'speak') {
+      const cadenceWpm = spokenWordsEvaluated > 0
+        ? Math.round((spokenWordsEvaluated / minutes) * 10) / 10
+        : 0;
+      const cadenceDesc = getCadenceDescriptor(cadenceWpm);
+      const pronAcc = spokenWordsEvaluated > 0
+        ? Math.round((spokenPronunciationSum / spokenWordsEvaluated) * 10) / 10
+        : 100;
+      const enunAcc = spokenWordsEvaluated > 0
+        ? Math.round((spokenEnunciationSum / spokenWordsEvaluated) * 10) / 10
+        : 100;
+
+      liveWpmEl.textContent = cadenceWpm > 0
+        ? `${Math.round(cadenceWpm)} WPM${cadenceDesc.shortLabel ? ` · ${cadenceDesc.shortLabel}` : ''}`
+        : '0 WPM';
+      liveCpmEl.textContent = `${pronAcc}%`;
+      liveAccEl.textContent = `${enunAcc}%`;
+      liveTimeEl.textContent = formatDuration(elapsedMs);
+      return;
+    }
+
     const cpm = Math.round(correctKeystrokes / minutes);
     const wpm = Math.round((correctKeystrokes / 5 / minutes) * 10) / 10;
     const acc = totalKeystrokes > 0
@@ -2386,10 +3077,15 @@ export function renderTypingScreen(container, params = {}) {
     for (let i = clearStart; i <= clearEnd; i++) {
       const el = charEls[i];
       if (!el) continue;
-      el.classList.remove('is-current', 'is-error', 'is-error-caret');
+      el.classList.remove('is-current', 'is-error', 'is-error-caret', 'is-speak-error');
       const vNum = charToVerseMap[i];
       const isVDone = completedVerseSet.has(vNum);
-      if (isVDone) {
+      const wIdx = charToWordIdxMap[i];
+      const wordStatus = typeof wIdx === 'number' ? spokenWordStatusMap.get(wIdx) : null;
+      if (activeMode === 'speak' && wordStatus === 'error') {
+        el.classList.remove('is-correct');
+        el.classList.add('is-speak-error');
+      } else if (isVDone) {
         el.classList.add('is-correct');
       } else if (currentVR && i >= currentVR.startCharIdx && i < cursorIdx) {
         el.classList.add('is-correct');
@@ -2398,7 +3094,7 @@ export function renderTypingScreen(container, params = {}) {
       }
     }
 
-    if (errorBuffer.length > 0) {
+    if (errorBuffer.length > 0 && activeMode === 'type') {
       for (let eIdx = 0; eIdx < errorBuffer.length; eIdx++) {
         const targetIndex = cursorIdx + eIdx;
         if (charEls[targetIndex]) {
@@ -2418,6 +3114,15 @@ export function renderTypingScreen(container, params = {}) {
         charEls[cursorIdx].classList.remove('is-correct');
         charEls[cursorIdx].classList.add('is-current');
       }
+    }
+
+    if (activeMode === 'speak') {
+      wordsList.forEach(w => {
+        if (!w.wordEl) return;
+        const st = spokenWordStatusMap.get(w.wordIdx);
+        w.wordEl.classList.toggle('is-speak-error', st === 'error');
+        w.wordEl.classList.toggle('is-speak-active', !isCompleted && w.wordIdx === currentWordIdx);
+      });
     }
 
     // Highlight active verse block & update verse counter
@@ -2481,11 +3186,6 @@ export function renderTypingScreen(container, params = {}) {
   function completeSingleVerseNow(vRange) {
     const vDurMs = verseStartTime ? Math.max(200, performance.now() - verseStartTime) : 1000;
     const vMins = Math.max(vDurMs / 60000, 1 / 600);
-    const vCpm = Math.round(vRange.charCount / vMins);
-    const vWpm = Math.round((vRange.charCount / 5 / vMins) * 10) / 10;
-    const vAcc = verseKeystrokes > 0
-      ? Math.round((verseCorrectKeystrokes / verseKeystrokes) * 1000) / 10
-      : 100;
 
     completedVerseSet.add(vRange.verse);
     sittingTypedVersesSet.add(vRange.verse);
@@ -2495,8 +3195,58 @@ export function renderTypingScreen(container, params = {}) {
     }
     if (vRange.supEl) {
       vRange.supEl.classList.add('is-done');
-      vRange.supEl.textContent = `✓ ${vRange.verse}`;
+      vRange.supEl.textContent = activeMode === 'speak' ? `🗣️ ${vRange.verse}` : `✓ ${vRange.verse}`;
     }
+
+    if (activeMode === 'speak') {
+      const vWordsEval = Math.max(1, verseSpokenWordsEvaluated || vRange.wordCount);
+      const vCadenceWpm = Math.round((vWordsEval / vMins) * 10) / 10;
+      const vPronAcc = verseSpokenWordsEvaluated > 0
+        ? Math.round((verseSpokenPronunciationSum / verseSpokenWordsEvaluated) * 10) / 10
+        : 100;
+      const vEnunAcc = verseSpokenWordsEvaluated > 0
+        ? Math.round((verseSpokenEnunciationSum / verseSpokenWordsEvaluated) * 10) / 10
+        : 100;
+      const vErrorsSnapshot = [...verseSpokenWordErrors];
+
+      const recordPromise = recordSpokenVerse({
+        sittingSessionId,
+        bookId: book.id,
+        bookName: book.name,
+        chapter: initialChapter,
+        verse: vRange.verse,
+        totalChapterVerses: allChapterVerses.length || verses.length,
+        translation: activeTranslation,
+        wpm: vCadenceWpm,
+        accuracy: vPronAcc,
+        enunciation: vEnunAcc,
+        charsTyped: vRange.charCount,
+        wordsTyped: vRange.wordCount,
+        mistakes: vErrorsSnapshot.length,
+        durationMs: Math.round(vDurMs),
+        completedAt: new Date().toISOString()
+      });
+
+      const badgeEl = container.querySelector('#telemetry-completed-badge');
+      if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
+      resetActiveVerseTelemetry();
+
+      return {
+        recordPromise,
+        vWpm: vCadenceWpm,
+        vCpm: vPronAcc,
+        vAcc: vPronAcc,
+        vEnunciation: vEnunAcc,
+        vDurMs,
+        vErrors: vErrorsSnapshot
+      };
+    }
+
+    const vCpm = Math.round(vRange.charCount / vMins);
+    const vWpm = Math.round((vRange.charCount / 5 / vMins) * 10) / 10;
+    const vAcc = verseKeystrokes > 0
+      ? Math.round((verseCorrectKeystrokes / verseKeystrokes) * 1000) / 10
+      : 100;
 
     const recordPromise = recordCompletedVerse({
       sittingSessionId,
@@ -2523,27 +3273,168 @@ export function renderTypingScreen(container, params = {}) {
     return { recordPromise, vWpm, vCpm, vAcc, vDurMs };
   }
 
+  function renderSpeechErrorsReviewHtml(errorsArray, totalWordsCount) {
+    if (!errorsArray || errorsArray.length === 0) {
+      return `
+        <div class="speech-review-banner is-perfect">
+          <span class="speech-review-icon">✨</span>
+          <div class="speech-review-text">
+            <strong>Spotless Pronunciation!</strong>
+            <span>All ${totalWordsCount} words were spoken clearly with zero mispronunciations.</span>
+          </div>
+        </div>
+      `;
+    }
+
+    const itemsHtml = errorsArray.slice(0, 24).map(err => `
+      <div class="speech-error-chip">
+        ${!singleVerseMode ? `<span class="speech-err-verse">v.${err.verse}</span>` : ''}
+        <span class="speech-err-expected">“${escapeHtml(err.expected)}”</span>
+        <span class="speech-err-heard">heard <em>“${escapeHtml(err.spoken || 'unclear')}”</em></span>
+      </div>
+    `).join('');
+
+    return `
+      <div class="speech-review-banner has-errors">
+        <div class="speech-review-header">
+          <span class="speech-review-title">🗣️ Pronunciation Review (${errorsArray.length} ${errorsArray.length === 1 ? 'word' : 'words'} to review)</span>
+          <span class="speech-review-hint">Words highlighted in red above had pronunciation differences:</span>
+        </div>
+        <div class="speech-error-chips-list">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSingleVerseSpeakEndCard({ cadenceWpm, pronAcc, enunAcc, durationMs, errors }) {
+    const speakEndCard = container.querySelector('#speak-end-summary-card');
+    if (!speakEndCard) return;
+    const cadenceDesc = getCadenceDescriptor(cadenceWpm);
+    const totalWords = wordsList.length || 1;
+
+    speakEndCard.innerHTML = `
+      <div class="speak-summary-card-inner">
+        <div class="speak-summary-top-row">
+          <div class="speak-summary-title-group">
+            <span class="speak-summary-badge">🗣️ Verse ${targetSingleVerseNum || 1} Spoken</span>
+            <span class="speak-cadence-pill ${cadenceDesc.badgeClass}">${Math.round(cadenceWpm)} WPM · ${cadenceDesc.label}</span>
+          </div>
+          <div class="speak-summary-kpis">
+            <div class="speak-kpi-chip">
+              <span class="speak-kpi-lbl">Cadence</span>
+              <strong class="speak-kpi-val">${Math.round(cadenceWpm)} WPM</strong>
+            </div>
+            <div class="speak-kpi-chip">
+              <span class="speak-kpi-lbl">Pronunciation</span>
+              <strong class="speak-kpi-val">${pronAcc}%</strong>
+            </div>
+            <div class="speak-kpi-chip">
+              <span class="speak-kpi-lbl">Enunciation</span>
+              <strong class="speak-kpi-val">${enunAcc}%</strong>
+            </div>
+            <div class="speak-kpi-chip">
+              <span class="speak-kpi-lbl">Time</span>
+              <strong class="speak-kpi-val">${formatDuration(durationMs)}</strong>
+            </div>
+          </div>
+        </div>
+
+        ${renderSpeechErrorsReviewHtml(errors, totalWords)}
+
+        <div class="speak-summary-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="speak-card-retry-btn">
+            ↺ Speak Again
+          </button>
+          <span class="speak-auto-advance-note" id="speak-auto-advance-note">
+            ${autoAdvance ? (errors.length > 0 ? 'Pausing briefly so you can review pronunciation...' : 'Auto-advancing to next verse...') : 'Press Enter or click Next Verse to continue'}
+          </span>
+          <button type="button" class="btn btn-primary btn-sm" id="speak-card-next-btn">
+            ${(singleVerseMode && shuffleVerses) ? '🎲 Next Verse →' : 'Next Verse →'}
+          </button>
+        </div>
+      </div>
+    `;
+    speakEndCard.hidden = false;
+
+    const retryBtn = speakEndCard.querySelector('#speak-card-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        if (speechAutoAdvanceTimer) {
+          clearTimeout(speechAutoAdvanceTimer);
+          speechAutoAdvanceTimer = null;
+        }
+        restartTyping();
+      });
+    }
+    const nextBtn = speakEndCard.querySelector('#speak-card-next-btn');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (speechAutoAdvanceTimer) {
+          clearTimeout(speechAutoAdvanceTimer);
+          speechAutoAdvanceTimer = null;
+        }
+        navigateNextStep();
+      });
+    }
+  }
+
   async function showCompletionModal(verseCompletionInfo = null) {
     isCompleted = true;
     clearTimer();
+    stopSpeechRecognition();
     elapsedMs = startTime ? performance.now() - startTime : 1000;
     const minutes = Math.max(elapsedMs / 60000, 1 / 600);
-    const finalCpm = verseCompletionInfo && singleVerseMode
-      ? verseCompletionInfo.vCpm
-      : Math.round(correctKeystrokes / minutes);
-    const finalWpm = verseCompletionInfo && singleVerseMode
-      ? verseCompletionInfo.vWpm
-      : Math.round((correctKeystrokes / 5 / minutes) * 10) / 10;
-    const finalAcc = totalKeystrokes > 0
-      ? Math.round((correctKeystrokes / totalKeystrokes) * 1000) / 10
-      : 100;
+
+    const isSpeak = activeMode === 'speak';
+    let finalWpm = 0;
+    let finalCpm = 0;
+    let finalAcc = 100;
+    let finalEnun = 100;
+
+    if (isSpeak) {
+      const totalEval = Math.max(1, spokenWordsEvaluated || wordsList.length);
+      finalWpm = verseCompletionInfo && singleVerseMode
+        ? verseCompletionInfo.vWpm
+        : Math.round((totalEval / minutes) * 10) / 10;
+      finalAcc = verseCompletionInfo && singleVerseMode
+        ? verseCompletionInfo.vAcc
+        : (spokenWordsEvaluated > 0 ? Math.round((spokenPronunciationSum / spokenWordsEvaluated) * 10) / 10 : 100);
+      finalEnun = verseCompletionInfo && singleVerseMode && typeof verseCompletionInfo.vEnunciation === 'number'
+        ? verseCompletionInfo.vEnunciation
+        : (spokenWordsEvaluated > 0 ? Math.round((spokenEnunciationSum / spokenWordsEvaluated) * 10) / 10 : 100);
+      finalCpm = finalAcc;
+    } else {
+      finalCpm = verseCompletionInfo && singleVerseMode
+        ? verseCompletionInfo.vCpm
+        : Math.round(correctKeystrokes / minutes);
+      finalWpm = verseCompletionInfo && singleVerseMode
+        ? verseCompletionInfo.vWpm
+        : Math.round((correctKeystrokes / 5 / minutes) * 10) / 10;
+      finalAcc = totalKeystrokes > 0
+        ? Math.round((correctKeystrokes / totalKeystrokes) * 1000) / 10
+        : 100;
+    }
 
     if (progressFill) {
       progressFill.style.width = '100%';
     }
-    liveWpmEl.textContent = finalWpm.toFixed(1);
-    liveCpmEl.textContent = String(finalCpm);
-    liveAccEl.textContent = `${finalAcc}%`;
+
+    if (isSpeak) {
+      const cadenceDesc = getCadenceDescriptor(finalWpm);
+      liveWpmEl.textContent = `${Math.round(finalWpm)} WPM${cadenceDesc.shortLabel ? ` · ${cadenceDesc.shortLabel}` : ''}`;
+      liveCpmEl.textContent = `${finalAcc}%`;
+      liveAccEl.textContent = `${finalEnun}%`;
+      if (speakStatusPill) {
+        speakStatusPill.textContent = spokenWordErrors.length === 0
+          ? '✓ Passage spoken clearly!'
+          : `✓ Complete · ${spokenWordErrors.length} ${spokenWordErrors.length === 1 ? 'word' : 'words'} to review`;
+      }
+    } else {
+      liveWpmEl.textContent = finalWpm.toFixed(1);
+      liveCpmEl.textContent = String(finalCpm);
+      liveAccEl.textContent = `${finalAcc}%`;
+    }
     liveTimeEl.textContent = formatDuration(elapsedMs);
 
     let res = null;
@@ -2557,15 +3448,41 @@ export function renderTypingScreen(container, params = {}) {
       chapter: initialChapter,
       verse: singleVerseMode ? targetSingleVerseNum : null,
       translation: activeTranslation,
+      mode: activeMode,
       wpm: finalWpm,
       cpm: finalCpm,
-      accuracy: finalAcc
+      accuracy: finalAcc,
+      enunciation: isSpeak ? finalEnun : null
     });
 
     const badgeEl = container.querySelector('#telemetry-completed-badge');
     if (badgeEl) badgeEl.innerHTML = getProgressBadgeHtml();
 
     if (singleVerseMode) {
+      if (isSpeak) {
+        renderSingleVerseSpeakEndCard({
+          cadenceWpm: finalWpm,
+          pronAcc: finalAcc,
+          enunAcc: finalEnun,
+          durationMs: elapsedMs,
+          errors: spokenWordErrors
+        });
+        if (advanceStepBtn) {
+          advanceStepBtn.hidden = false;
+          advanceStepBtn.classList.remove('btn-secondary');
+          advanceStepBtn.classList.add('btn-primary', 'is-ready');
+          advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+          advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
+        }
+        if (autoAdvance) {
+          const delayMs = spokenWordErrors.length > 0 ? 3600 : 1400;
+          speechAutoAdvanceTimer = setTimeout(() => {
+            navigateNextStep();
+          }, delayMs);
+        }
+        return;
+      }
+
       if (autoAdvance) {
         navigateNextStep();
         return;
@@ -2593,8 +3510,8 @@ export function renderTypingScreen(container, params = {}) {
           : `Verse ${targetSingleVerseNum} Completed!`;
       } else {
         modalTitleEl.textContent = doneChVerses >= totalChVerses
-          ? 'Chapter Completed!'
-          : 'Passage Completed!';
+          ? (isSpeak ? 'Chapter Spoken!' : 'Chapter Completed!')
+          : (isSpeak ? 'Passage Spoken!' : 'Passage Completed!');
       }
     }
 
@@ -2602,30 +3519,87 @@ export function renderTypingScreen(container, params = {}) {
       ? `${book.name} ${initialChapter}:${targetSingleVerseNum} (${trObj.shortName})`
       : `${book.name} ${initialChapter} (${trObj.shortName}) · ${doneChVerses}/${totalChVerses} Verses Complete`;
 
-    container.querySelector('#comp-wpm').textContent = `${finalWpm} WPM`;
-    container.querySelector('#comp-cpm').textContent = `${finalCpm} CPM`;
-    container.querySelector('#comp-acc').textContent = `${finalAcc}%`;
-    container.querySelector('#comp-verses').textContent = `${doneChVerses}/${totalChVerses}v`;
-    container.querySelector('#comp-chars').textContent = correctKeystrokes.toLocaleString();
-    container.querySelector('#comp-time').textContent = formatDuration(elapsedMs);
+    const lblWpm = container.querySelector('#comp-lbl-wpm');
+    const lblCpm = container.querySelector('#comp-lbl-cpm');
+    const lblAcc = container.querySelector('#comp-lbl-acc');
+    const lblChars = container.querySelector('#comp-lbl-chars');
+    const speechErrorsBox = container.querySelector('#completion-speech-errors');
 
-    const badges = [];
-    if (res?.justCompletedFullChapter) {
-      badges.push(`<span class="comp-highlight-pill is-emerald">✨ Full Chapter Completed (+1 Bible Reach)</span>`);
-    } else if (res?.isFirstTimeVerseOverall) {
-      badges.push(`<span class="comp-highlight-pill is-emerald">✓ Verse Saved (${doneChVerses}/${totalChVerses} in ${book.abbr} ${initialChapter})</span>`);
-    }
-    if (res?.isNewVersePersonalBest) {
-      badges.push(`<span class="comp-highlight-pill is-lavender">🏆 New Personal Best Speed!</span>`);
-    }
-    container.querySelector('#completion-highlights').innerHTML = badges.join('');
+    if (isSpeak) {
+      const cadenceDesc = getCadenceDescriptor(finalWpm);
+      if (lblWpm) lblWpm.textContent = 'Cadence';
+      if (lblCpm) lblCpm.textContent = 'Pronunciation';
+      if (lblAcc) lblAcc.textContent = 'Enunciation';
+      if (lblChars) lblChars.textContent = 'Words Spoken';
 
-    container.querySelector('#completion-reach-summary').innerHTML = `
-      <div class="comp-reach-row">
-        <span>Overall Reach: <strong>${stats.overallCompletedChapters}/${stats.totalBibleChapters} chapters</strong> · <strong>${stats.overallCompletedVerses.toLocaleString()} verses</strong></span>
-        <span>All-Time Avg: <strong>${stats.avgWpm} WPM · ${stats.avgCpm} CPM</strong></span>
-      </div>
-    `;
+      container.querySelector('#comp-wpm').textContent = `${Math.round(finalWpm)} WPM`;
+      container.querySelector('#comp-cpm').textContent = `${finalAcc}%`;
+      container.querySelector('#comp-acc').textContent = `${finalEnun}%`;
+      container.querySelector('#comp-verses').textContent = `${doneChVerses}/${totalChVerses}v`;
+      container.querySelector('#comp-chars').textContent = (spokenWordsEvaluated || wordsList.length).toLocaleString();
+      container.querySelector('#comp-time').textContent = formatDuration(elapsedMs);
+
+      if (speechErrorsBox) {
+        speechErrorsBox.hidden = false;
+        speechErrorsBox.innerHTML = renderSpeechErrorsReviewHtml(spokenWordErrors, wordsList.length);
+      }
+
+      const badges = [];
+      badges.push(`<span class="comp-highlight-pill ${cadenceDesc.badgeClass || 'is-emerald'}">🎙️ Cadence: ${cadenceDesc.label} (${Math.round(finalWpm)} WPM)</span>`);
+      if (res?.justCompletedFullChapter) {
+        badges.push(`<span class="comp-highlight-pill is-emerald">✨ Full Chapter Spoken (+1 Bible Reach)</span>`);
+      }
+      if (finalEnun >= 90 && finalAcc >= 95) {
+        badges.push(`<span class="comp-highlight-pill is-lavender">🎯 Clear Enunciation &amp; Pronunciation</span>`);
+      }
+      container.querySelector('#completion-highlights').innerHTML = badges.join('');
+
+      container.querySelector('#completion-reach-summary').innerHTML = `
+        <div class="comp-reach-row">
+          <span>Overall Reach: <strong>${stats.overallCompletedChapters}/${stats.totalBibleChapters} chapters</strong> · <strong>${stats.overallCompletedVerses.toLocaleString()} verses</strong></span>
+          <span>Spoken Avg: <strong>${stats.avgSpeakCadenceWpm || Math.round(finalWpm)} WPM Cadence · ${stats.avgPronunciationAccuracy || finalAcc}% Pronunciation</strong></span>
+        </div>
+      `;
+    } else {
+      if (lblWpm) lblWpm.textContent = 'Speed (WPM)';
+      if (lblCpm) lblCpm.textContent = 'Speed (CPM)';
+      if (lblAcc) lblAcc.textContent = 'Accuracy';
+      if (lblChars) lblChars.textContent = 'Characters';
+      if (speechErrorsBox) {
+        speechErrorsBox.hidden = true;
+        speechErrorsBox.innerHTML = '';
+      }
+
+      container.querySelector('#comp-wpm').textContent = `${finalWpm} WPM`;
+      container.querySelector('#comp-cpm').textContent = `${finalCpm} CPM`;
+      container.querySelector('#comp-acc').textContent = `${finalAcc}%`;
+      container.querySelector('#comp-verses').textContent = `${doneChVerses}/${totalChVerses}v`;
+      container.querySelector('#comp-chars').textContent = correctKeystrokes.toLocaleString();
+      container.querySelector('#comp-time').textContent = formatDuration(elapsedMs);
+
+      const badges = [];
+      if (res?.justCompletedFullChapter) {
+        badges.push(`<span class="comp-highlight-pill is-emerald">✨ Full Chapter Completed (+1 Bible Reach)</span>`);
+      } else if (res?.isFirstTimeVerseOverall) {
+        badges.push(`<span class="comp-highlight-pill is-emerald">✓ Verse Saved (${doneChVerses}/${totalChVerses} in ${book.abbr} ${initialChapter})</span>`);
+      }
+      if (res?.isNewVersePersonalBest) {
+        badges.push(`<span class="comp-highlight-pill is-lavender">🏆 New Personal Best Speed!</span>`);
+      }
+      container.querySelector('#completion-highlights').innerHTML = badges.join('');
+
+      container.querySelector('#completion-reach-summary').innerHTML = `
+        <div class="comp-reach-row">
+          <span>Overall Reach: <strong>${stats.overallCompletedChapters}/${stats.totalBibleChapters} chapters</strong> · <strong>${stats.overallCompletedVerses.toLocaleString()} verses</strong></span>
+          <span>All-Time Avg: <strong>${stats.avgWpm} WPM · ${stats.avgCpm} CPM</strong></span>
+        </div>
+      `;
+    }
+
+    const retryBtn = container.querySelector('#comp-retry-btn');
+    if (retryBtn) {
+      retryBtn.textContent = `↺ ${isSpeak ? 'Speak Again' : 'Type Again'}`;
+    }
 
     const nextBtn = container.querySelector('#comp-next-btn');
     if (nextBtn) {
@@ -2648,6 +3622,282 @@ export function renderTypingScreen(container, params = {}) {
     completionBackdrop.hidden = false;
   }
 
+  // ── Non-Blocking Speak Mode Engine (Web Speech API) ────────────
+  function advanceSpokenWordNonBlocking(evalResult, spokenTokenStr) {
+    if (isCompleted || currentWordIdx >= wordsList.length) return;
+
+    const wObj = wordsList[currentWordIdx];
+    const currentVIdx = wObj.vIdx;
+    const currentVRange = verseRanges[currentVIdx];
+
+    if (!startTime) {
+      startTime = performance.now();
+      timerInterval = setInterval(updateLiveMetrics, 250);
+      trackEvent('start_speaking_session', {
+        bookId: book.id,
+        chapter: initialChapter,
+        verse: targetSingleVerseNum || 1,
+        mode: singleVerseMode ? 'single' : 'chapter',
+        translation: activeTranslation
+      });
+    }
+    if (!verseStartTime) {
+      verseStartTime = performance.now();
+    }
+
+    const prevCursor = cursorIdx;
+    spokenWordsEvaluated++;
+    verseSpokenWordsEvaluated++;
+    spokenPronunciationSum += evalResult.pronunciationScore;
+    verseSpokenPronunciationSum += evalResult.pronunciationScore;
+    spokenEnunciationSum += evalResult.enunciationScore;
+    verseSpokenEnunciationSum += evalResult.enunciationScore;
+
+    if (evalResult.matched) {
+      spokenWordsCorrect++;
+      verseSpokenWordsCorrect++;
+      spokenWordStatusMap.set(wObj.wordIdx, 'correct');
+      if (wObj.wordEl) {
+        wObj.wordEl.classList.remove('is-speak-error', 'is-speak-active');
+      }
+    } else {
+      mistakes++;
+      verseMistakes++;
+      spokenWordStatusMap.set(wObj.wordIdx, 'error');
+      if (wObj.wordEl) {
+        wObj.wordEl.classList.remove('is-speak-active');
+        wObj.wordEl.classList.add('is-speak-error');
+      }
+      const errEntry = {
+        wordIdx: wObj.wordIdx,
+        verse: wObj.verse,
+        expected: wObj.rawWord.replace(/^[^a-zA-Z0-9']+|[^a-zA-Z0-9']+$/g, '') || wObj.rawWord,
+        spoken: spokenTokenStr || 'unclear'
+      };
+      spokenWordErrors.push(errEntry);
+      verseSpokenWordErrors.push(errEntry);
+    }
+
+    // Check if this was the last word of the current verse
+    if (wObj.isLastWordOfVerse && currentVRange) {
+      const vCompletionInfo = completeSingleVerseNow(currentVRange);
+
+      if (singleVerseMode) {
+        currentWordIdx = wordsList.length;
+        cursorIdx = targetChars.length;
+        refreshAllCharClasses();
+        updateCursorAndErrorClasses(prevCursor, 0);
+        showCompletionModal(vCompletionInfo);
+        return;
+      }
+
+      if (skipCompletedVerses) {
+        const nextVIdx = currentVIdx + 1;
+        if (nextVIdx >= verseRanges.length || completedVerseSet.has(verseRanges[nextVIdx].verse)) {
+          const targetIncompleteVIdx = findNextIncompleteVerseIdx(nextVIdx, true);
+          if (targetIncompleteVIdx === -1) {
+            currentWordIdx = wordsList.length;
+            cursorIdx = targetChars.length;
+            refreshAllCharClasses();
+            updateCursorAndErrorClasses(prevCursor, 0);
+            showCompletionModal(vCompletionInfo);
+            return;
+          }
+          const nextIncompleteVerse = verseRanges[targetIncompleteVIdx].verse;
+          jumpToVerse(nextIncompleteVerse, { isSkipJump: true });
+          updateLiveMetrics();
+          return;
+        }
+      }
+
+      if (currentWordIdx >= wordsList.length - 1) {
+        currentWordIdx = wordsList.length;
+        cursorIdx = targetChars.length;
+        refreshAllCharClasses();
+        updateCursorAndErrorClasses(prevCursor, 0);
+        showCompletionModal(vCompletionInfo);
+        return;
+      }
+    }
+
+    currentWordIdx++;
+    // Auto-skip any punctuation-only tokens that have no alphanumeric characters
+    while (currentWordIdx < wordsList.length && !wordsList[currentWordIdx].cleanWord) {
+      spokenWordStatusMap.set(wordsList[currentWordIdx].wordIdx, 'correct');
+      if (wordsList[currentWordIdx].isLastWordOfVerse) break;
+      currentWordIdx++;
+    }
+
+    if (currentWordIdx >= wordsList.length) {
+      cursorIdx = targetChars.length;
+      refreshAllCharClasses();
+      updateCursorAndErrorClasses(prevCursor, 0);
+      showCompletionModal();
+      return;
+    }
+
+    cursorIdx = wordsList[currentWordIdx].startCharIdx;
+    refreshAllCharClasses();
+    updateCursorAndErrorClasses(prevCursor, 0);
+    updateLiveMetrics();
+  }
+
+  function processSpeechRecognitionResults(event) {
+    if (activeMode !== 'speak' || !micEnabled || isCompleted || wordsList.length === 0) return;
+
+    if (speechInterimErrorTimer) {
+      clearTimeout(speechInterimErrorTimer);
+      speechInterimErrorTimer = null;
+    }
+
+    for (let rIdx = 0; rIdx < event.results.length; rIdx++) {
+      if (isCompleted || currentWordIdx >= wordsList.length) break;
+
+      const res = event.results[rIdx];
+      const alt = res[0];
+      if (!alt || !alt.transcript) continue;
+
+      const isFinal = Boolean(res.isFinal);
+      const conf = typeof alt.confidence === 'number' && alt.confidence > 0 ? alt.confidence : 0.92;
+      const rawTokens = alt.transcript
+        .trim()
+        .split(/\s+/)
+        .map(t => normalizeSpokenWord(t))
+        .filter(Boolean);
+
+      const alreadyConsumed = speechProcessedMap.get(rIdx) || 0;
+      let tIdx = alreadyConsumed;
+
+      while (tIdx < rawTokens.length && currentWordIdx < wordsList.length && !isCompleted) {
+        const spokenTok = rawTokens[tIdx];
+        const hasMoreTokensAfter = tIdx < rawTokens.length - 1;
+        const targetWordObj = wordsList[currentWordIdx];
+
+        // Auto-pass punctuation-only token if needed
+        if (!targetWordObj.cleanWord) {
+          advanceSpokenWordNonBlocking(
+            { matched: true, exact: true, similarity: 1, pronunciationScore: 100, enunciationScore: 100 },
+            spokenTok
+          );
+          continue;
+        }
+
+        const evalCurr = evaluateSpokenWord(spokenTok, targetWordObj.cleanWord, conf);
+
+        if (evalCurr.matched) {
+          // Spoken word matches current expected word! Advance immediately.
+          tIdx++;
+          speechProcessedMap.set(rIdx, tIdx);
+          advanceSpokenWordNonBlocking(evalCurr, spokenTok);
+          continue;
+        }
+
+        // Current spoken token did NOT match targetWordObj.
+        // If this is the very last token of an still-open interim utterance, wait briefly
+        // in case the user is mid-syllable (e.g. "begin" -> "beginning") before advancing.
+        if (!isFinal && !hasMoreTokensAfter) {
+          const capturedRIdx = rIdx;
+          const capturedTIdx = tIdx;
+          const capturedWordIdx = currentWordIdx;
+          const capturedSpokenTok = spokenTok;
+          speechInterimErrorTimer = setTimeout(() => {
+            if (
+              activeMode === 'speak' &&
+              micEnabled &&
+              !isCompleted &&
+              currentWordIdx === capturedWordIdx &&
+              (speechProcessedMap.get(capturedRIdx) || 0) === capturedTIdx
+            ) {
+              speechProcessedMap.set(capturedRIdx, capturedTIdx + 1);
+              const wNow = wordsList[currentWordIdx];
+              if (wNow) {
+                const ev = evaluateSpokenWord(capturedSpokenTok, wNow.cleanWord, conf);
+                advanceSpokenWordNonBlocking(ev, capturedSpokenTok);
+              }
+            }
+          }, 750);
+          break;
+        }
+
+        // Either isFinal is true OR the user has already spoken subsequent word(s) after spokenTok!
+        // Check 1-word lookahead within the same verse: did the user skip targetWordObj and say the next word?
+        const nextWordObj = currentWordIdx + 1 < wordsList.length ? wordsList[currentWordIdx + 1] : null;
+        if (
+          nextWordObj &&
+          nextWordObj.verse === targetWordObj.verse &&
+          isSpokenWordMatch(spokenTok, nextWordObj.cleanWord)
+        ) {
+          // Mark targetWordObj as missed/skipped without consuming spokenTok yet, then match nextWordObj on next loop iteration!
+          advanceSpokenWordNonBlocking(
+            { matched: false, exact: false, similarity: 0, pronunciationScore: 0, enunciationScore: 35 },
+            '(skipped)'
+          );
+          continue;
+        }
+
+        // Otherwise, targetWordObj was mispronounced as spokenTok. Record error and advance cursor non-blockingly!
+        tIdx++;
+        speechProcessedMap.set(rIdx, tIdx);
+        advanceSpokenWordNonBlocking(evalCurr, spokenTok);
+      }
+    }
+  }
+
+  function startSpeechRecognition() {
+    if (activeMode !== 'speak' || !micEnabled || isCompleted) return;
+    if (!speechSupported) {
+      updateSpeakMicUI();
+      return;
+    }
+    if (speechRecognition) return;
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    try {
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.maxAlternatives = 1;
+      rec.lang = 'en-US';
+      speechProcessedMap.clear();
+
+      rec.onresult = (event) => {
+        processSpeechRecognitionResults(event);
+      };
+
+      rec.onerror = (event) => {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          micEnabled = false;
+          stopSpeechRecognition();
+          updateSpeakMicUI();
+          if (speakStatusPill) {
+            speakStatusPill.hidden = false;
+            speakStatusPill.textContent = '⚠️ Microphone access denied — please allow mic permissions';
+            speakStatusPill.classList.add('is-error');
+          }
+        }
+      };
+
+      rec.onend = () => {
+        speechRecognition = null;
+        if (activeMode === 'speak' && micEnabled && !isCompleted && document.body.contains(container)) {
+          setTimeout(() => {
+            if (activeMode === 'speak' && micEnabled && !isCompleted && document.body.contains(container)) {
+              startSpeechRecognition();
+            }
+          }, 150);
+        }
+      };
+
+      speechRecognition = rec;
+      rec.start();
+      updateSpeakMicUI();
+    } catch (_) {
+      speechRecognition = null;
+    }
+  }
+
   function normalizeTypedChar(ch) {
     if (ch === '\u2018' || ch === '\u2019' || ch === '\u02BC') return "'";
     if (ch === '\u201C' || ch === '\u201D') return '"';
@@ -2657,7 +3907,7 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function processBackspace(clearAll = false) {
-    if (isCompleted || targetChars.length === 0) return;
+    if (isCompleted || targetChars.length === 0 || activeMode !== 'type') return;
     if (errorBuffer.length === 0) return;
 
     const prevCursor = cursorIdx;
@@ -2671,7 +3921,7 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function processTypedChar(rawChar) {
-    if (isCompleted || targetChars.length === 0) return;
+    if (isCompleted || targetChars.length === 0 || activeMode !== 'type') return;
     const ch = normalizeTypedChar(rawChar);
     if (!ch || ch.length !== 1) return;
 
@@ -2781,30 +4031,57 @@ export function renderTypingScreen(container, params = {}) {
     }
   }
 
+  function closeTopmostModal() {
+    if (modeSettingsBackdrop && !modeSettingsBackdrop.hidden) {
+      closeModeSettingsModal();
+      return true;
+    }
+    if (modeSelectBackdrop && !modeSelectBackdrop.hidden) {
+      closeModeSelectModal();
+      return true;
+    }
+    if (actionsBackdrop && !actionsBackdrop.hidden) {
+      closeActionsModal();
+      return true;
+    }
+    if (bookmarkBackdrop && !bookmarkBackdrop.hidden) {
+      closeBookmarkModal();
+      return true;
+    }
+    return false;
+  }
+
   function handleTypingKeydown(e) {
-    if (singleVerseMode && meditateMode) {
-      if (e.key === 'Escape' && optionsBackdrop && !optionsBackdrop.hidden) {
+    if (e.key === 'Escape') {
+      if (closeTopmostModal()) {
         e.preventDefault();
-        closeOptionsModal();
+        return;
       }
+      if (singleVerseMode && activeMode === 'draw') {
+        return;
+      }
+      e.preventDefault();
+      restartTyping();
+      return;
+    }
+
+    if (singleVerseMode && activeMode === 'draw') {
       return;
     }
 
     if (isCompleted) {
       if (e.key === 'Enter') {
         e.preventDefault();
+        if (speechAutoAdvanceTimer) {
+          clearTimeout(speechAutoAdvanceTimer);
+          speechAutoAdvanceTimer = null;
+        }
         navigateNextStep();
       }
       return;
     }
 
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (optionsBackdrop && !optionsBackdrop.hidden) {
-        closeOptionsModal();
-        return;
-      }
-      restartTyping();
+    if (activeMode === 'speak') {
       return;
     }
 
@@ -2831,21 +4108,24 @@ export function renderTypingScreen(container, params = {}) {
       cleanup();
       return;
     }
-    if (singleVerseMode && meditateMode) {
-      if (e.key === 'Escape' && optionsBackdrop && !optionsBackdrop.hidden) {
-        e.preventDefault();
-        closeOptionsModal();
-      }
+    if (e.key === 'Escape' && isAnyModalOpen() && (!completionBackdrop || completionBackdrop.hidden)) {
+      e.preventDefault();
+      closeTopmostModal();
+      return;
+    }
+    if (singleVerseMode && activeMode === 'draw') {
       return;
     }
     if (e.target === hiddenInput) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea, select')) return;
-    if (document.body.classList.contains('browse-open')) {
+    if (document.body.classList.contains('browse-open') || isAnyModalOpen()) {
       return;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'Enter' || e.key.length === 1) {
-      focusTypingInput();
+      if (activeMode === 'type') {
+        focusTypingInput();
+      }
       handleTypingKeydown(e);
     }
   };
@@ -2858,18 +4138,13 @@ export function renderTypingScreen(container, params = {}) {
       return;
     }
 
-    // In meditate mode, the canvas is full height with no scrolling
-    if (singleVerseMode && meditateMode) {
+    // In draw mode, the canvas is full height with no scrolling
+    if (singleVerseMode && activeMode === 'draw') {
       return;
     }
 
-    // If options modal, completion modal, or browse drawer is open, don't hijack scroll
-    const optionsBackdrop = container.querySelector('#typing-options-backdrop');
-    if (
-      (completionBackdrop && !completionBackdrop.hidden) ||
-      (optionsBackdrop && !optionsBackdrop.hidden) ||
-      document.body.classList.contains('browse-open')
-    ) {
+    // If any modal or browse drawer is open, don't hijack scroll
+    if (isAnyModalOpen() || document.body.classList.contains('browse-open')) {
       return;
     }
 
@@ -2910,7 +4185,7 @@ export function renderTypingScreen(container, params = {}) {
 
   // Mobile virtual keyboard fallback via input event
   hiddenInput.addEventListener('input', (e) => {
-    if (singleVerseMode && meditateMode) {
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') {
       hiddenInput.value = '';
       return;
     }
@@ -2932,29 +4207,29 @@ export function renderTypingScreen(container, params = {}) {
   });
 
   function focusTypingInput() {
-    if (singleVerseMode && meditateMode) return;
-    if (document.body.classList.contains('browse-open') || !completionBackdrop.hidden) return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
+    if (document.body.classList.contains('browse-open') || isAnyModalOpen()) return;
     hiddenInput.focus({ preventScroll: true });
     viewportWrapper.classList.add('is-focused');
     focusBanner.hidden = true;
   }
 
   hiddenInput.addEventListener('focus', () => {
-    if (singleVerseMode && meditateMode) return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
     viewportWrapper.classList.add('is-focused');
     focusBanner.hidden = true;
   });
 
   hiddenInput.addEventListener('blur', () => {
-    if (singleVerseMode && meditateMode) return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
     viewportWrapper.classList.remove('is-focused');
-    if (!isCompleted && targetChars.length > 0 && !document.body.classList.contains('browse-open')) {
+    if (!isCompleted && targetChars.length > 0 && !document.body.classList.contains('browse-open') && !isAnyModalOpen()) {
       focusBanner.hidden = false;
     }
   });
 
   viewportWrapper.addEventListener('click', () => {
-    if (singleVerseMode && meditateMode) return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
     focusTypingInput();
   });
 
@@ -2968,7 +4243,9 @@ export function renderTypingScreen(container, params = {}) {
   if (compOpenChapterBtn) {
     compOpenChapterBtn.addEventListener('click', () => {
       completionBackdrop.hidden = true;
-      navigate(`/typing/${book.id}/${initialChapter}`);
+      setSingleVerseModePref(false);
+      const targetChapterMode = activeMode === 'draw' ? 'type' : activeMode;
+      navigate(`/${targetChapterMode}/${book.id}/${initialChapter}`);
     });
   }
 

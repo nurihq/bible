@@ -5457,4 +5457,354 @@ sup.verse-num.is-both {
   transform: translateX(-50%) translateY(0);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   MODE MODAL, STACKED MODE SETTINGS MODAL & ACTIONS MODAL
+   ══════════════════════════════════════════════════════════════════════════ */
+.mode-select-backdrop {
+  z-index: 1100;
+}
+
+.mode-settings-backdrop {
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.typing-actions-backdrop {
+  z-index: 1150;
+}
+
+.mode-select-card,
+.mode-settings-card,
+.typing-actions-card {
+  max-width: 480px;
+  width: 92%;
+}
+
+.mode-radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.mode-radio-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-surface);
+  transition: all var(--transition-fast);
+}
+
+.mode-radio-item:hover {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.mode-radio-item.is-selected {
+  border-color: var(--primary);
+  background: rgba(104, 94, 125, 0.08);
+  box-shadow: 0 2px 8px rgba(104, 94, 125, 0.12);
+}
+
+[data-theme="dark"] .mode-radio-item.is-selected {
+  background: rgba(167, 139, 250, 0.12);
+}
+
+.mode-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mode-radio-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mode-radio-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mode-radio-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.mode-radio-title {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mode-radio-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.mode-settings-gear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.mode-settings-gear-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--bg-surface);
+  transform: rotate(25deg);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPEAK MODE CONTROLS, WORD HIGHLIGHTING & SPEECH REVIEW SUMMARY
+   ══════════════════════════════════════════════════════════════════════════ */
+.speak-mic-toggle-btn.is-mic-active {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #059669;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .speak-mic-toggle-btn.is-mic-active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #34d399;
+}
+
+.speak-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.speak-status-pill.is-listening {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #059669;
+}
+
+[data-theme="dark"] .speak-status-pill.is-listening {
+  color: #34d399;
+}
+
+.speak-status-pill.is-error {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #dc2626;
+}
+
+[data-theme="dark"] .speak-status-pill.is-error {
+  color: #f87171;
+}
+
+/* Word-level active & non-blocking mispronounced state in Speak Mode */
+.t-word.is-speak-active {
+  background: rgba(59, 130, 246, 0.14);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.t-word.is-speak-error,
+.t-char.is-speak-error {
+  color: #dc2626 !important;
+  text-decoration: underline wavy rgba(220, 38, 38, 0.75);
+  text-underline-offset: 4px;
+}
+
+[data-theme="dark"] .t-word.is-speak-error,
+[data-theme="dark"] .t-char.is-speak-error {
+  color: #f87171 !important;
+  text-decoration-color: rgba(248, 113, 113, 0.8);
+}
+
+.t-word.is-speak-flash-error {
+  background: rgba(239, 68, 68, 0.22);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+/* End-of-Verse Speech Summary Card (Single Verse Mode) */
+.speak-end-summary-card {
+  margin-top: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1.15rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.speak-summary-card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.speak-summary-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.speak-summary-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.speak-summary-kpis {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.speak-kpi-chip {
+  font-size: 0.78rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.speak-kpi-chip strong {
+  color: var(--text-primary);
+}
+
+.speech-review-banner {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+
+.speech-review-banner.is-clean {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #059669;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .speech-review-banner.is-clean {
+  color: #34d399;
+}
+
+.speech-review-banner.has-errors {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.speech-review-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.45rem;
+}
+
+.speech-error-chips-list {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.speech-error-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  font-size: 0.78rem;
+}
+
+.speech-err-expected {
+  font-weight: 700;
+  color: #dc2626;
+}
+
+[data-theme="dark"] .speech-err-expected {
+  color: #f87171;
+}
+
+.speech-err-heard {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.completion-speech-errors {
+  margin: 0.85rem 0;
+  text-align: left;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPOKEN PROGRESS BADGES, SWATCHES & COMPLETENESS MAP CELLS
+   ══════════════════════════════════════════════════════════════════════════ */
+.chapter-completed-pill.is-spoken,
+.kpi-badge.is-spoken {
+  background: rgba(14, 165, 233, 0.14);
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+[data-theme="dark"] .chapter-completed-pill.is-spoken,
+[data-theme="dark"] .kpi-badge.is-spoken {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.legend-swatch.is-spoken,
+.reach-ch-cell.is-spoken,
+.browse-ch-cell.is-spoken {
+  background: #0ea5e9;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.verse-num.is-spoken {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .verse-num.is-spoken {
+  color: #38bdf8;
+}
+
+
 

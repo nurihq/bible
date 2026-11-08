@@ -3,20 +3,22 @@ import {
   getLocalStore,
   getPreferredTranslation,
   setPreferredTranslation,
+  getActiveModePref,
   getChapterProgressSummary,
+  getAllDrawings,
   getAllMeditations,
   getAllFavorites,
   getAllBookmarks
-} from '../api.js?v=20261107_v11';
+} from '../api.js?v=20261108_v12';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261107_v11';
-import { trackEvent } from '../analytics.js?v=20261107_v11';
-import { navigate } from '../router.js?v=20261107_v11';
+} from '../bible-data.js?v=20261108_v12';
+import { trackEvent } from '../analytics.js?v=20261108_v12';
+import { navigate } from '../router.js?v=20261108_v12';
 
 function escapeHtml(str) {
   return String(str)
@@ -62,6 +64,15 @@ export class Navbar {
       }
     });
 
+    const updateDrawingsBadge = () => {
+      const badge = document.querySelector('#nav-menu-drawings-btn .nav-item-badge');
+      if (badge) {
+        badge.textContent = String(getAllDrawings().length);
+      }
+    };
+    window.addEventListener('bible:drawings-updated', updateDrawingsBadge);
+    window.addEventListener('bible:meditations-updated', updateDrawingsBadge);
+
     // Cmd/Ctrl+K focuses the search bar from anywhere
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -93,7 +104,7 @@ export class Navbar {
 
   /** Current passage derived from the route (falls back to last opened chapter) */
   getCurrentPassage(cleanPath) {
-    const m = (cleanPath || '').match(/^\/typing\/(\d+)\/(\d+)(?:\/(\d+))?/);
+    const m = (cleanPath || '').match(/^\/(?:typing|type|speak|draw|promises)\/(\d+)\/(\d+)(?:\/(\d+))?/);
     if (m) {
       return { bookId: Number(m[1]), chapter: Number(m[2]), verse: m[3] ? Number(m[3]) : null };
     }
@@ -139,6 +150,7 @@ export class Navbar {
     const root = document.getElementById('browse-drawer-root');
     if (!root) return;
 
+    const activeMode = getActiveModePref();
     const passage = this.getCurrentPassage((this.currentRoute || '').replace(/^#/, ''));
     const filteredBooks = BIBLE_BOOKS.filter(b =>
       this.drawerTestament === 'ALL' ? true : b.testament === this.drawerTestament
@@ -178,18 +190,21 @@ export class Navbar {
       let cls = '';
       if (s.isBoth) cls = 'is-both is-completed';
       else if (s.isFullyTyped) cls = 'is-completed';
+      else if (s.isFullySpoken) cls = 'is-spoken is-completed';
       else if (s.isFullyRead) cls = 'is-read';
       else if (s.isPartial) cls = 'is-partial';
 
       const title = s.isBoth
-        ? `${selBook.name} ${c} — Read & Typed (${s.totalVerses}/${s.totalVerses} verses)`
+        ? `${selBook.name} ${c} — Completed in multiple modes (${s.totalVerses}/${s.totalVerses} verses)`
         : (s.isFullyTyped
           ? `${selBook.name} ${c} — Typed (${s.totalVerses}/${s.totalVerses} verses)`
-          : (s.isFullyRead
-            ? `${selBook.name} ${c} — Read (${s.totalVerses}/${s.totalVerses} verses)`
-            : (s.isPartial
-              ? `${selBook.name} ${c} — ${s.completedVersesCount}/${s.totalVerses} verses`
-              : `${selBook.name} ${c} — ${s.totalVerses} verses`)));
+          : (s.isFullySpoken
+            ? `${selBook.name} ${c} — Spoken (${s.totalVerses}/${s.totalVerses} verses)`
+            : (s.isFullyRead
+              ? `${selBook.name} ${c} — Read (${s.totalVerses}/${s.totalVerses} verses)`
+              : (s.isPartial
+                ? `${selBook.name} ${c} — ${s.completedVersesCount}/${s.totalVerses} verses`
+                : `${selBook.name} ${c} — ${s.totalVerses} verses`))));
 
       chapterBtns.push(`
         <button type="button" class="drawer-chapter-pill ${cls} ${isCurrent ? 'is-current' : ''} ${c === this.drawerChapter ? 'is-drawer-selected' : ''}"
@@ -205,15 +220,19 @@ export class Navbar {
     for (let v = 1; v <= verseCount; v++) {
       const vRec = chSum.record?.completedVerses?.[String(v)];
       const vIsRead = Boolean(chSum.isFullyRead || vRec?.isRead);
-      const vIsTyped = Boolean(chSum.isFullyTyped || vRec?.isTyped || (vRec?.count && vRec.count > 0));
+      const vIsSpoken = Boolean(chSum.isFullySpoken || vRec?.isSpoken);
+      const vIsTyped = Boolean(chSum.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && vRec?.count && vRec.count > 0));
       let vCls = '';
       let vBadge = '';
-      if (vIsRead && vIsTyped) {
+      if ((vIsRead && vIsTyped) || (vIsRead && vIsSpoken) || (vIsTyped && vIsSpoken)) {
         vCls = 'is-both';
         vBadge = '<span class="drawer-v-check">✓</span>';
       } else if (vIsTyped) {
         vCls = 'is-completed';
         vBadge = '<span class="drawer-v-check">✓</span>';
+      } else if (vIsSpoken) {
+        vCls = 'is-spoken is-completed';
+        vBadge = '<span class="drawer-v-check">🗣️</span>';
       } else if (vIsRead) {
         vCls = 'is-read';
         vBadge = '<span class="drawer-v-check">📖</span>';
@@ -221,7 +240,7 @@ export class Navbar {
 
       verseBtns.push(`
         <button type="button" class="drawer-verse-pill ${vCls}" data-verse="${v}"
-          title="Type only ${selBook.name} ${this.drawerChapter}:${v}${vIsRead && vIsTyped ? ' (Read & Typed)' : vIsTyped ? ' (Typed)' : vIsRead ? ' (Read)' : ''}">
+          title="Open ${selBook.name} ${this.drawerChapter}:${v}${vIsTyped ? ' (Typed)' : vIsSpoken ? ' (Spoken)' : vIsRead ? ' (Read)' : ''}">
           ${v}${vBadge}
         </button>`);
     }
@@ -247,7 +266,7 @@ export class Navbar {
             <div class="drawer-chapters-grid">${chapterBtns.join('')}</div>
             <div class="drawer-verses-section">
               <div class="drawer-verses-header">
-                <span><strong>${selBook.name} ${this.drawerChapter}</strong> · ${verseCount} verses${chSum.completedVersesCount > 0 ? ` · ${chSum.isFullyCompleted ? verseCount : chSum.completedVersesCount} done` : ''} — click a verse to type just that verse</span>
+                <span><strong>${selBook.name} ${this.drawerChapter}</strong> · ${verseCount} verses${chSum.completedVersesCount > 0 ? ` · ${chSum.isFullyCompleted ? verseCount : chSum.completedVersesCount} done` : ''} — click a verse to open just that verse</span>
                 <button type="button" class="btn btn-primary btn-sm" id="drawer-open-chapter-btn">📖 Open entire ${selBook.name} ${this.drawerChapter} →</button>
               </div>
               <div class="drawer-verses-grid">${verseBtns.join('')}</div>
@@ -284,7 +303,12 @@ export class Navbar {
         const ch = Number(btn.getAttribute('data-chapter'));
         trackEvent('drawer_select_chapter', { bookId: selBook.id, chapter: ch });
         this.closeDrawer();
-        navigate(`/typing/${selBook.id}/${ch}`);
+        const mode = getActiveModePref();
+        if (mode === 'draw') {
+          navigate(`/draw/${selBook.id}/${ch}/1`);
+        } else {
+          navigate(`/${mode}/${selBook.id}/${ch}`);
+        }
       });
     });
 
@@ -293,14 +317,20 @@ export class Navbar {
         const v = Number(btn.getAttribute('data-verse'));
         trackEvent('drawer_select_verse', { bookId: selBook.id, chapter: this.drawerChapter, verse: v });
         this.closeDrawer();
-        navigate(`/typing/${selBook.id}/${this.drawerChapter}/${v}`);
+        const mode = getActiveModePref();
+        navigate(`/${mode}/${selBook.id}/${this.drawerChapter}/${v}`);
       });
     });
 
     root.querySelector('#drawer-open-chapter-btn').addEventListener('click', () => {
       trackEvent('drawer_open_chapter', { bookId: selBook.id, chapter: this.drawerChapter });
       this.closeDrawer();
-      navigate(`/typing/${selBook.id}/${this.drawerChapter}`);
+      const mode = getActiveModePref();
+      if (mode === 'draw') {
+        navigate(`/type/${selBook.id}/${this.drawerChapter}`);
+      } else {
+        navigate(`/${mode}/${selBook.id}/${this.drawerChapter}`);
+      }
     });
 
     // Keep the selected chapter in view
@@ -318,13 +348,22 @@ export class Navbar {
       input.value = '';
       input.blur();
     }
+    const mode = getActiveModePref();
     trackEvent('bible_search_select', { label: r.label, mode: r.mode || 'chapter' });
     if (r.mode === 'verse' && r.verse) {
-      navigate(`/typing/${r.bookId}/${r.chapter}/${r.verse}`);
+      navigate(`/${mode}/${r.bookId}/${r.chapter}/${r.verse}`);
     } else if (r.mode === 'chapter-at-verse' && r.verse) {
-      navigate(`/typing/${r.bookId}/${r.chapter}?verse=${r.verse}`);
+      if (mode === 'draw') {
+        navigate(`/draw/${r.bookId}/${r.chapter}/${r.verse}`);
+      } else {
+        navigate(`/${mode}/${r.bookId}/${r.chapter}?verse=${r.verse}`);
+      }
     } else {
-      navigate(`/typing/${r.bookId}/${r.chapter}`);
+      if (mode === 'draw') {
+        navigate(`/draw/${r.bookId}/${r.chapter}/1`);
+      } else {
+        navigate(`/${mode}/${r.bookId}/${r.chapter}`);
+      }
     }
   }
 
@@ -339,7 +378,7 @@ export class Navbar {
 
     dropdown.innerHTML = results.map((r, idx) => {
       const sum = getChapterProgressSummary(r.bookId, r.chapter, 'ALL');
-      let badge = `<span class="search-go-hint">${r.mode === 'verse' ? 'Single verse →' : 'Type →'}</span>`;
+      let badge = `<span class="search-go-hint">${r.mode === 'verse' ? 'Single verse →' : 'Open →'}</span>`;
       if (r.mode === 'verse' && r.verse) {
         if (sum.isFullyCompleted || sum.completedVerseNums.includes(Number(r.verse))) {
           badge = '<span class="search-done-badge">✓ Verse done</span>';
@@ -379,13 +418,19 @@ export class Navbar {
     const cleanPath = (currentRoute || '').replace(/^#/, '') || '/';
     const isHomeScreen = cleanPath === '/' || cleanPath === '';
     const isSignInScreen = cleanPath === '/signin';
-    const isTypingActive = cleanPath === '/typing' || cleanPath.startsWith('/typing/');
+    const isPromisesActive =
+      cleanPath === '/promises' ||
+      cleanPath === '/typing' ||
+      cleanPath === '/type' ||
+      cleanPath === '/speak' ||
+      cleanPath === '/draw' ||
+      /^\/(?:typing|type|speak|draw|promises)\//.test(cleanPath);
     const isProgressActive = cleanPath === '/progress';
-    const isMeditationsActive = cleanPath === '/meditations';
+    const isDrawingsActive = cleanPath === '/drawings' || cleanPath === '/meditations';
     const isFavoritesActive = cleanPath === '/favorites';
     const isBookmarksActive = cleanPath === '/bookmarks';
-    const allMeds = getAllMeditations();
-    const meditationCount = allMeds.length;
+    const allDrawings = getAllDrawings();
+    const drawingsCount = allDrawings.length;
     const allFavs = getAllFavorites();
     const favoritesCount = allFavs.length;
     const allBookmarks = getAllBookmarks();
@@ -397,6 +442,7 @@ export class Navbar {
     const passageBook = getBookById(passage.bookId);
     const browseLabel = `${passageBook.name} ${passage.chapter}${passage.verse ? `:${passage.verse}` : ''}`;
     const activeTr = getPreferredTranslation();
+    const activeMode = getActiveModePref();
 
     container.innerHTML = `
       <header class="navbar">
@@ -447,12 +493,12 @@ export class Navbar {
 
         <div class="nav-right">
           ${!isHomeScreen && !isSignInScreen ? `
-            <a href="/typing" class="nav-about-btn ${isTypingActive ? 'active' : ''}" title="Bible Typing">
+            <a href="/${activeMode}" class="nav-about-btn ${isPromisesActive ? 'active' : ''}" id="nav-promises-btn" title="Scripture Promises">
               <span>⌨️</span>
-              <span class="nav-about-text">Typing</span>
+              <span class="nav-about-text">Promises</span>
             </a>
 
-            <a href="/progress" class="nav-about-btn ${isProgressActive ? 'active' : ''}" title="Typing Progress &amp; Bible Reach">
+            <a href="/progress" class="nav-about-btn ${isProgressActive ? 'active' : ''}" title="Progress &amp; Bible Reach">
               <span>📊</span>
               <span class="nav-about-text">Progress</span>
             </a>
@@ -468,7 +514,7 @@ export class Navbar {
               type="button"
               class="nav-user-chip nav-user-chip-btn ${!isAuthed ? 'nav-guest-chip' : ''}"
               id="nav-profile-dropdown-btn"
-              title="${isAuthed ? `Account & Meditations (${escapeHtml(user?.email || '')})` : 'Menu & Meditations'}"
+              title="${isAuthed ? `Account & Drawings (${escapeHtml(user?.email || '')})` : 'Menu & Drawings'}"
               aria-haspopup="true"
               aria-expanded="false"
             >
@@ -513,10 +559,10 @@ export class Navbar {
                   <span class="nav-item-badge">${bookmarksCount}</span>
                 </a>
 
-                <a href="/meditations" class="nav-profile-dropdown-item ${isMeditationsActive ? 'active' : ''}" id="nav-menu-meditations-btn">
+                <a href="/drawings" class="nav-profile-dropdown-item ${isDrawingsActive ? 'active' : ''}" id="nav-menu-drawings-btn">
                   <span class="nav-item-icon">🎨</span>
-                  <span class="nav-item-title">Meditations</span>
-                  <span class="nav-item-badge">${meditationCount}</span>
+                  <span class="nav-item-title">Drawings</span>
+                  <span class="nav-item-badge">${drawingsCount}</span>
                 </a>
               </div>
 

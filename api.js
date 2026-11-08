@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261107_v11';
+import { CONFIG } from './config.js?v=20261108_v12';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261107_v11';
+} from './bible-data.js?v=20261108_v12';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -174,6 +174,7 @@ function createDefaultStore() {
     lastBookId: 1,
     lastChapter: 1,
     lastVerse: null,
+    activeMode: 'type', // 'type' | 'speak' | 'draw'
     meditateMode: false,
     meditateFont: DEFAULT_MEDITATE_FONT,
     meditateFontSize: DEFAULT_MEDITATE_FONT_SIZE,
@@ -192,7 +193,8 @@ function createDefaultStore() {
       '#64748B',
       '#FFFFFF'
     ],
-    meditations: {}, // { "1:1:1": MeditationRecord }
+    drawings: {}, // { "1:1:1": DrawingRecord }
+    meditations: {}, // legacy alias synced with drawings
     favorites: {}, // { "1:1:1": FavoriteRecord }
     bookmarks: {}, // { [id]: BookmarkRecord }
     chapters: {}, // { "1:1": CompletedChapterRecord }
@@ -207,13 +209,23 @@ export function getLocalStore() {
     try {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
+        const mergedDrawings = {
+          ...((parsed.meditations && typeof parsed.meditations === 'object') ? parsed.meditations : {}),
+          ...((parsed.drawings && typeof parsed.drawings === 'object') ? parsed.drawings : {})
+        };
+        const resolvedActiveMode = ['type', 'speak', 'draw'].includes(parsed.activeMode)
+          ? parsed.activeMode
+          : (parsed.meditateMode ? 'draw' : 'type');
         const store = {
           ...createDefaultStore(),
           ...parsed,
+          activeMode: resolvedActiveMode,
+          meditateMode: resolvedActiveMode === 'draw',
           singleVerseMode: parsed.singleVerseMode !== undefined ? Boolean(parsed.singleVerseMode) : true,
           shuffleVerses: parsed.shuffleVerses !== undefined ? Boolean(parsed.shuffleVerses) : true,
           skipCompletedVerses: parsed.skipCompletedVerses !== false,
-          meditations: (parsed.meditations && typeof parsed.meditations === 'object') ? parsed.meditations : {},
+          drawings: mergedDrawings,
+          meditations: mergedDrawings,
           favorites: (parsed.favorites && typeof parsed.favorites === 'object') ? parsed.favorites : {},
           bookmarks: (parsed.bookmarks && typeof parsed.bookmarks === 'object') ? parsed.bookmarks : {},
           chapters: parsed.chapters || {},
@@ -245,6 +257,11 @@ export function getPreferredTranslation() {
 export function syncPreferencesToCloud() {
   if (!Auth.isAuthenticated() || !CONFIG.API_ENDPOINTS.profile) return;
   const store = getLocalStore();
+  const combinedDrawings = { ...(store.meditations || {}), ...(store.drawings || {}) };
+  const deletedDrawings = Array.from(new Set([
+    ...(store.deletedMeditationKeys || []),
+    ...(store.deletedDrawingKeys || [])
+  ]));
   fetchWithAuth(CONFIG.API_ENDPOINTS.profile, {
     method: 'POST',
     body: JSON.stringify({
@@ -256,20 +273,27 @@ export function syncPreferencesToCloud() {
       showTypingStats: Boolean(store.showTypingStats),
       shuffleVerses: Boolean(store.shuffleVerses),
       shuffleScope: store.shuffleScope || 'bible',
+      activeMode: store.activeMode || (store.meditateMode ? 'draw' : 'type'),
       meditateMode: Boolean(store.meditateMode),
       meditatePalette: Array.isArray(store.meditatePalette) ? store.meditatePalette : DEFAULT_MEDITATE_PALETTE,
       meditateFont: store.meditateFont || DEFAULT_MEDITATE_FONT,
       meditateFontSize: store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE,
-      meditations: store.meditations || {},
+      meditateFontCase: store.meditateFontCase || DEFAULT_MEDITATE_FONT_CASE,
+      meditateFontColor: store.meditateFontColor || DEFAULT_MEDITATE_FONT_COLOR,
+      meditateBoxWidth: store.meditateBoxWidth || DEFAULT_MEDITATE_BOX_WIDTH,
+      drawings: combinedDrawings,
+      meditations: combinedDrawings,
       favorites: store.favorites || {},
       bookmarks: store.bookmarks || {},
-      deletedMeditationKeys: store.deletedMeditationKeys || [],
+      deletedDrawingKeys: deletedDrawings,
+      deletedMeditationKeys: deletedDrawings,
       deletedFavoriteKeys: store.deletedFavoriteKeys || [],
       deletedBookmarkIds: store.deletedBookmarkIds || []
     })
   }).then(() => {
     const fresh = getLocalStore();
-    if (fresh.deletedMeditationKeys?.length || fresh.deletedFavoriteKeys?.length || fresh.deletedBookmarkIds?.length) {
+    if (fresh.deletedDrawingKeys?.length || fresh.deletedMeditationKeys?.length || fresh.deletedFavoriteKeys?.length || fresh.deletedBookmarkIds?.length) {
+      delete fresh.deletedDrawingKeys;
       delete fresh.deletedMeditationKeys;
       delete fresh.deletedFavoriteKeys;
       delete fresh.deletedBookmarkIds;
@@ -408,16 +432,30 @@ export const DEFAULT_MEDITATE_PALETTE = [
   '#FFFFFF'  // Eraser / White
 ];
 
-export function getMeditateModePref() {
+export function getActiveModePref() {
   const store = getLocalStore();
-  return Boolean(store.meditateMode);
+  if (['type', 'speak', 'draw'].includes(store.activeMode)) {
+    return store.activeMode;
+  }
+  return store.meditateMode ? 'draw' : 'type';
+}
+
+export function setActiveModePref(mode) {
+  const cleanMode = ['type', 'speak', 'draw'].includes(mode) ? mode : 'type';
+  const store = getLocalStore();
+  store.activeMode = cleanMode;
+  store.meditateMode = cleanMode === 'draw';
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:mode-changed', { detail: { mode: cleanMode } }));
+}
+
+export function getMeditateModePref() {
+  return getActiveModePref() === 'draw';
 }
 
 export function setMeditateModePref(enabled) {
-  const store = getLocalStore();
-  store.meditateMode = Boolean(enabled);
-  saveLocalStore(store);
-  syncPreferencesToCloud();
+  setActiveModePref(enabled ? 'draw' : 'type');
 }
 
 export function getMeditatePalettePref() {
@@ -502,8 +540,8 @@ export function setMeditateBoxWidthPref(width) {
   syncPreferencesToCloud();
 }
 
-// ── Scripture Meditations (Saved Color-by-Numbers Artworks) ─────
-export function saveVerseMeditation({
+// ── Scripture Drawings (Saved Color-by-Numbers Artworks) ─────
+export function saveVerseDrawing({
   bookId,
   chapter,
   verse,
@@ -521,11 +559,14 @@ export function saveVerseMeditation({
   textY
 }) {
   const store = getLocalStore();
+  if (!store.drawings || typeof store.drawings !== 'object') {
+    store.drawings = {};
+  }
   if (!store.meditations || typeof store.meditations !== 'object') {
     store.meditations = {};
   }
   const key = `${bookId}:${chapter}:${verse}`;
-  const existing = store.meditations[key] || {};
+  const existing = store.drawings[key] || store.meditations[key] || {};
   const mergedFills = { ...(existing.fills || {}), ...(fills || {}) };
 
   // First colour equals save: only persist if user has colored at least one segment
@@ -560,17 +601,19 @@ export function saveVerseMeditation({
     textY: typeof textY === 'number' ? textY : (typeof existing.textY === 'number' ? existing.textY : 76),
     updatedAt: new Date().toISOString()
   };
+  store.drawings[key] = record;
   store.meditations[key] = record;
   saveLocalStore(store);
   syncPreferencesToCloud();
+  window.dispatchEvent(new CustomEvent('bible:drawings-updated', { detail: { record } }));
   window.dispatchEvent(new CustomEvent('bible:meditations-updated', { detail: { record } }));
   return record;
 }
 
-export function getVerseMeditation(bookId, chapter, verse) {
+export function getVerseDrawing(bookId, chapter, verse) {
   const store = getLocalStore();
   const key = `${bookId}:${chapter}:${verse}`;
-  const med = store.meditations?.[key] || null;
+  const med = store.drawings?.[key] || store.meditations?.[key] || null;
   if (!med) return null;
   if (!med.fills || typeof med.fills !== 'object' || Object.keys(med.fills).length === 0) {
     return null;
@@ -581,26 +624,38 @@ export function getVerseMeditation(bookId, chapter, verse) {
   return med;
 }
 
-export function getAllMeditations() {
+export function getAllDrawings() {
   const store = getLocalStore();
-  const list = Object.values(store.meditations || {});
+  const combined = { ...(store.meditations || {}), ...(store.drawings || {}) };
+  const list = Object.values(combined);
   return list
     .filter(m => m && m.fills && typeof m.fills === 'object' && Object.keys(m.fills).length > 0)
     .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
 
-export function deleteVerseMeditation(bookId, chapter, verse) {
+export function deleteVerseDrawing(bookId, chapter, verse) {
   const store = getLocalStore();
   const key = `${bookId}:${chapter}:${verse}`;
-  if (store.meditations && store.meditations[key]) {
-    delete store.meditations[key];
+  const hadDrawing = Boolean((store.drawings && store.drawings[key]) || (store.meditations && store.meditations[key]));
+  if (hadDrawing) {
+    if (store.drawings) delete store.drawings[key];
+    if (store.meditations) delete store.meditations[key];
+    if (!store.deletedDrawingKeys) store.deletedDrawingKeys = [];
+    if (!store.deletedDrawingKeys.includes(key)) store.deletedDrawingKeys.push(key);
     if (!store.deletedMeditationKeys) store.deletedMeditationKeys = [];
     if (!store.deletedMeditationKeys.includes(key)) store.deletedMeditationKeys.push(key);
     saveLocalStore(store);
     syncPreferencesToCloud();
+    window.dispatchEvent(new CustomEvent('bible:drawings-updated', { detail: { key, deleted: true } }));
     window.dispatchEvent(new CustomEvent('bible:meditations-updated', { detail: { key, deleted: true } }));
   }
 }
+
+// Backward-compatible aliases
+export const saveVerseMeditation = saveVerseDrawing;
+export const getVerseMeditation = getVerseDrawing;
+export const getAllMeditations = getAllDrawings;
+export const deleteVerseMeditation = deleteVerseDrawing;
 
 // ── Favorited Scripture Verses ─────────────────────────────────
 export function saveVerseFavorite({ bookId, chapter, verse, verseRef, verseText, translation, comment }) {
@@ -923,17 +978,26 @@ export function isChapterRecordFullyRead(rec) {
   return readCount >= total;
 }
 
+export function isChapterRecordFullySpoken(rec) {
+  if (!rec) return false;
+  if (rec.isFullySpoken === true) return true;
+  const total = Math.max(Number(rec.totalVerses) || 0, Number(rec.versesCount) || 0);
+  if (total <= 0) return false;
+  const spokenCount = Object.values(rec.completedVerses || {}).filter(v => v && v.isSpoken).length;
+  return spokenCount >= total;
+}
+
 export function isChapterRecordFullyTyped(rec, translationFilter = 'ALL') {
   if (!rec) return false;
   const total = Math.max(Number(rec.totalVerses) || 0, Number(rec.versesCount) || 0);
   if (translationFilter === 'ALL') {
     if (rec.isFullyTyped === true) return true;
-    if (rec.isFullyCompleted === true && !rec.isFullyRead && rec.isRead !== true) return true;
+    if (rec.isFullyCompleted === true && !rec.isFullyRead && rec.isRead !== true && !rec.isFullySpoken && rec.isSpoken !== true) return true;
     const typedCount = Object.values(rec.completedVerses || {}).filter(v =>
-      v && v.isTyped !== false && ((v.count || 0) > 0 || (v.bestWpm || 0) > 0 || v.isTyped === true)
+      v && v.isTyped !== false && (v.isTyped === true || (!v.isRead && !v.isSpoken && ((v.count || 0) > 0 || (v.bestWpm || 0) > 0)))
     ).length;
     if (total > 0 && typedCount >= total) return true;
-    if (typedCount === 0 && (rec.completedCount || 0) > 0 && rec.isRead !== true) return true;
+    if (typedCount === 0 && (rec.completedCount || 0) > 0 && rec.isRead !== true && rec.isSpoken !== true) return true;
     return false;
   }
   const trStat = rec.translations?.[translationFilter];
@@ -950,6 +1014,7 @@ export function isChapterRecordFullyCompleted(rec) {
   if (rec.isFullyCompleted === true) return true;
   if (isChapterRecordFullyRead(rec)) return true;
   if (isChapterRecordFullyTyped(rec)) return true;
+  if (isChapterRecordFullySpoken(rec)) return true;
   const total = Math.max(Number(rec.totalVerses) || 0, Number(rec.versesCount) || 0);
   const coveredCount = Object.keys(rec.completedVerses || {}).length;
   if (total > 0 && coveredCount >= total) return true;
@@ -965,19 +1030,27 @@ export function isVerseRead(rec, verseNum) {
   return Boolean(vRec?.isRead);
 }
 
+export function isVerseSpoken(rec, verseNum) {
+  if (!rec) return false;
+  if (rec.isFullySpoken === true) return true;
+  const vKey = String(verseNum);
+  const vRec = rec.completedVerses?.[vKey];
+  return Boolean(vRec?.isSpoken);
+}
+
 export function isVerseTyped(rec, verseNum, translationFilter = 'ALL') {
   if (!rec) return false;
   const vKey = String(verseNum);
   const vRec = rec.completedVerses?.[vKey];
   if (vRec) {
-    const hasTyped = vRec.isTyped !== false && ((vRec.count || 0) > 0 || (vRec.bestWpm || 0) > 0 || vRec.isTyped === true);
+    const hasTyped = vRec.isTyped !== false && (vRec.isTyped === true || (!vRec.isRead && !vRec.isSpoken && ((vRec.count || 0) > 0 || (vRec.bestWpm || 0) > 0)));
     if (!hasTyped) return false;
     if (translationFilter === 'ALL') return true;
     return Boolean(vRec.translations?.[translationFilter]);
   }
   // Legacy full-chapter completion fallback
   if (!rec.completedVerses || Object.keys(rec.completedVerses).length === 0) {
-    if ((rec.completedCount || 0) > 0 && rec.isFullyCompleted !== false && rec.isRead !== true) {
+    if ((rec.completedCount || 0) > 0 && rec.isFullyCompleted !== false && rec.isRead !== true && rec.isSpoken !== true) {
       if (translationFilter === 'ALL') return true;
       return Boolean(rec.translations?.[translationFilter]);
     }
@@ -986,7 +1059,7 @@ export function isVerseTyped(rec, verseNum, translationFilter = 'ALL') {
 }
 
 export function isVerseCovered(rec, verseNum, translationFilter = 'ALL') {
-  return isVerseRead(rec, verseNum) || isVerseTyped(rec, verseNum, translationFilter);
+  return isVerseRead(rec, verseNum) || isVerseTyped(rec, verseNum, translationFilter) || isVerseSpoken(rec, verseNum);
 }
 
 export function isVerseCompletedInRecord(rec, verseNum, translationFilter = 'ALL') {
@@ -1015,7 +1088,9 @@ export function markChapterAsRead(bookId, chapter, translation = 'ESV') {
       bestAccuracy: prevV?.bestAccuracy || 100,
       isRead: true,
       readAt: now,
-      isTyped: Boolean(prevV?.isTyped || (prevV?.count && prevV.count > 0) || (prevV?.bestWpm && prevV.bestWpm > 0)),
+      isSpoken: Boolean(prevV?.isSpoken),
+      spokenAt: prevV?.spokenAt || null,
+      isTyped: Boolean(prevV?.isTyped || (!prevV?.isSpoken && ((prevV?.count && prevV.count > 0) || (prevV?.bestWpm && prevV.bestWpm > 0)))),
       translations: prevV?.translations || {},
       firstCompletedAt: prevV?.firstCompletedAt || now,
       lastCompletedAt: prevV?.lastCompletedAt || now
@@ -1023,6 +1098,7 @@ export function markChapterAsRead(bookId, chapter, translation = 'ESV') {
   }
 
   const isFullyTyped = Boolean(prevChapter.isFullyTyped || (totalVerses > 0 && Object.values(prevVerses).filter(v => v.isTyped).length >= totalVerses));
+  const isFullySpoken = Boolean(prevChapter.isFullySpoken || (totalVerses > 0 && Object.values(prevVerses).filter(v => v.isSpoken).length >= totalVerses));
 
   store.chapters[key] = {
     ...prevChapter,
@@ -1039,6 +1115,8 @@ export function markChapterAsRead(bookId, chapter, translation = 'ESV') {
     readAt: now,
     isFullyTyped,
     isTyped: Boolean(prevChapter.isTyped || isFullyTyped || (prevChapter.completedCount && prevChapter.completedCount > 0)),
+    isFullySpoken,
+    isSpoken: Boolean(prevChapter.isSpoken || isFullySpoken),
     completedVerses: prevVerses,
     firstCompletedAt: prevChapter.firstCompletedAt || now,
     lastCompletedAt: now
@@ -1089,7 +1167,7 @@ export function unmarkChapterAsRead(bookId, chapter) {
 
   const prevVerses = { ...(rec.completedVerses || {}) };
   for (const [vKey, vObj] of Object.entries(prevVerses)) {
-    if (vObj && vObj.isTyped) {
+    if (vObj && (vObj.isTyped || vObj.isSpoken)) {
       prevVerses[vKey] = { ...vObj, isRead: false, readAt: null };
     } else {
       delete prevVerses[vKey];
@@ -1097,15 +1175,17 @@ export function unmarkChapterAsRead(bookId, chapter) {
   }
 
   const typedVersesCount = Object.values(prevVerses).filter(v => v.isTyped).length;
+  const spokenVersesCount = Object.values(prevVerses).filter(v => v.isSpoken).length;
   const totalVerses = rec.totalVerses || getChapterVerseCount(bId, ch);
   const isFullyTyped = Boolean(rec.isFullyTyped || (totalVerses > 0 && typedVersesCount >= totalVerses));
+  const isFullySpoken = Boolean(rec.isFullySpoken || (totalVerses > 0 && spokenVersesCount >= totalVerses));
 
   store.chapters[key] = {
     ...rec,
     isRead: false,
     isFullyRead: false,
     readAt: null,
-    isFullyCompleted: isFullyTyped,
+    isFullyCompleted: Boolean(isFullyTyped || isFullySpoken || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses)),
     completedVerses: prevVerses,
     completedVersesCount: Object.keys(prevVerses).length
   };
@@ -1146,7 +1226,9 @@ export function markVerseAsRead(bookId, chapter, verse, translation = 'ESV') {
     bestAccuracy: prevV?.bestAccuracy || 100,
     isRead: true,
     readAt: now,
-    isTyped: Boolean(prevV?.isTyped || (prevV?.count && prevV.count > 0) || (prevV?.bestWpm && prevV.bestWpm > 0)),
+    isSpoken: Boolean(prevV?.isSpoken),
+    spokenAt: prevV?.spokenAt || null,
+    isTyped: Boolean(prevV?.isTyped || (!prevV?.isSpoken && ((prevV?.count && prevV.count > 0) || (prevV?.bestWpm && prevV.bestWpm > 0)))),
     translations: prevV?.translations || {},
     firstCompletedAt: prevV?.firstCompletedAt || now,
     lastCompletedAt: prevV?.lastCompletedAt || now
@@ -1156,7 +1238,9 @@ export function markVerseAsRead(bookId, chapter, verse, translation = 'ESV') {
   const isFullyRead = totalVerses > 0 && readVersesCount >= totalVerses;
   const typedVersesCount = Object.values(prevVerses).filter(v => v.isTyped).length;
   const isFullyTyped = Boolean(prevChapter.isFullyTyped || (totalVerses > 0 && typedVersesCount >= totalVerses));
-  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
+  const spokenVersesCount = Object.values(prevVerses).filter(v => v.isSpoken).length;
+  const isFullySpoken = Boolean(prevChapter.isFullySpoken || (totalVerses > 0 && spokenVersesCount >= totalVerses));
+  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || isFullySpoken || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
 
   store.chapters[key] = {
     ...prevChapter,
@@ -1173,6 +1257,8 @@ export function markVerseAsRead(bookId, chapter, verse, translation = 'ESV') {
     readAt: isFullyRead ? now : prevChapter.readAt,
     isFullyTyped,
     isTyped: Boolean(prevChapter.isTyped || typedVersesCount > 0),
+    isFullySpoken,
+    isSpoken: Boolean(prevChapter.isSpoken || spokenVersesCount > 0),
     completedVerses: prevVerses,
     firstCompletedAt: prevChapter.firstCompletedAt || now,
     lastCompletedAt: now
@@ -1227,7 +1313,7 @@ export function unmarkVerseAsRead(bookId, chapter, verse) {
   const prevV = prevVerses[vKey];
   if (!prevV) return rec;
 
-  if (prevV.isTyped) {
+  if (prevV.isTyped || prevV.isSpoken) {
     prevVerses[vKey] = { ...prevV, isRead: false, readAt: null };
   } else {
     delete prevVerses[vKey];
@@ -1238,7 +1324,9 @@ export function unmarkVerseAsRead(bookId, chapter, verse) {
   const isFullyRead = totalVerses > 0 && readVersesCount >= totalVerses;
   const typedVersesCount = Object.values(prevVerses).filter(v => v.isTyped).length;
   const isFullyTyped = Boolean(rec.isFullyTyped || (totalVerses > 0 && typedVersesCount >= totalVerses));
-  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
+  const spokenVersesCount = Object.values(prevVerses).filter(v => v.isSpoken).length;
+  const isFullySpoken = Boolean(rec.isFullySpoken || (totalVerses > 0 && spokenVersesCount >= totalVerses));
+  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || isFullySpoken || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
 
   store.chapters[key] = {
     ...rec,
@@ -1255,7 +1343,6 @@ export function unmarkVerseAsRead(bookId, chapter, verse) {
 
 export function toggleVerseRead(bookId, chapter, verse, translation = 'ESV') {
   const sum = getChapterProgressSummary(bookId, chapter);
-  const vKey = String(verse);
   const isRead = Boolean(sum.isFullyRead || sum.readVerseNums.includes(Number(verse)));
   if (isRead) {
     unmarkVerseAsRead(bookId, chapter, verse);
@@ -1275,21 +1362,25 @@ export function getChapterProgressSummary(bookId, chapter, translationFilter = '
   if (!rec) {
     return {
       hasAnyProgress: false,
-      isFullyCompleted: false, // covered (read or typed)
+      isFullyCompleted: false, // covered (read, typed, or spoken)
       isFullyRead: false,
       isFullyTyped: false,
+      isFullySpoken: false,
       isBoth: false,
       isReadOnly: false,
       isTypedOnly: false,
+      isSpokenOnly: false,
       isPartial: false,
-      coverageType: 'unseen', // 'both' | 'typed' | 'read' | 'partial' | 'unseen'
+      coverageType: 'unseen', // 'both' | 'typed' | 'spoken' | 'read' | 'partial' | 'unseen'
       completedVersesCount: 0, // unique covered count
       readVersesCount: 0,
       typedVersesCount: 0,
+      spokenVersesCount: 0,
       totalVerses: canonicalTotal,
       completedVerseNums: [],
       readVerseNums: [],
       typedVerseNums: [],
+      spokenVerseNums: [],
       bestWpm: 0,
       bestCpm: 0,
       record: null
@@ -1301,10 +1392,12 @@ export function getChapterProgressSummary(bookId, chapter, translationFilter = '
 
   const readVerseNums = [];
   const typedVerseNums = [];
+  const spokenVerseNums = [];
 
   const allVerseKeys = new Set(Object.keys(completedVersesObj).map(Number).filter(n => n >= 1));
   const isFullyReadCh = isChapterRecordFullyRead(rec);
   const isFullyTypedCh = isChapterRecordFullyTyped(rec, translationFilter);
+  const isFullySpokenCh = isChapterRecordFullySpoken(rec);
 
   if (isFullyReadCh && allVerseKeys.size === 0 && totalVerses > 0) {
     for (let i = 1; i <= totalVerses; i++) readVerseNums.push(i);
@@ -1317,13 +1410,24 @@ export function getChapterProgressSummary(bookId, chapter, translationFilter = '
     }
   }
 
+  if (isFullySpokenCh && allVerseKeys.size === 0 && totalVerses > 0) {
+    for (let i = 1; i <= totalVerses; i++) spokenVerseNums.push(i);
+  } else {
+    for (const [k, v] of Object.entries(completedVersesObj)) {
+      const vNum = Number(k);
+      if (vNum >= 1 && (v?.isSpoken || isFullySpokenCh)) {
+        spokenVerseNums.push(vNum);
+      }
+    }
+  }
+
   if (isFullyTypedCh && allVerseKeys.size === 0 && totalVerses > 0) {
     for (let i = 1; i <= totalVerses; i++) typedVerseNums.push(i);
   } else {
     for (const [k, v] of Object.entries(completedVersesObj)) {
       const vNum = Number(k);
       if (vNum >= 1) {
-        const hasTyped = v?.isTyped !== false && ((v?.count || 0) > 0 || (v?.bestWpm || 0) > 0 || v?.isTyped === true);
+        const hasTyped = v?.isTyped !== false && (v?.isTyped === true || (!v?.isRead && !v?.isSpoken && ((v?.count || 0) > 0 || (v?.bestWpm || 0) > 0)));
         if (hasTyped) {
           if (translationFilter === 'ALL' || v?.translations?.[translationFilter]) {
             typedVerseNums.push(vNum);
@@ -1335,8 +1439,9 @@ export function getChapterProgressSummary(bookId, chapter, translationFilter = '
 
   readVerseNums.sort((a, b) => a - b);
   typedVerseNums.sort((a, b) => a - b);
+  spokenVerseNums.sort((a, b) => a - b);
 
-  const coveredSet = new Set([...readVerseNums, ...typedVerseNums]);
+  const coveredSet = new Set([...readVerseNums, ...typedVerseNums, ...spokenVerseNums]);
   const completedVerseNumsSorted = Array.from(coveredSet).sort((a, b) => a - b);
 
   let isFullyCompleted = false;
@@ -1351,9 +1456,13 @@ export function getChapterProgressSummary(bookId, chapter, translationFilter = '
 
   const isFullyRead = isFullyReadCh || (totalVerses > 0 && readVerseNums.length >= totalVerses);
   const isFullyTyped = isFullyTypedCh || (totalVerses > 0 && typedVerseNums.length >= totalVerses);
-  const isBoth = isFullyRead && isFullyTyped;
-  const isReadOnly = isFullyRead && !isFullyTyped;
-  const isTypedOnly = isFullyTyped && !isFullyRead;
+  const isFullySpoken = isFullySpokenCh || (totalVerses > 0 && spokenVerseNums.length >= totalVerses);
+
+  const fullModesCount = (isFullyRead ? 1 : 0) + (isFullyTyped ? 1 : 0) + (isFullySpoken ? 1 : 0);
+  const isBoth = fullModesCount >= 2;
+  const isReadOnly = isFullyRead && !isFullyTyped && !isFullySpoken;
+  const isTypedOnly = isFullyTyped && !isFullyRead && !isFullySpoken;
+  const isSpokenOnly = isFullySpoken && !isFullyRead && !isFullyTyped;
 
   const completedVersesCount = isFullyCompleted && totalVerses > 0
     ? Math.max(completedVerseNumsSorted.length, totalVerses)
@@ -1367,32 +1476,41 @@ export function getChapterProgressSummary(bookId, chapter, translationFilter = '
     ? Math.max(typedVerseNums.length, totalVerses)
     : typedVerseNums.length;
 
+  const spokenVersesCount = isFullySpoken && totalVerses > 0
+    ? Math.max(spokenVerseNums.length, totalVerses)
+    : spokenVerseNums.length;
+
   const hasAnyProgress = isFullyCompleted || completedVersesCount > 0;
   const isPartial = hasAnyProgress && !isFullyCompleted;
 
   let coverageType = 'unseen';
   if (isBoth) coverageType = 'both';
   else if (isTypedOnly) coverageType = 'typed';
+  else if (isSpokenOnly) coverageType = 'spoken';
   else if (isReadOnly) coverageType = 'read';
   else if (isPartial) coverageType = 'partial';
 
   return {
     hasAnyProgress,
-    isFullyCompleted, // covered (read or typed)
+    isFullyCompleted, // covered (read, typed, or spoken)
     isFullyRead,
     isFullyTyped,
+    isFullySpoken,
     isBoth,
     isReadOnly,
     isTypedOnly,
+    isSpokenOnly,
     isPartial,
     coverageType,
     completedVersesCount,
     readVersesCount,
     typedVersesCount,
+    spokenVersesCount,
     totalVerses,
     completedVerseNums: completedVerseNumsSorted,
     readVerseNums,
     typedVerseNums,
+    spokenVerseNums,
     bestWpm: rec.bestWpm || 0,
     bestCpm: rec.bestCpm || 0,
     record: rec
@@ -1426,8 +1544,11 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
   const chapter = Number(session.chapter) || 1;
   const chapterKey = `${book.id}:${chapter}`;
   const translation = String(session.translation || 'ESV').toUpperCase();
-  const wpm = Number(session.wpm) || 0;
-  const cpm = Number(session.cpm) || 0;
+  const isReadActivity = session.activityType === 'read';
+  const isSpokenActivity = session.activityType === 'spoken';
+  const isTypedActivity = !isReadActivity && !isSpokenActivity;
+  const wpm = isTypedActivity ? (Number(session.wpm) || 0) : 0;
+  const cpm = isTypedActivity ? (Number(session.cpm) || 0) : 0;
   const accuracy = Number(session.accuracy) ?? 100;
   const completedAt = session.completedAt || new Date().toISOString();
 
@@ -1441,15 +1562,17 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
     const prevV = prevCompletedVerses[vKey];
     const prevVTr = prevV?.translations?.[translation];
     const vs = session.verseStats?.[vKey];
-    const vWpm = vs ? Number(vs.wpm) || 0 : wpm;
-    const vCpm = vs ? Number(vs.cpm) || 0 : cpm;
+    const vWpm = isTypedActivity ? (vs ? Number(vs.wpm) || 0 : wpm) : 0;
+    const vCpm = isTypedActivity ? (vs ? Number(vs.cpm) || 0 : cpm) : 0;
     const vAcc = vs ? Number(vs.accuracy) || 100 : accuracy;
     prevCompletedVerses[vKey] = {
       verse: vNum,
       count: (prevV?.count || 0) + 1,
-      isTyped: true,
-      isRead: Boolean(prevV?.isRead),
-      readAt: prevV?.readAt || null,
+      isTyped: Boolean(prevV?.isTyped || isTypedActivity),
+      isRead: Boolean(prevV?.isRead || isReadActivity),
+      isSpoken: Boolean(prevV?.isSpoken || isSpokenActivity),
+      readAt: isReadActivity ? completedAt : (prevV?.readAt || null),
+      spokenAt: isSpokenActivity ? completedAt : (prevV?.spokenAt || null),
       bestWpm: Math.max(prevV?.bestWpm || 0, vWpm),
       bestCpm: Math.max(prevV?.bestCpm || 0, vCpm),
       bestAccuracy: Math.max(prevV?.bestAccuracy || 0, vAcc),
@@ -1480,20 +1603,28 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
   const completedVersesCount = Object.keys(prevCompletedVerses).length;
   const wasFullyCompleted = isChapterRecordFullyCompleted(prevChapter);
   const typedVersesCount = Object.values(prevCompletedVerses).filter(v =>
-    v && v.isTyped !== false && ((v.count || 0) > 0 || (v.bestWpm || 0) > 0 || v.isTyped === true)
+    v && v.isTyped !== false && (v.isTyped === true || (!v.isRead && !v.isSpoken && ((v.count || 0) > 0 || (v.bestWpm || 0) > 0)))
   ).length;
+  const spokenVersesCount = Object.values(prevCompletedVerses).filter(v => v && v.isSpoken).length;
   const isNowFullyTyped = Boolean(
     prevChapter?.isFullyTyped ||
-    session.isFullChapter ||
+    (session.isFullChapter && isTypedActivity) ||
     (resolvedTotalVerses > 0 && typedVersesCount >= resolvedTotalVerses)
+  );
+  const isNowFullySpoken = Boolean(
+    prevChapter?.isFullySpoken ||
+    (session.isFullChapter && isSpokenActivity) ||
+    (resolvedTotalVerses > 0 && spokenVersesCount >= resolvedTotalVerses)
   );
   const isNowFullyRead = Boolean(
     prevChapter?.isFullyRead ||
+    (session.isFullChapter && isReadActivity) ||
     (resolvedTotalVerses > 0 && Object.values(prevCompletedVerses).filter(v => v && v.isRead).length >= resolvedTotalVerses)
   );
   const isNowFullyCompleted = Boolean(
     wasFullyCompleted ||
     isNowFullyTyped ||
+    isNowFullySpoken ||
     isNowFullyRead ||
     (resolvedTotalVerses > 0 && completedVersesCount >= resolvedTotalVerses)
   );
@@ -1527,9 +1658,11 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
     completedVersesCount,
     isFullyCompleted: isNowFullyCompleted,
     isFullyTyped: isNowFullyTyped,
+    isFullySpoken: isNowFullySpoken,
     isFullyRead: isNowFullyRead,
     isRead: Boolean(prevChapter?.isRead || isNowFullyRead),
-    isTyped: true,
+    isSpoken: Boolean(prevChapter?.isSpoken || isSpokenActivity || isNowFullySpoken),
+    isTyped: Boolean(prevChapter?.isTyped || isTypedActivity || isNowFullyTyped),
     completedVerses: prevCompletedVerses,
     completedCount: isNowFullyCompleted
       ? Math.max(1, (prevChapter?.completedCount || 0) + (!wasFullyCompleted ? 1 : 0))
@@ -1557,12 +1690,13 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
 }
 
 /**
- * Record a single completed verse immediately (supports both Single-Verse Mode and Partial/Full Chapter Mode).
- * The sitting's session is updated in-place (same sessionId) so partial chapter progress is saved after every
- * verse without creating a new history row per verse.
+ * Record a single completed verse immediately (supports both Single-Verse Mode and Partial/Full Chapter Mode,
+ * and both 'typed' and 'spoken' activityType).
  */
 export async function recordCompletedVerse(verseData) {
   const store = getLocalStore();
+  const activityType = verseData.activityType === 'spoken' ? 'spoken' : 'typed';
+  const isSpoken = activityType === 'spoken';
   const bookId = Number(verseData.bookId) || 1;
   const book = getBookById(bookId);
   const chapter = Number(verseData.chapter) || 1;
@@ -1571,14 +1705,17 @@ export async function recordCompletedVerse(verseData) {
   const allVerseNumbers = Array.isArray(verseData.allVerseNumbers) ? verseData.allVerseNumbers.map(Number) : [];
   const translation = String(verseData.translation || store.preferredTranslation || 'ESV').toUpperCase();
   const wpm = Math.max(0, Math.round((Number(verseData.wpm) || 0) * 10) / 10);
-  const cpm = Math.max(0, Math.round(Number(verseData.cpm) || 0));
+  const cpm = isSpoken ? 0 : Math.max(0, Math.round(Number(verseData.cpm) || 0));
   const accuracy = Math.min(100, Math.max(0, Math.round((Number(verseData.accuracy) ?? 100) * 10) / 10));
+  const enunciation = isSpoken
+    ? Math.min(100, Math.max(0, Math.round((Number(verseData.enunciation ?? verseData.accuracy) ?? 100) * 10) / 10))
+    : undefined;
   const charsTyped = Math.max(0, Math.round(Number(verseData.charsTyped) || 0));
   const wordsTyped = Math.max(0, Math.round(Number(verseData.wordsTyped) || 0));
   const mistakes = Math.max(0, Math.round(Number(verseData.mistakes) || 0));
   const durationMs = Math.max(0, Math.round(Number(verseData.durationMs) || 0));
   const completedAt = verseData.completedAt || new Date().toISOString();
-  const sessionId = verseData.sittingSessionId || verseData.sessionId || `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const sessionId = verseData.sittingSessionId || verseData.sessionId || `${isSpoken ? 'spk' : 's'}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const chapterKey = `${book.id}:${chapter}`;
   const prevChapter = store.chapters[chapterKey];
@@ -1586,9 +1723,9 @@ export async function recordCompletedVerse(verseData) {
   const wasVerseCompleteOverall = isVerseCompletedInRecord(prevChapter, verse, 'ALL');
   const wasVerseCompleteInTr = isVerseCompletedInRecord(prevChapter, verse, translation);
   const prevBestWpm = prevChapter?.completedVerses?.[String(verse)]?.bestWpm || 0;
-  const isNewVersePersonalBest = wpm > prevBestWpm;
+  const isNewVersePersonalBest = !isSpoken && wpm > prevBestWpm;
 
-  // Does this verse complete the chapter in this translation? (uses the verses that actually exist in the loaded text)
+  // Does this verse complete the chapter in this translation?
   const trCovered = new Set();
   for (const [vKey, vRec] of Object.entries(prevChapter?.completedVerses || {})) {
     if (vRec?.translations?.[translation]) trCovered.add(Number(vKey));
@@ -1607,7 +1744,9 @@ export async function recordCompletedVerse(verseData) {
     (allVerseNumbers.length > 0 && allVerseNumbers.every(n => trCovered.has(n)))
   );
 
-  const verseStatEntry = { wpm, cpm, accuracy };
+  const verseStatEntry = isSpoken
+    ? { wpm: 0, cpm: 0, accuracy }
+    : { wpm, cpm, accuracy };
 
   // Build or update the sitting session in store.sessions
   const existingSessionIdx = store.sessions.findIndex(s => s.sessionId === sessionId);
@@ -1624,13 +1763,19 @@ export async function recordCompletedVerse(verseData) {
     const totalDur = (Number(prevS.durationMs) || 0) + durationMs;
     const totalMistakes = (Number(prevS.mistakes) || 0) + mistakes;
     const mins = Math.max(totalDur / 60000, 1 / 600);
-    const aggCpm = Math.round(totalChars / mins);
-    const aggWpm = Math.round((totalChars / 5 / mins) * 10) / 10;
+    const aggCpm = isSpoken ? 0 : Math.round(totalChars / mins);
+    const aggWpm = isSpoken
+      ? Math.round((totalWords / mins) * 10) / 10
+      : Math.round((totalChars / 5 / mins) * 10) / 10;
     const aggAcc = Math.round((((Number(prevS.accuracy) || 100) * prevVersesList.length + accuracy) / (prevVersesList.length + 1)) * 10) / 10;
+    const aggEnun = isSpoken
+      ? Math.round((((Number(prevS.enunciation ?? prevS.accuracy) || 100) * prevVersesList.length + (enunciation ?? accuracy)) / (prevVersesList.length + 1)) * 10) / 10
+      : undefined;
 
     sessionObj = {
       ...prevS,
       sessionId,
+      activityType,
       bookId: book.id,
       bookName: book.name,
       chapter,
@@ -1643,6 +1788,7 @@ export async function recordCompletedVerse(verseData) {
       wpm: aggWpm,
       cpm: aggCpm,
       accuracy: aggAcc,
+      ...(isSpoken ? { enunciation: aggEnun } : {}),
       charsTyped: totalChars,
       wordsTyped: totalWords,
       versesTyped: combinedVerseNums.length,
@@ -1655,6 +1801,7 @@ export async function recordCompletedVerse(verseData) {
   } else {
     sessionObj = {
       sessionId,
+      activityType,
       bookId: book.id,
       bookName: book.name,
       chapter,
@@ -1667,6 +1814,7 @@ export async function recordCompletedVerse(verseData) {
       wpm,
       cpm,
       accuracy,
+      ...(isSpoken ? { enunciation: enunciation ?? accuracy } : {}),
       charsTyped,
       wordsTyped,
       versesTyped: 1,
@@ -1680,6 +1828,7 @@ export async function recordCompletedVerse(verseData) {
 
   // Update chapter aggregate with this completed verse
   const singleVerseDelta = {
+    activityType,
     bookId: book.id,
     bookName: book.name,
     chapter,
@@ -1689,8 +1838,8 @@ export async function recordCompletedVerse(verseData) {
     totalChapterVerses,
     isFullChapter: completesInTranslation,
     translation,
-    wpm,
-    cpm,
+    wpm: isSpoken ? 0 : wpm,
+    cpm: isSpoken ? 0 : cpm,
     accuracy,
     versesTyped: 1,
     completedAt
@@ -1731,16 +1880,25 @@ export async function recordCompletedVerse(verseData) {
   };
 }
 
+export async function recordSpokenVerse(verseData) {
+  return recordCompletedVerse({ ...verseData, activityType: 'spoken', cpm: 0 });
+}
+
 // ── Record Completed Chapter Locally & Sync to Cloud ────────────
 export async function recordCompletedChapter(sessionData) {
   const store = getLocalStore();
+  const activityType = sessionData.activityType === 'spoken' ? 'spoken' : 'typed';
+  const isSpoken = activityType === 'spoken';
   const bookId = Number(sessionData.bookId) || 1;
   const book = getBookById(bookId);
   const chapter = Number(sessionData.chapter) || 1;
   const translation = String(sessionData.translation || store.preferredTranslation || 'ESV').toUpperCase();
   const wpm = Math.max(0, Math.round((Number(sessionData.wpm) || 0) * 10) / 10);
-  const cpm = Math.max(0, Math.round(Number(sessionData.cpm) || 0));
+  const cpm = isSpoken ? 0 : Math.max(0, Math.round(Number(sessionData.cpm) || 0));
   const accuracy = Math.min(100, Math.max(0, Math.round((Number(sessionData.accuracy) ?? 100) * 10) / 10));
+  const enunciation = isSpoken
+    ? Math.min(100, Math.max(0, Math.round((Number(sessionData.enunciation ?? sessionData.accuracy) ?? 100) * 10) / 10))
+    : undefined;
   const charsTyped = Math.max(0, Math.round(Number(sessionData.charsTyped) || 0));
   const wordsTyped = Math.max(0, Math.round(Number(sessionData.wordsTyped) || 0));
   const versesTyped = Math.max(1, Math.round(Number(sessionData.versesTyped) || 1));
@@ -1752,17 +1910,18 @@ export async function recordCompletedChapter(sessionData) {
   const mistakes = Math.max(0, Math.round(Number(sessionData.mistakes) || 0));
   const durationMs = Math.max(0, Math.round(Number(sessionData.durationMs) || 0));
   const completedAt = sessionData.completedAt || new Date().toISOString();
-  const sessionId = sessionData.sittingSessionId || sessionData.sessionId || `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const sessionId = sessionData.sittingSessionId || sessionData.sessionId || `${isSpoken ? 'spk' : 's'}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const chapterKey = `${book.id}:${chapter}`;
   const prevChapter = store.chapters[chapterKey];
   const wasFullyCompleted = isChapterRecordFullyCompleted(prevChapter);
-  const isNewPersonalBest = !prevChapter || wpm > (prevChapter.bestWpm || 0);
+  const isNewPersonalBest = !isSpoken && (!prevChapter || wpm > (prevChapter.bestWpm || 0));
   const isFirstTimeOverall = !wasFullyCompleted;
   const isFirstTimeInTranslation = !prevChapter?.translations?.[translation]?.isFullyCompleted;
 
   const newSession = {
     sessionId,
+    activityType,
     bookId: book.id,
     bookName: book.name,
     chapter,
@@ -1774,6 +1933,7 @@ export async function recordCompletedChapter(sessionData) {
     wpm,
     cpm,
     accuracy,
+    ...(isSpoken ? { enunciation: enunciation ?? accuracy } : {}),
     charsTyped,
     wordsTyped,
     versesTyped: completedVerseNumbers.length,
@@ -1821,6 +1981,10 @@ export async function recordCompletedChapter(sessionData) {
   };
 }
 
+export async function recordSpokenChapter(sessionData) {
+  return recordCompletedChapter({ ...sessionData, activityType: 'spoken', cpm: 0 });
+}
+
 function normalizeSessionForReconstruct(s) {
   if (Array.isArray(s.completedVerseNumbers) && s.completedVerseNumbers.length > 0) return s;
   if (s.verseNumber) {
@@ -1836,7 +2000,7 @@ function normalizeSessionForReconstruct(s) {
   return s;
 }
 
-// ── Compute Comprehensive Typing & Bible Reach Statistics ────────
+// ── Compute Comprehensive Typing, Speaking & Bible Reach Statistics ──
 export function getGlobalTypingStats() {
   const store = getLocalStore();
   const chaptersMap = store.chapters || {};
@@ -1849,7 +2013,11 @@ export function getGlobalTypingStats() {
     const normalized = normalizeSessionForReconstruct(s);
     const rec = mergedChapters[key];
     const verses = normalized.completedVerseNumbers || [];
-    const reflected = rec && (verses.length === 0 || verses.every(v => isVerseCompletedInRecord(rec, v, normalized.translation)));
+    const reflected = rec && (verses.length === 0 || verses.every(v => {
+      if (normalized.activityType === 'spoken') return isVerseSpoken(rec, v);
+      if (normalized.activityType === 'read') return isVerseRead(rec, v);
+      return isVerseTyped(rec, v, normalized.translation);
+    }));
     if (!reflected) {
       mergedChapters[key] = applySessionToChapterRecord(rec, normalized, normalized.totalChapterVerses || 0);
     }
@@ -1860,11 +2028,13 @@ export function getGlobalTypingStats() {
   let overallCoveredChapters = 0;
   let overallReadChapters = 0;
   let overallTypedChapters = 0;
+  let overallSpokenChapters = 0;
   let overallBothChapters = 0;
   let partialChaptersCount = 0;
   let overallCoveredVerses = 0;
   let overallReadVerses = 0;
   let overallTypedVerses = 0;
+  let overallSpokenVerses = 0;
   let overallBothVerses = 0;
   let otCoveredChapters = 0;
   let ntCoveredChapters = 0;
@@ -1896,6 +2066,13 @@ export function getGlobalTypingStats() {
         overallTypedVerses += sum.typedVersesCount;
       }
 
+      if (sum.isFullySpoken) {
+        overallSpokenChapters++;
+        overallSpokenVerses += sum.totalVerses;
+      } else if (sum.spokenVersesCount > 0) {
+        overallSpokenVerses += sum.spokenVersesCount;
+      }
+
       if (sum.isBoth) {
         overallBothChapters++;
         overallBothVerses += sum.totalVerses;
@@ -1912,29 +2089,37 @@ export function getGlobalTypingStats() {
   const overallReadVersesPercentage = Math.round((overallReadVerses / TOTAL_BIBLE_VERSES) * 1000) / 10;
   const overallTypedPercentage = Math.round((overallTypedChapters / TOTAL_BIBLE_CHAPTERS) * 1000) / 10;
   const overallTypedVersesPercentage = Math.round((overallTypedVerses / TOTAL_BIBLE_VERSES) * 1000) / 10;
+  const overallSpokenPercentage = Math.round((overallSpokenChapters / TOTAL_BIBLE_CHAPTERS) * 1000) / 10;
+  const overallSpokenVersesPercentage = Math.round((overallSpokenVerses / TOTAL_BIBLE_VERSES) * 1000) / 10;
   const overallReadOnlyChapters = Math.max(0, overallReadChapters - overallBothChapters);
   const overallTypedOnlyChapters = Math.max(0, overallTypedChapters - overallBothChapters);
+  const overallSpokenOnlyChapters = Math.max(0, overallSpokenChapters - overallBothChapters);
 
-  // Count books fully completed (covered, read, typed)
+  // Count books fully completed (covered, read, typed, spoken)
   let completedBooksCount = 0;
   let readBooksCount = 0;
   let typedBooksCount = 0;
+  let spokenBooksCount = 0;
   for (const book of BIBLE_BOOKS) {
     let coveredInBook = 0;
     let readInBook = 0;
     let typedInBook = 0;
+    let spokenInBook = 0;
     for (let ch = 1; ch <= book.chapters; ch++) {
       const sum = getChapterProgressSummary(book.id, ch, 'ALL');
       if (sum.isFullyCompleted) coveredInBook++;
       if (sum.isFullyRead) readInBook++;
       if (sum.isFullyTyped) typedInBook++;
+      if (sum.isFullySpoken) spokenInBook++;
     }
     if (coveredInBook === book.chapters) completedBooksCount++;
     if (readInBook === book.chapters) readBooksCount++;
     if (typedInBook === book.chapters) typedBooksCount++;
+    if (spokenInBook === book.chapters) spokenBooksCount++;
   }
 
-  // Speed & volume metrics across sessions
+  // Speed & volume metrics across TYPED sessions only (do not include read or spoken sessions in typing WPM/CPM)
+  const typedSessions = sessions.filter(s => s.activityType !== 'read' && s.activityType !== 'spoken');
   let totalWpmSum = 0;
   let totalCpmSum = 0;
   let totalAccSum = 0;
@@ -1945,7 +2130,7 @@ export function getGlobalTypingStats() {
   let totalCharsTyped = 0;
   let totalDurationMs = 0;
 
-  for (const s of sessions) {
+  for (const s of typedSessions) {
     const wpm = Number(s.wpm) || 0;
     const cpm = Number(s.cpm) || 0;
     const acc = Number(s.accuracy) ?? 100;
@@ -1960,8 +2145,9 @@ export function getGlobalTypingStats() {
     totalDurationMs += Number(s.durationMs) || 0;
   }
 
-  if (sessions.length === 0 && allChapterRecords.length > 0) {
-    for (const c of allChapterRecords) {
+  const typedChapterRecords = allChapterRecords.filter(c => (c.bestWpm || 0) > 0 || c.isTyped);
+  if (typedSessions.length === 0 && typedChapterRecords.length > 0) {
+    for (const c of typedChapterRecords) {
       totalWpmSum += Number(c.bestWpm) || 0;
       totalCpmSum += Number(c.bestCpm) || 0;
       totalAccSum += Number(c.bestAccuracy) || 100;
@@ -1971,10 +2157,43 @@ export function getGlobalTypingStats() {
     }
   }
 
-  const denom = sessions.length || allChapterRecords.length || 0;
+  const denom = typedSessions.length || typedChapterRecords.length || 0;
   const avgWpm = denom > 0 ? Math.round((totalWpmSum / denom) * 10) / 10 : 0;
   const avgCpm = denom > 0 ? Math.round(totalCpmSum / denom) : 0;
   const avgAccuracy = denom > 0 ? Math.round((totalAccSum / denom) * 10) / 10 : 100;
+
+  // Speaking Cadence (WPM), Pronunciation Accuracy & Enunciation across SPOKEN sessions
+  const spokenSessions = sessions.filter(s => s.activityType === 'spoken');
+  let speakWpmSum = 0;
+  let speakWpmCount = 0;
+  let speakPronSum = 0;
+  let speakEnunSum = 0;
+  let totalVersesSpokenInSessions = 0;
+  let totalWordsSpoken = 0;
+  let totalSpeakDurationMs = 0;
+
+  for (const s of spokenSessions) {
+    const swpm = Number(s.wpm) || 0;
+    if (swpm > 0) {
+      speakWpmSum += swpm;
+      speakWpmCount++;
+    }
+    const pron = Number(s.accuracy) ?? 100;
+    const enun = Number(s.enunciation ?? s.accuracy) ?? 100;
+    speakPronSum += pron;
+    speakEnunSum += enun;
+    totalVersesSpokenInSessions += Number(s.versesTyped) || 0;
+    totalWordsSpoken += Number(s.wordsTyped) || 0;
+    totalSpeakDurationMs += Number(s.durationMs) || 0;
+  }
+
+  const avgSpeakCadenceWpm = speakWpmCount > 0 ? Math.round((speakWpmSum / speakWpmCount) * 10) / 10 : 0;
+  const avgPronunciationAccuracy = spokenSessions.length > 0
+    ? Math.round((speakPronSum / spokenSessions.length) * 10) / 10
+    : 100;
+  const avgEnunciation = spokenSessions.length > 0
+    ? Math.round((speakEnunSum / spokenSessions.length) * 10) / 10
+    : 100;
 
   // Per-translation completeness breakdown
   const byTranslation = {};
@@ -2031,7 +2250,7 @@ export function getGlobalTypingStats() {
   }
 
   return {
-    // Total Bible Covered (Read OR Typed)
+    // Total Bible Covered (Read, Typed, OR Spoken)
     overallCoveredChapters,
     overallCoveredVerses,
     overallCoveredPercentage,
@@ -2048,6 +2267,20 @@ export function getGlobalTypingStats() {
     overallTypedPercentage,
     overallTypedVersesPercentage,
     overallTypedOnlyChapters,
+    // Spoken Breakdown
+    overallSpokenChapters,
+    overallSpokenVerses,
+    overallSpokenPercentage,
+    overallSpokenVersesPercentage,
+    overallSpokenOnlyChapters,
+    // Speaking Cadence, Pronunciation & Enunciation
+    avgSpeakCadenceWpm,
+    avgPronunciationAccuracy,
+    avgEnunciation,
+    totalWordsSpoken,
+    totalVersesSpokenInSessions,
+    totalSpeakDurationMs,
+    spokenSessionsCount: spokenSessions.length,
     // Both Breakdown
     overallBothChapters,
     overallBothVerses,
@@ -2068,6 +2301,7 @@ export function getGlobalTypingStats() {
     completedBooksCount,
     readBooksCount,
     typedBooksCount,
+    spokenBooksCount,
     totalBooksCount: BIBLE_BOOKS.length,
     avgWpm,
     avgCpm,
@@ -2078,7 +2312,7 @@ export function getGlobalTypingStats() {
     totalWordsTyped,
     totalCharsTyped,
     totalDurationMs,
-    sessionsCount: sessions.length,
+    sessionsCount: typedSessions.length,
     chaptersMap: mergedChapters,
     sessions,
     byTranslation
@@ -2144,8 +2378,10 @@ function mergeChapterRecords(localCh, cloudCh) {
         ...localV,
         count: Math.max(localV.count || 0, cloudV.count || 0),
         isRead: Boolean(localV.isRead || cloudV.isRead),
-        isTyped: Boolean(localV.isTyped || cloudV.isTyped || (localV.count && localV.count > 0) || (cloudV.count && cloudV.count > 0)),
+        isSpoken: Boolean(localV.isSpoken || cloudV.isSpoken),
+        isTyped: Boolean(localV.isTyped || cloudV.isTyped || (!localV.isRead && !localV.isSpoken && localV.count > 0) || (!cloudV.isRead && !cloudV.isSpoken && cloudV.count > 0)),
         readAt: localV.readAt && cloudV.readAt ? (localV.readAt > cloudV.readAt ? localV.readAt : cloudV.readAt) : (localV.readAt || cloudV.readAt),
+        spokenAt: localV.spokenAt && cloudV.spokenAt ? (localV.spokenAt > cloudV.spokenAt ? localV.spokenAt : cloudV.spokenAt) : (localV.spokenAt || cloudV.spokenAt),
         bestWpm: Math.max(localV.bestWpm || 0, cloudV.bestWpm || 0),
         bestCpm: Math.max(localV.bestCpm || 0, cloudV.bestCpm || 0),
         bestAccuracy: Math.max(localV.bestAccuracy || 0, cloudV.bestAccuracy || 0),
@@ -2171,9 +2407,15 @@ function mergeChapterRecords(localCh, cloudCh) {
     cloudCh.isFullyTyped ||
     (totalVerses > 0 && Object.values(mergedVerses).filter(v => v.isTyped).length >= totalVerses)
   );
+  const isFullySpoken = Boolean(
+    localCh.isFullySpoken ||
+    cloudCh.isFullySpoken ||
+    (totalVerses > 0 && Object.values(mergedVerses).filter(v => v.isSpoken).length >= totalVerses)
+  );
   const isFullyCompleted = Boolean(
     isFullyRead ||
     isFullyTyped ||
+    isFullySpoken ||
     isChapterRecordFullyCompleted(localCh) ||
     isChapterRecordFullyCompleted(cloudCh) ||
     (totalVerses > 0 && completedVersesCount >= totalVerses)
@@ -2188,7 +2430,9 @@ function mergeChapterRecords(localCh, cloudCh) {
     isFullyCompleted,
     isFullyRead,
     isFullyTyped,
+    isFullySpoken,
     isRead: isFullyRead,
+    isSpoken: Boolean(localCh.isSpoken || cloudCh.isSpoken || isFullySpoken),
     isTyped: Boolean(localCh.isTyped || cloudCh.isTyped || isFullyTyped),
     completedVerses: mergedVerses,
     completedCount: Math.max(localCh.completedCount || 0, cloudCh.completedCount || 0),
@@ -2233,7 +2477,7 @@ export async function syncLocalToCloud() {
     ]);
 
     const latestStore = getLocalStore();
-    let meditationsChanged = false;
+    let drawingsChanged = false;
     let favoritesChanged = false;
     let bookmarksChanged = false;
 
@@ -2247,17 +2491,24 @@ export async function syncLocalToCloud() {
       if (cp.showTypingStats !== undefined) latestStore.showTypingStats = Boolean(cp.showTypingStats);
       if (cp.shuffleVerses !== undefined) latestStore.shuffleVerses = Boolean(cp.shuffleVerses);
       if (cp.shuffleScope) latestStore.shuffleScope = cp.shuffleScope;
-      if (cp.meditateMode !== undefined) latestStore.meditateMode = Boolean(cp.meditateMode);
+      if (['type', 'speak', 'draw'].includes(cp.activeMode)) {
+        latestStore.activeMode = cp.activeMode;
+        latestStore.meditateMode = cp.activeMode === 'draw';
+      } else if (cp.meditateMode !== undefined) {
+        latestStore.meditateMode = Boolean(cp.meditateMode);
+        latestStore.activeMode = latestStore.meditateMode ? 'draw' : 'type';
+      }
       if (Array.isArray(cp.meditatePalette) && cp.meditatePalette.length === 10) {
         latestStore.meditatePalette = cp.meditatePalette;
       }
       if (cp.meditateFont) latestStore.meditateFont = cp.meditateFont;
       if (typeof cp.meditateFontSize === 'number') latestStore.meditateFontSize = cp.meditateFontSize;
 
-      if (cp.meditations && typeof cp.meditations === 'object') {
-        const localMeds = latestStore.meditations || {};
+      const cloudDrawings = { ...(cp.meditations || {}), ...(cp.drawings || {}) };
+      if (Object.keys(cloudDrawings).length > 0) {
+        const localMeds = { ...(latestStore.meditations || {}), ...(latestStore.drawings || {}) };
         const mergedMeds = { ...localMeds };
-        for (const [key, cloudMed] of Object.entries(cp.meditations)) {
+        for (const [key, cloudMed] of Object.entries(cloudDrawings)) {
           if (!cloudMed) continue;
           const localMed = mergedMeds[key];
           const cloudTime = cloudMed.updatedAt || '';
@@ -2265,10 +2516,11 @@ export async function syncLocalToCloud() {
           if (!localMed || cloudTime >= localTime) {
             if (JSON.stringify(localMed) !== JSON.stringify(cloudMed)) {
               mergedMeds[key] = cloudMed;
-              meditationsChanged = true;
+              drawingsChanged = true;
             }
           }
         }
+        latestStore.drawings = mergedMeds;
         latestStore.meditations = mergedMeds;
       }
 
@@ -2349,7 +2601,8 @@ export async function syncLocalToCloud() {
 
     saveLocalStore(latestStore);
 
-    if (meditationsChanged) {
+    if (drawingsChanged) {
+      window.dispatchEvent(new CustomEvent('bible:drawings-updated'));
       window.dispatchEvent(new CustomEvent('bible:meditations-updated'));
     }
     if (favoritesChanged) {
@@ -2371,6 +2624,8 @@ export const Api = {
   syncLocalToCloud,
   recordCompletedVerse,
   recordCompletedChapter,
+  recordSpokenVerse,
+  recordSpokenChapter,
   markChapterAsRead,
   unmarkChapterAsRead,
   toggleChapterRead,
@@ -2394,12 +2649,26 @@ export const Api = {
   setAdvanceButtonPref,
   getShuffleVersesPref,
   setShuffleVersesPref,
+  getActiveModePref,
+  setActiveModePref,
+  getMeditateModePref,
+  setMeditateModePref,
+  saveVerseDrawing,
+  getVerseDrawing,
+  getAllDrawings,
+  deleteVerseDrawing,
+  saveVerseMeditation,
+  getVerseMeditation,
+  getAllMeditations,
+  deleteVerseMeditation,
   getChapterProgressSummary,
   isChapterRecordFullyCompleted,
   isChapterRecordFullyRead,
   isChapterRecordFullyTyped,
+  isChapterRecordFullySpoken,
   isVerseCompletedInRecord,
   isVerseRead,
   isVerseTyped,
+  isVerseSpoken,
   isVerseCovered
 };

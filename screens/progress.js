@@ -1,9 +1,10 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261107_v11';
-import { getGlobalTypingStats, getChapterProgressSummary } from '../api.js?v=20261107_v11';
-import { trackEvent } from '../analytics.js?v=20261107_v11';
+} from '../bible-data.js?v=20261108_v12';
+import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261108_v12';
+import { getCadenceDescriptor } from './typing.js?v=20261108_v12';
+import { trackEvent } from '../analytics.js?v=20261108_v12';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -33,12 +34,23 @@ function formatDateShort(isoStr) {
 }
 
 function buildSpeedChartSVG(sessions, metric = 'wpm') {
-  const chronological = [...sessions].reverse().slice(-30);
+  const filtered = metric === 'cadence'
+    ? sessions.filter(s => s.activityType === 'spoken' && (Number(s.wpm) || 0) > 0)
+    : sessions.filter(s => s.activityType !== 'read' && s.activityType !== 'spoken');
+  const chronological = [...filtered].reverse().slice(-30);
   if (chronological.length === 0) {
+    if (metric === 'cadence') {
+      return `
+        <div class="chart-empty-state">
+          <p>Complete your first verse or chapter in <strong>Speak Mode</strong> to see your Speaking Cadence &amp; Clarity chart.</p>
+          <a href="/speak" class="btn btn-primary btn-sm">🗣️ Start Speaking →</a>
+        </div>
+      `;
+    }
     return `
       <div class="chart-empty-state">
-        <p>Complete your first Bible verse or chapter to see your WPM &amp; CPM speed progression chart.</p>
-        <a href="/typing" class="btn btn-primary btn-sm">Start Typing →</a>
+        <p>Complete your first Bible verse or chapter to see your WPM &amp; CPM progression chart.</p>
+        <a href="/type" class="btn btn-primary btn-sm">⌨️ Start Typing →</a>
       </div>
     `;
   }
@@ -102,7 +114,7 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
         ${points.map((p, i) => `
           <g class="chart-node-group">
             <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" fill="var(--bg-surface)" stroke="var(--primary)" stroke-width="2.5">
-              <title>${p.session.bookName} ${p.session.chapter}${p.session.verseRange ? `:${p.session.verseRange}` : ''} (${p.session.translation}): ${p.val} ${unitLabel} · ${p.session.accuracy}% acc</title>
+              <title>${p.session.bookName} ${p.session.chapter}${p.session.verseRange ? `:${p.session.verseRange}` : ''} (${p.session.translation}): ${p.val} ${unitLabel} · ${p.session.accuracy}% ${metric === 'cadence' ? `pronunciation · ${p.session.enunciation ?? p.session.accuracy}% enunciation` : 'acc'}</title>
             </circle>
             ${(i === 0 || i === points.length - 1 || points.length <= 8) ? `
               <text x="${p.x.toFixed(1)}" y="${(padTop + plotH + 18).toFixed(1)}" text-anchor="middle" fill="var(--text-muted)" font-size="10">
@@ -117,8 +129,8 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
 }
 
 export function renderProgressScreen(container) {
-  let activeChartMetric = 'wpm';
-  let activeCoverageFilter = 'ALL'; // 'ALL' (Read & Typed) | 'TYPED' | 'READ'
+  let activeChartMetric = 'wpm'; // 'wpm' | 'cpm' | 'cadence'
+  let activeCoverageFilter = 'ALL'; // 'ALL' | 'TYPED' | 'SPEAK' | 'READ'
   let activeTranslationFilter = 'ALL';
   let showTranslationDrawer = false;
   let activeTestamentTab = 'ALL';
@@ -128,6 +140,8 @@ export function renderProgressScreen(container) {
   function render() {
     const stats = getGlobalTypingStats();
     const isSpecificTr = activeTranslationFilter !== 'ALL';
+    const activeMode = getActiveModePref() || 'type';
+    const cadenceDesc = getCadenceDescriptor(stats.avgSpeakCadenceWpm);
 
     if (!initializedExpanded) {
       initializedExpanded = true;
@@ -182,23 +196,23 @@ export function renderProgressScreen(container) {
           <div class="screen-title-group">
             <div class="screen-lang-tag">
               <span>📊</span>
-              <span>Scripture Completeness &amp; Speed</span>
+              <span>Scripture Completeness, Typing &amp; Speaking Cadence</span>
             </div>
-            <h1 class="screen-title">Bible Reach &amp; Typing Progress</h1>
+            <h1 class="screen-title">Bible Reach &amp; Progress</h1>
             <p class="screen-subtitle">
-              Track your journey through the whole Bible (read or typed), your WPM speed, and verse-level reach across all 66 books, 1,189 chapters, and 31,103 verses.
+              Track your journey through the whole Bible (read, typed, or spoken), your typing speed, and your speaking cadence &amp; clarity across all 66 books, 1,189 chapters, and 31,103 verses.
             </p>
           </div>
           <div class="screen-actions">
-            <a href="/typing" class="btn btn-primary">
-              ⌨️ Continue Typing →
+            <a href="/${activeMode}" class="btn btn-primary">
+              ✨ Open Promises →
             </a>
           </div>
         </div>
 
         <!-- Top 4 KPI Summary Cards -->
         <div class="kpi-cards-grid">
-          <!-- Card 1: Total Scripture Covered (Read OR Typed) -->
+          <!-- Card 1: Total Scripture Covered (Read, Typed, OR Spoken) -->
           <div class="kpi-card is-primary-kpi">
             <div class="kpi-card-top">
               <span class="kpi-label">Total Scripture Covered</span>
@@ -211,7 +225,8 @@ export function renderProgressScreen(container) {
             <div class="kpi-breakdown-row">
               <span class="kpi-badge is-read">📖 ${stats.overallReadChapters} read</span>
               <span class="kpi-badge is-done">⌨️ ${stats.overallTypedChapters} typed</span>
-              ${stats.overallBothChapters > 0 ? `<span class="kpi-badge is-both">✨ ${stats.overallBothChapters} both</span>` : ''}
+              <span class="kpi-badge is-spoken">🗣️ ${stats.overallSpokenChapters} spoken</span>
+              ${stats.overallBothChapters > 0 ? `<span class="kpi-badge is-both">✨ ${stats.overallBothChapters} multi</span>` : ''}
             </div>
             <div class="kpi-mini-bar">
               <div class="kpi-mini-fill" style="width: ${Math.max(stats.overallCoveredChapters > 0 ? stats.overallCoveredPercentage : 0, 0)}%"></div>
@@ -244,36 +259,115 @@ export function renderProgressScreen(container) {
               <strong>${stats.overallTypedPercentage}%</strong> chapters · <strong>${stats.overallTypedVerses.toLocaleString()}</strong> verses typed (${stats.overallTypedVersesPercentage}%)
             </div>
             <div class="kpi-note-text">
-              ${stats.totalWordsTyped.toLocaleString()} words typed across ${stats.sessionsCount} sessions
+              ${stats.totalWordsTyped.toLocaleString()} words typed · Avg <strong>${stats.avgWpm} WPM</strong> (${stats.avgAccuracy}% acc)
             </div>
           </div>
 
-          <!-- Card 4: Typing Speed & Accuracy -->
+          <!-- Card 4: Scripture Spoken -->
           <div class="kpi-card">
             <div class="kpi-card-top">
-              <span class="kpi-label">Average Speed</span>
-              <span class="kpi-icon">⚡</span>
+              <span class="kpi-label">Scripture Spoken</span>
+              <span class="kpi-icon">🗣️</span>
             </div>
-            <div class="kpi-value">${stats.avgWpm} <small>WPM</small></div>
+            <div class="kpi-value">${stats.overallSpokenChapters} <small>/ ${stats.totalBibleChapters} ch</small></div>
             <div class="kpi-sub">
-              <strong>${stats.avgCpm} CPM</strong> avg · <strong>${stats.avgAccuracy}%</strong> acc · Best: <strong>${stats.bestWpm} WPM</strong>
+              <strong>${stats.overallSpokenPercentage}%</strong> chapters · <strong>${stats.overallSpokenVerses.toLocaleString()}</strong> verses spoken (${stats.overallSpokenVersesPercentage}%)
             </div>
             <div class="kpi-note-text">
-              ${formatTotalDuration(stats.totalDurationMs)} total typing time
+              ${stats.totalWordsSpoken.toLocaleString()} words spoken across ${stats.spokenSessionsCount} sessions
             </div>
           </div>
         </div>
 
-        <!-- WPM & CPM Progression Chart Card -->
+        <!-- Speaking Cadence, Pronunciation & Enunciation Section -->
+        <div class="section-card speaking-cadence-section-card">
+          <div class="section-card-header">
+            <div>
+              <h2 class="section-card-title">🗣️ Speaking Cadence &amp; Clarity</h2>
+              <p class="section-card-subtitle">
+                Thoughtful scripture reading values clear enunciation and a steady, unhurried cadence (110–155 WPM) over rushing.
+              </p>
+            </div>
+            <a href="/speak" class="btn btn-secondary btn-sm">🎙️ Practice Speak Mode →</a>
+          </div>
+          <div class="kpi-cards-grid speaking-kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card-top">
+                <span class="kpi-label">Speaking Cadence</span>
+                <span class="kpi-icon">🎙️</span>
+              </div>
+              <div class="kpi-value">${stats.avgSpeakCadenceWpm > 0 ? `${stats.avgSpeakCadenceWpm} <small>WPM</small>` : `— <small>WPM</small>`}</div>
+              <div class="kpi-sub">
+                ${stats.avgSpeakCadenceWpm > 0
+                  ? `<span class="kpi-badge ${cadenceDesc.badgeClass || 'is-emerald'}">${cadenceDesc.label}</span>`
+                  : 'Ideal reading cadence: <strong>110–155 WPM</strong>'}
+              </div>
+              <div class="kpi-note-text">
+                Measured for steady, natural scripture reading pace
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-card-top">
+                <span class="kpi-label">Pronunciation Accuracy</span>
+                <span class="kpi-icon">🎯</span>
+              </div>
+              <div class="kpi-value">${stats.spokenSessionsCount > 0 ? `${stats.avgPronunciationAccuracy}%` : '—'}</div>
+              <div class="kpi-sub">
+                <strong>${stats.totalWordsSpoken.toLocaleString()}</strong> total words spoken aloud
+              </div>
+              <div class="kpi-note-text">
+                Percentage of words pronounced accurately without error
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-card-top">
+                <span class="kpi-label">Enunciation &amp; Clarity</span>
+                <span class="kpi-icon">✨</span>
+              </div>
+              <div class="kpi-value">${stats.spokenSessionsCount > 0 ? `${stats.avgEnunciation}%` : '—'}</div>
+              <div class="kpi-sub">
+                <strong>${formatTotalDuration(stats.totalSpeakDurationMs)}</strong> total speaking time
+              </div>
+              <div class="kpi-note-text">
+                Vocal clarity &amp; word articulation score
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-card-top">
+                <span class="kpi-label">Typing Speed &amp; Accuracy</span>
+                <span class="kpi-icon">⚡</span>
+              </div>
+              <div class="kpi-value">${stats.avgWpm} <small>WPM</small></div>
+              <div class="kpi-sub">
+                <strong>${stats.avgCpm} CPM</strong> avg · <strong>${stats.avgAccuracy}%</strong> acc · Best: <strong>${stats.bestWpm} WPM</strong>
+              </div>
+              <div class="kpi-note-text">
+                ${formatTotalDuration(stats.totalDurationMs)} total typing time
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WPM, CPM & Speaking Cadence Chart Card -->
         <div class="section-card">
           <div class="section-card-header">
             <div>
-              <h2 class="section-card-title">Speed Progression (${activeChartMetric.toUpperCase()})</h2>
-              <p class="section-card-subtitle">Your typing speed across recent completed verses &amp; chapters</p>
+              <h2 class="section-card-title">
+                ${activeChartMetric === 'cadence' ? 'Speaking Cadence Trend (WPM)' : `Typing Speed Progression (${activeChartMetric.toUpperCase()})`}
+              </h2>
+              <p class="section-card-subtitle">
+                ${activeChartMetric === 'cadence'
+                  ? 'Your natural reading cadence (WPM) across recent spoken verses & chapters'
+                  : 'Your typing speed across recent completed verses & chapters'}
+              </p>
             </div>
             <div class="chart-toggle-pills">
-              <button type="button" class="pill-toggle-btn ${activeChartMetric === 'wpm' ? 'active' : ''}" data-metric="wpm">WPM</button>
-              <button type="button" class="pill-toggle-btn ${activeChartMetric === 'cpm' ? 'active' : ''}" data-metric="cpm">CPM</button>
+              <button type="button" class="pill-toggle-btn ${activeChartMetric === 'wpm' ? 'active' : ''}" data-metric="wpm">Typing WPM</button>
+              <button type="button" class="pill-toggle-btn ${activeChartMetric === 'cpm' ? 'active' : ''}" data-metric="cpm">Typing CPM</button>
+              <button type="button" class="pill-toggle-btn ${activeChartMetric === 'cadence' ? 'active' : ''}" data-metric="cadence">Speaking Cadence</button>
             </div>
           </div>
           ${buildSpeedChartSVG(stats.sessions, activeChartMetric)}
@@ -290,7 +384,7 @@ export function renderProgressScreen(container) {
               <p class="section-card-subtitle">
                 ${isSpecificTr
                   ? `Viewing progress in ${getTranslationByCode(activeTranslationFilter).name}: ${filteredCompletedCount}/${stats.totalBibleChapters} chapters full${filteredPartialCount > 0 ? `, ${filteredPartialCount} partial` : ''} (${filteredVersesCount.toLocaleString()} verses).`
-                  : `Total Scripture covered: <strong>${stats.overallCoveredChapters}/${stats.totalBibleChapters} chapters</strong> (${stats.overallCoveredVerses.toLocaleString()} verses). Click any book to view chapters; click any chapter to start typing.`}
+                  : `Total Scripture covered: <strong>${stats.overallCoveredChapters}/${stats.totalBibleChapters} chapters</strong> (${stats.overallCoveredVerses.toLocaleString()} verses). Click any book to view chapters; click any chapter to open.`}
               </p>
             </div>
 
@@ -298,8 +392,9 @@ export function renderProgressScreen(container) {
               <!-- Coverage Category Filter -->
               <div class="chart-toggle-pills" title="Filter map view by activity type">
                 <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'ALL' ? 'active' : ''}" data-coverage-filter="ALL">All Covered (${stats.overallCoveredChapters})</button>
-                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'TYPED' ? 'active' : ''}" data-coverage-filter="TYPED">Typed Only (${stats.overallTypedChapters})</button>
-                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'READ' ? 'active' : ''}" data-coverage-filter="READ">Read Only (${stats.overallReadChapters})</button>
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'TYPED' ? 'active' : ''}" data-coverage-filter="TYPED">Typed (${stats.overallTypedChapters})</button>
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'SPEAK' ? 'active' : ''}" data-coverage-filter="SPEAK">Spoken (${stats.overallSpokenChapters})</button>
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'READ' ? 'active' : ''}" data-coverage-filter="READ">Read (${stats.overallReadChapters})</button>
               </div>
 
               <!-- Testament Tabs -->
@@ -323,8 +418,9 @@ export function renderProgressScreen(container) {
           <!-- Color Legend Bar -->
           <div class="completeness-legend-bar">
             <span class="legend-item"><i class="legend-swatch is-done"></i> <strong>Typed</strong></span>
+            <span class="legend-item"><i class="legend-swatch is-spoken"></i> <strong>Spoken</strong></span>
             <span class="legend-item"><i class="legend-swatch is-read"></i> <strong>Read</strong></span>
-            <span class="legend-item"><i class="legend-swatch is-both"></i> <strong>Both Read &amp; Typed</strong></span>
+            <span class="legend-item"><i class="legend-swatch is-both"></i> <strong>Multiple Modes</strong></span>
             <span class="legend-item"><i class="legend-swatch is-partial"></i> <strong>In Progress</strong></span>
           </div>
 
@@ -332,7 +428,7 @@ export function renderProgressScreen(container) {
           <div class="translation-breakdown-drawer" id="translation-breakdown-drawer" ${showTranslationDrawer ? '' : 'hidden'}>
             <div class="tr-drawer-top">
               <span class="tr-drawer-hint">
-                Every verse and chapter you type counts toward your <strong>Overall Completeness</strong>. Select a translation below to inspect your completeness within a specific translation:
+                Every verse and chapter you complete counts toward your <strong>Overall Completeness</strong>. Select a translation below to inspect your completeness within a specific translation:
               </span>
               ${isSpecificTr ? `
                 <button type="button" class="btn btn-secondary btn-sm" id="reset-tr-filter-btn">
@@ -379,6 +475,14 @@ export function renderProgressScreen(container) {
                     partialInBook++;
                     versesInBook += sum.typedVersesCount;
                   }
+                } else if (activeCoverageFilter === 'SPEAK') {
+                  if (sum.isFullySpoken) {
+                    doneInBook++;
+                    versesInBook += sum.totalVerses;
+                  } else if (sum.spokenVersesCount > 0) {
+                    partialInBook++;
+                    versesInBook += sum.spokenVersesCount;
+                  }
                 } else if (activeCoverageFilter === 'READ') {
                   if (sum.isFullyRead) {
                     doneInBook++;
@@ -409,7 +513,7 @@ export function renderProgressScreen(container) {
                   const rec = sum.record;
                   const trs = rec ? Object.keys(rec.translations || {}).join(', ') : '';
                   let cellClass = '';
-                  let cellTitle = `Type ${b.name} ${c}`;
+                  let cellTitle = `Open ${b.name} ${c}`;
                   let cellContent = `${c}`;
 
                   if (activeCoverageFilter === 'TYPED') {
@@ -421,6 +525,15 @@ export function renderProgressScreen(container) {
                       cellTitle = `${b.name} ${c} — Partially Typed (${sum.typedVersesCount}/${sum.totalVerses}v)`;
                       cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.typedVersesCount}v</sup>`;
                     }
+                  } else if (activeCoverageFilter === 'SPEAK') {
+                    if (sum.isFullySpoken) {
+                      cellClass = 'is-spoken';
+                      cellTitle = `${b.name} ${c} — Fully Spoken (${sum.spokenVersesCount}/${sum.totalVerses}v)`;
+                    } else if (sum.spokenVersesCount > 0) {
+                      cellClass = 'is-partial';
+                      cellTitle = `${b.name} ${c} — Partially Spoken (${sum.spokenVersesCount}/${sum.totalVerses}v)`;
+                      cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.spokenVersesCount}v</sup>`;
+                    }
                   } else if (activeCoverageFilter === 'READ') {
                     if (sum.isFullyRead) {
                       cellClass = 'is-read';
@@ -431,29 +544,32 @@ export function renderProgressScreen(container) {
                       cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.readVersesCount}v</sup>`;
                     }
                   } else {
-                    // Default ALL (Read or Typed)
                     if (sum.isBoth) {
                       cellClass = 'is-both';
-                      cellTitle = `${b.name} ${c} — Read & Typed (${sum.completedVersesCount}/${sum.totalVerses}v) · Best: ${sum.bestWpm} WPM`;
-                    } else if (sum.isTypedOnly || (sum.isFullyTyped && !sum.isFullyRead)) {
+                      cellTitle = `${b.name} ${c} — Completed in multiple modes (${sum.completedVersesCount}/${sum.totalVerses}v)`;
+                    } else if (sum.isTypedOnly || (sum.isFullyTyped && !sum.isFullyRead && !sum.isFullySpoken)) {
                       cellClass = 'is-done';
-                      cellTitle = `${b.name} ${c} — Typed (${sum.typedVersesCount}/${sum.totalVerses}v in ${trs}) · Best: ${sum.bestWpm} WPM`;
-                    } else if (sum.isReadOnly || (sum.isFullyRead && !sum.isFullyTyped)) {
+                      cellTitle = `${b.name} ${c} — Typed (${sum.typedVersesCount}/${sum.totalVerses}v${trs ? ` in ${trs}` : ''}) · Best: ${sum.bestWpm} WPM`;
+                    } else if (sum.isSpokenOnly || (sum.isFullySpoken && !sum.isFullyRead && !sum.isFullyTyped)) {
+                      cellClass = 'is-spoken';
+                      cellTitle = `${b.name} ${c} — Spoken (${sum.spokenVersesCount}/${sum.totalVerses}v)`;
+                    } else if (sum.isReadOnly || (sum.isFullyRead && !sum.isFullyTyped && !sum.isFullySpoken)) {
                       cellClass = 'is-read';
-                      cellTitle = `${b.name} ${c} — Marked as Read (${sum.readVersesCount}/${sum.totalVerses}v) — Click to practice typing`;
+                      cellTitle = `${b.name} ${c} — Marked as Read (${sum.readVersesCount}/${sum.totalVerses}v)`;
                     } else if (sum.isPartial) {
                       cellClass = 'is-partial';
                       const parts = [];
                       if (sum.readVersesCount > 0) parts.push(`${sum.readVersesCount} read`);
                       if (sum.typedVersesCount > 0) parts.push(`${sum.typedVersesCount} typed`);
-                      cellTitle = `${b.name} ${c} — In Progress (${sum.completedVersesCount}/${sum.totalVerses || '?'}v: ${parts.join(', ')}) — Click to type`;
+                      if (sum.spokenVersesCount > 0) parts.push(`${sum.spokenVersesCount} spoken`);
+                      cellTitle = `${b.name} ${c} — In Progress (${sum.completedVersesCount}/${sum.totalVerses || '?'}v: ${parts.join(', ')})`;
                       cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.completedVersesCount}v</sup>`;
                     }
                   }
 
                   chapterCells.push(`
                     <a
-                      href="/typing/${b.id}/${c}"
+                      href="/${activeCoverageFilter === 'SPEAK' ? 'speak' : (activeMode === 'draw' ? 'type' : activeMode)}/${b.id}/${c}"
                       class="reach-ch-cell ${cellClass}"
                       title="${cellTitle}"
                     >
@@ -493,21 +609,21 @@ export function renderProgressScreen(container) {
           </div>
         </div>
 
-        <!-- Historic Typing Sessions & Verses Typed Log -->
+        <!-- Historic Typing & Speaking Sessions Log -->
         <div class="section-card">
           <div class="section-card-header">
             <div>
-              <h2 class="section-card-title">Historic Sessions &amp; Verses Typed</h2>
+              <h2 class="section-card-title">Historic Sessions (Typed &amp; Spoken)</h2>
               <p class="section-card-subtitle">
-                Complete chronological log of every Bible chapter, partial sitting, and single verse you have typed
+                Complete chronological log of every Bible chapter, partial sitting, and single verse you have typed or spoken
               </p>
             </div>
           </div>
 
           ${stats.sessions.length === 0 ? `
             <div class="chart-empty-state">
-              <p>No completed verses or chapters recorded yet. Type any verse or chapter to build your history!</p>
-              <a href="/typing" class="btn btn-primary btn-sm">Open Bible Typing →</a>
+              <p>No completed verses or chapters recorded yet. Type or speak any verse or chapter to build your history!</p>
+              <a href="/${activeMode}" class="btn btn-primary btn-sm">Open Promises →</a>
             </div>
           ` : `
             <div class="history-table-wrapper">
@@ -515,10 +631,11 @@ export function renderProgressScreen(container) {
                 <thead>
                   <tr>
                     <th>Passage &amp; Verses</th>
+                    <th>Mode</th>
                     <th>Translation</th>
-                    <th>WPM</th>
-                    <th>CPM</th>
-                    <th>Accuracy</th>
+                    <th>Speed / Cadence</th>
+                    <th>Detail</th>
+                    <th>Accuracy / Clarity</th>
                     <th>Duration</th>
                     <th>Completed</th>
                     <th></th>
@@ -526,7 +643,11 @@ export function renderProgressScreen(container) {
                 </thead>
                 <tbody>
                   ${stats.sessions.map(s => {
+                    const isSpoken = s.activityType === 'spoken';
+                    const isRead = s.activityType === 'read';
+                    const modeRoute = isSpoken ? 'speak' : 'type';
                     const singleV = s.verseNumber || (s.versesTyped === 1 && /^\d+$/.test(String(s.verseRange || '')) ? Number(s.verseRange) : null);
+                    const sCadence = isSpoken ? getCadenceDescriptor(s.wpm) : null;
                     return `
                       <tr>
                         <td>
@@ -535,19 +656,36 @@ export function renderProgressScreen(container) {
                             <span>${s.versesTyped === 1 ? '1 verse' : `${s.versesTyped} verses`} · ${(s.wordsTyped || 0).toLocaleString()} words</span>
                           </div>
                         </td>
+                        <td>
+                          <span class="kpi-badge ${isSpoken ? 'is-spoken' : (isRead ? 'is-read' : 'is-done')}">
+                            ${isSpoken ? '🗣️ Spoken' : (isRead ? '📖 Read' : '⌨️ Typed')}
+                          </span>
+                        </td>
                         <td><span class="hist-tr-badge">${s.translation || 'ESV'}</span></td>
-                        <td><strong>${s.wpm} WPM</strong></td>
-                        <td>${s.cpm} CPM</td>
-                        <td>${s.accuracy ?? 100}%</td>
+                        <td>
+                          ${isSpoken
+                            ? `<strong>${s.wpm || 0} WPM</strong>`
+                            : `<strong>${s.wpm} WPM</strong>`}
+                        </td>
+                        <td>
+                          ${isSpoken
+                            ? `<span class="hist-cadence-note">${sCadence?.shortLabel || 'Cadence'}</span>`
+                            : `${s.cpm} CPM`}
+                        </td>
+                        <td>
+                          ${isSpoken
+                            ? `${s.accuracy ?? 100}% pron · ${s.enunciation ?? s.accuracy ?? 100}% enun`
+                            : `${s.accuracy ?? 100}%`}
+                        </td>
                         <td>${formatTotalDuration(s.durationMs)}</td>
                         <td class="hist-date-cell">${formatDateShort(s.completedAt)}</td>
                         <td class="hist-action-cell" style="white-space: nowrap;">
                           ${singleV ? `
-                            <a href="/typing/${s.bookId}/${s.chapter}/${singleV}" class="btn btn-secondary btn-sm" title="Practice only Verse ${singleV}">
+                            <a href="/${modeRoute}/${s.bookId}/${s.chapter}/${singleV}" class="btn btn-secondary btn-sm" title="Practice Verse ${singleV}">
                               🎯 v.${singleV}
                             </a>
                           ` : ''}
-                          <a href="/typing/${s.bookId}/${s.chapter}" class="btn btn-secondary btn-sm" title="Open ${s.bookName} ${s.chapter}">
+                          <a href="/${modeRoute}/${s.bookId}/${s.chapter}" class="btn btn-secondary btn-sm" title="Open ${s.bookName} ${s.chapter}">
                             📖 Ch. →
                           </a>
                         </td>
@@ -636,4 +774,3 @@ export function renderProgressScreen(container) {
 
   render();
 }
-
