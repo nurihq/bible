@@ -5816,6 +5816,59 @@ sup.verse-num.is-both {
   text-align: left;
 }
 
+.speech-review-retry-row {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed rgba(239, 68, 68, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+}
+
+.speak-review-retry-btn {
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.25);
+}
+
+.speech-review-banner.is-failed-threshold {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.speak-summary-badge.is-needs-retry {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #dc2626;
+}
+
+[data-theme="dark"] .speak-summary-badge.is-needs-retry {
+  color: #f87171;
+}
+
+.speak-kpi-chip.is-failed-kpi strong {
+  color: #dc2626;
+}
+
+[data-theme="dark"] .speak-kpi-chip.is-failed-kpi strong {
+  color: #f87171;
+}
+
+.speak-auto-advance-note.is-failed-note {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .speak-auto-advance-note.is-failed-note {
+  color: #f87171;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    SPOKEN PROGRESS BADGES, SWATCHES & COMPLETENESS MAP CELLS
    ══════════════════════════════════════════════════════════════════════════ */

@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v23';
+} from '../bible-data.js?v=20261108_v24';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v23';
+} from '../api.js?v=20261108_v24';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v23';
-import { trackEvent } from '../analytics.js?v=20261108_v23';
-import { navigate } from '../router.js?v=20261108_v23';
+} from '../meditate-art.js?v=20261108_v24';
+import { trackEvent } from '../analytics.js?v=20261108_v24';
+import { navigate } from '../router.js?v=20261108_v24';
 
 function escapeHtml(str) {
   return String(str)
@@ -3496,17 +3496,6 @@ export function renderTypingScreen(container, params = {}) {
     const vDurMs = verseStartTime ? Math.max(200, performance.now() - verseStartTime) : 1000;
     const vMins = Math.max(vDurMs / 60000, 1 / 600);
 
-    completedVerseSet.add(vRange.verse);
-    sittingTypedVersesSet.add(vRange.verse);
-
-    if (vRange.verseBlockEl) {
-      vRange.verseBlockEl.classList.add('is-verse-completed');
-    }
-    if (vRange.supEl) {
-      vRange.supEl.classList.add('is-done');
-      vRange.supEl.textContent = activeMode === 'speak' ? `🗣️ ${vRange.verse}` : `✓ ${vRange.verse}`;
-    }
-
     if (activeMode === 'speak') {
       const vWordsEval = Math.max(1, verseSpokenWordsEvaluated || vRange.wordCount);
       const vCadenceWpm = Math.round((vWordsEval / vMins) * 10) / 10;
@@ -3517,37 +3506,66 @@ export function renderTypingScreen(container, params = {}) {
         ? Math.round((verseSpokenEnunciationSum / verseSpokenWordsEvaluated) * 10) / 10
         : 100;
       const vErrorsSnapshot = [...verseSpokenWordErrors];
+      const verseWordTotal = Math.max(1, vRange.wordCount || vWordsEval || 1);
+      const isOverFiftyPercentWrong = (vErrorsSnapshot.length / verseWordTotal > 0.5) || (vPronAcc < 50);
 
-      const recordPromise = recordSpokenVerse({
-        sittingSessionId,
-        bookId: book.id,
-        bookName: book.name,
-        chapter: initialChapter,
-        verse: vRange.verse,
-        totalChapterVerses: allChapterVerses.length || verses.length,
-        translation: activeTranslation,
-        wpm: vCadenceWpm,
-        accuracy: vPronAcc,
-        enunciation: vEnunAcc,
-        charsTyped: vRange.charCount,
-        wordsTyped: vRange.wordCount,
-        mistakes: vErrorsSnapshot.length,
-        durationMs: Math.round(vDurMs),
-        completedAt: new Date().toISOString()
-      });
+      let recordPromise = null;
+      if (!isOverFiftyPercentWrong) {
+        completedVerseSet.add(vRange.verse);
+        sittingTypedVersesSet.add(vRange.verse);
+
+        if (vRange.verseBlockEl) {
+          vRange.verseBlockEl.classList.add('is-verse-completed');
+        }
+        if (vRange.supEl) {
+          vRange.supEl.classList.add('is-done');
+          vRange.supEl.textContent = `🗣️ ${vRange.verse}`;
+        }
+
+        recordPromise = recordSpokenVerse({
+          sittingSessionId,
+          bookId: book.id,
+          bookName: book.name,
+          chapter: initialChapter,
+          verse: vRange.verse,
+          totalChapterVerses: allChapterVerses.length || verses.length,
+          translation: activeTranslation,
+          wpm: vCadenceWpm,
+          accuracy: vPronAcc,
+          enunciation: vEnunAcc,
+          charsTyped: vRange.charCount,
+          wordsTyped: vRange.wordCount,
+          mistakes: vErrorsSnapshot.length,
+          durationMs: Math.round(vDurMs),
+          completedAt: new Date().toISOString()
+        });
+      }
 
       syncSummaryBottomLine();
       resetActiveVerseTelemetry();
 
       return {
         recordPromise,
+        isOverFiftyPercentWrong,
         vWpm: vCadenceWpm,
         vCpm: vPronAcc,
         vAcc: vPronAcc,
         vEnunciation: vEnunAcc,
         vDurMs,
-        vErrors: vErrorsSnapshot
+        vErrors: vErrorsSnapshot,
+        wordCount: verseWordTotal
       };
+    }
+
+    completedVerseSet.add(vRange.verse);
+    sittingTypedVersesSet.add(vRange.verse);
+
+    if (vRange.verseBlockEl) {
+      vRange.verseBlockEl.classList.add('is-verse-completed');
+    }
+    if (vRange.supEl) {
+      vRange.supEl.classList.add('is-done');
+      vRange.supEl.textContent = `✓ ${vRange.verse}`;
     }
 
     const vCpm = Math.round(vRange.charCount / vMins);
@@ -3580,7 +3598,8 @@ export function renderTypingScreen(container, params = {}) {
     return { recordPromise, vWpm, vCpm, vAcc, vDurMs };
   }
 
-  function renderSpeechErrorsReviewHtml(errorsArray, totalWordsCount) {
+  function renderSpeechErrorsReviewHtml(errorsArray, totalWordsCount, options = {}) {
+    const { isOverFiftyPercentWrong = false, verseNum = null } = options;
     if (!errorsArray || errorsArray.length === 0) {
       return `
         <div class="speech-review-banner is-perfect">
@@ -3602,29 +3621,42 @@ export function renderTypingScreen(container, params = {}) {
     `).join('');
 
     return `
-      <div class="speech-review-banner has-errors">
+      <div class="speech-review-banner has-errors ${isOverFiftyPercentWrong ? 'is-failed-threshold' : ''}">
         <div class="speech-review-header">
           <span class="speech-review-title">🗣️ Pronunciation Review (${errorsArray.length} ${errorsArray.length === 1 ? 'word' : 'words'} to review)</span>
-          <span class="speech-review-hint">Words highlighted in red above had pronunciation differences:</span>
+          <span class="speech-review-hint">
+            ${isOverFiftyPercentWrong
+              ? 'Over 50% of words had pronunciation differences. This verse was not marked as spoken.'
+              : 'Words highlighted in red above had pronunciation differences:'}
+          </span>
         </div>
         <div class="speech-error-chips-list">
           ${itemsHtml}
         </div>
+        ${isOverFiftyPercentWrong ? `
+          <div class="speech-review-retry-row">
+            <button type="button" class="btn btn-primary speak-review-retry-btn" id="speech-errors-retry-btn">
+              ↺ Retry Verse${verseNum ? ` ${verseNum}` : ''}
+            </button>
+          </div>
+        ` : ''}
       </div>
     `;
   }
 
-  function renderSingleVerseSpeakEndCard({ cadenceWpm, pronAcc, enunAcc, durationMs, errors }) {
+  function renderSingleVerseSpeakEndCard({ cadenceWpm, pronAcc, enunAcc, durationMs, errors, isOverFiftyPercentWrong = false }) {
     const speakEndCard = container.querySelector('#speak-end-summary-card');
     if (!speakEndCard) return;
     const cadenceDesc = getCadenceDescriptor(cadenceWpm);
     const totalWords = wordsList.length || 1;
 
     speakEndCard.innerHTML = `
-      <div class="speak-summary-card-inner">
+      <div class="speak-summary-card-inner ${isOverFiftyPercentWrong ? 'is-verse-failed' : ''}">
         <div class="speak-summary-top-row">
           <div class="speak-summary-title-group">
-            <span class="speak-summary-badge">🗣️ Verse ${targetSingleVerseNum || 1} Spoken</span>
+            <span class="speak-summary-badge ${isOverFiftyPercentWrong ? 'is-needs-retry' : ''}">
+              ${isOverFiftyPercentWrong ? `⚠️ Verse ${targetSingleVerseNum || 1} Not Spoken (&gt;50% Errors)` : `🗣️ Verse ${targetSingleVerseNum || 1} Spoken`}
+            </span>
             <span class="speak-cadence-pill ${cadenceDesc.badgeClass}">${Math.round(cadenceWpm)} WPM · ${cadenceDesc.label}</span>
           </div>
           <div class="speak-summary-kpis">
@@ -3632,7 +3664,7 @@ export function renderTypingScreen(container, params = {}) {
               <span class="speak-kpi-lbl">Cadence</span>
               <strong class="speak-kpi-val">${Math.round(cadenceWpm)} WPM</strong>
             </div>
-            <div class="speak-kpi-chip">
+            <div class="speak-kpi-chip ${isOverFiftyPercentWrong ? 'is-failed-kpi' : ''}">
               <span class="speak-kpi-lbl">Pronunciation</span>
               <strong class="speak-kpi-val">${pronAcc}%</strong>
             </div>
@@ -3647,33 +3679,39 @@ export function renderTypingScreen(container, params = {}) {
           </div>
         </div>
 
-        ${renderSpeechErrorsReviewHtml(errors, totalWords)}
+        ${renderSpeechErrorsReviewHtml(errors, totalWords, { isOverFiftyPercentWrong, verseNum: targetSingleVerseNum })}
 
         <div class="speak-summary-actions">
-          <button type="button" class="btn btn-secondary btn-sm" id="speak-card-retry-btn">
-            ↺ Speak Again
+          <button type="button" class="btn ${isOverFiftyPercentWrong ? 'btn-primary' : 'btn-secondary'} btn-sm" id="speak-card-retry-btn">
+            ↺ ${isOverFiftyPercentWrong ? 'Retry Verse' : 'Speak Again'}
           </button>
-          <span class="speak-auto-advance-note" id="speak-auto-advance-note">
-            ${autoAdvance ? (errors.length > 0 ? 'Pausing briefly so you can review pronunciation...' : 'Auto-advancing to next verse...') : 'Press Enter or click Next Verse to continue'}
+          <span class="speak-auto-advance-note ${isOverFiftyPercentWrong ? 'is-failed-note' : ''}" id="speak-auto-advance-note">
+            ${isOverFiftyPercentWrong
+              ? '⚠️ Verse not marked as spoken (>50% errors). Click Retry to try again.'
+              : (autoAdvance
+                ? (errors.length > 0 ? 'Pausing briefly so you can review pronunciation...' : 'Auto-advancing to next verse...')
+                : 'Press Enter or click Next Verse to continue')}
           </span>
-          <button type="button" class="btn btn-primary btn-sm" id="speak-card-next-btn">
-            ${(singleVerseMode && shuffleVerses) ? '🎲 Next Verse →' : 'Next Verse →'}
+          <button type="button" class="btn ${isOverFiftyPercentWrong ? 'btn-secondary' : 'btn-primary'} btn-sm" id="speak-card-next-btn">
+            ${(singleVerseMode && shuffleVerses) ? (isOverFiftyPercentWrong ? '🎲 Skip Verse →' : '🎲 Next Verse →') : (isOverFiftyPercentWrong ? 'Skip Verse →' : 'Next Verse →')}
           </button>
         </div>
       </div>
     `;
     speakEndCard.hidden = false;
 
-    const retryBtn = speakEndCard.querySelector('#speak-card-retry-btn');
-    if (retryBtn) {
-      retryBtn.addEventListener('click', () => {
+    // Both the retry button below errors and the card retry button trigger retry
+    const retryButtons = speakEndCard.querySelectorAll('#speak-card-retry-btn, #speech-errors-retry-btn');
+    retryButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
         if (speechAutoAdvanceTimer) {
           clearTimeout(speechAutoAdvanceTimer);
           speechAutoAdvanceTimer = null;
         }
         restartTyping();
       });
-    }
+    });
+
     const nextBtn = speakEndCard.querySelector('#speak-card-next-btn');
     if (nextBtn) {
       nextBtn.addEventListener('click', () => {
@@ -3744,7 +3782,9 @@ export function renderTypingScreen(container, params = {}) {
       res = await verseCompletionInfo.recordPromise;
     }
 
-    trackEvent(singleVerseMode ? 'complete_bible_verse' : 'complete_bible_chapter', {
+    const isOverFiftyPercentWrong = Boolean(isSpeak && (verseCompletionInfo?.isOverFiftyPercentWrong || (verseCompletionInfo?.wordCount ? (spokenWordErrors.length / verseCompletionInfo.wordCount > 0.5) : false) || finalAcc < 50));
+
+    trackEvent(singleVerseMode ? (isOverFiftyPercentWrong ? 'fail_bible_verse_speak' : 'complete_bible_verse') : 'complete_bible_chapter', {
       bookId: book.id,
       bookName: book.name,
       chapter: initialChapter,
@@ -3766,20 +3806,29 @@ export function renderTypingScreen(container, params = {}) {
           pronAcc: finalAcc,
           enunAcc: finalEnun,
           durationMs: elapsedMs,
-          errors: spokenWordErrors
+          errors: spokenWordErrors,
+          isOverFiftyPercentWrong
         });
-        if (advanceStepBtn) {
-          advanceStepBtn.hidden = false;
-          advanceStepBtn.classList.remove('btn-secondary');
-          advanceStepBtn.classList.add('btn-primary', 'is-ready');
-          advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
-          advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
-        }
-        if (autoAdvance) {
-          const delayMs = spokenWordErrors.length > 0 ? 3600 : 1400;
-          speechAutoAdvanceTimer = setTimeout(() => {
-            navigateNextStep();
-          }, delayMs);
+        if (!isOverFiftyPercentWrong) {
+          if (advanceStepBtn) {
+            advanceStepBtn.hidden = false;
+            advanceStepBtn.classList.remove('btn-secondary');
+            advanceStepBtn.classList.add('btn-primary', 'is-ready');
+            advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+            advanceStepBtn.title = 'Verse complete! Click to advance (or press Enter)';
+          }
+          if (autoAdvance) {
+            const delayMs = spokenWordErrors.length > 0 ? 3600 : 1400;
+            speechAutoAdvanceTimer = setTimeout(() => {
+              navigateNextStep();
+            }, delayMs);
+          }
+        } else {
+          if (advanceStepBtn) {
+            advanceStepBtn.classList.remove('btn-primary', 'is-ready');
+            advanceStepBtn.classList.add('btn-secondary');
+            advanceStepBtn.title = 'Verse not spoken (>50% errors). Click Retry to try again';
+          }
         }
         return;
       }
@@ -3836,7 +3885,17 @@ export function renderTypingScreen(container, params = {}) {
 
       if (speechErrorsBox) {
         speechErrorsBox.hidden = false;
-        speechErrorsBox.innerHTML = renderSpeechErrorsReviewHtml(spokenWordErrors, wordsList.length);
+        speechErrorsBox.innerHTML = renderSpeechErrorsReviewHtml(spokenWordErrors, wordsList.length, {
+          isOverFiftyPercentWrong,
+          verseNum: targetSingleVerseNum
+        });
+        const errRetryBtn = speechErrorsBox.querySelector('#speech-errors-retry-btn');
+        if (errRetryBtn) {
+          errRetryBtn.addEventListener('click', () => {
+            completionBackdrop.hidden = true;
+            restartTyping();
+          });
+        }
       }
 
       const badges = [];
