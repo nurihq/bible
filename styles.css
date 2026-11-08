@@ -1205,6 +1205,13 @@ body.typing-active-view .main-content {
   font-size: 0.76rem;
   padding: 0.25rem 0.6rem;
   min-height: 28px;
+  height: 28px;
+  max-height: 28px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   white-space: nowrap;
 }
 
@@ -1273,6 +1280,10 @@ body.typing-active-view .main-content {
   font-size: 0.8rem;
   padding: 0.25rem 0.65rem;
   min-height: 28px;
+  height: 28px;
+  max-height: 28px;
+  line-height: 1;
+  box-sizing: border-box;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -5600,6 +5611,30 @@ sup.verse-num.is-both {
 /* ══════════════════════════════════════════════════════════════════════════
    SPEAK MODE CONTROLS, WORD HIGHLIGHTING & SPEECH REVIEW SUMMARY
    ══════════════════════════════════════════════════════════════════════════ */
+.speak-mic-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  padding: 0.25rem 0.6rem;
+  min-height: 28px;
+  height: 28px;
+  max-height: 28px;
+  line-height: 1;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: all var(--transition-fast);
+}
+
+.speak-mic-toggle-btn span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
 .speak-mic-toggle-btn.is-mic-active {
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.5);
@@ -5618,6 +5653,11 @@ sup.verse-num.is-both {
   align-items: center;
   gap: 0.35rem;
   padding: 0.2rem 0.6rem;
+  min-height: 28px;
+  height: 28px;
+  max-height: 28px;
+  box-sizing: border-box;
+  line-height: 1;
   border-radius: 999px;
   font-size: 0.76rem;
   font-weight: 600;

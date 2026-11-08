@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v19';
+} from '../bible-data.js?v=20261108_v20';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v19';
+} from '../api.js?v=20261108_v20';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v19';
-import { trackEvent } from '../analytics.js?v=20261108_v19';
-import { navigate } from '../router.js?v=20261108_v19';
+} from '../meditate-art.js?v=20261108_v20';
+import { trackEvent } from '../analytics.js?v=20261108_v20';
+import { navigate } from '../router.js?v=20261108_v20';
 
 function escapeHtml(str) {
   return String(str)
@@ -605,7 +605,7 @@ export function renderTypingScreen(container, params = {}) {
             </button>
             <button
               type="button"
-              class="btn btn-secondary btn-sm speak-mic-toggle-btn ${micEnabled ? 'is-mic-active' : ''}"
+              class="btn btn-secondary btn-sm summary-action-btn speak-mic-toggle-btn ${micEnabled ? 'is-mic-active' : ''}"
               id="speak-mic-toggle-btn"
               title="Toggle microphone for Speak Mode"
               ${activeMode === 'speak' ? '' : 'hidden'}
