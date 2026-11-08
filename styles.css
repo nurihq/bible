@@ -5469,12 +5469,18 @@ sup.verse-num.is-both {
   background: rgba(15, 23, 42, 0.55);
 }
 
+.scope-settings-backdrop {
+  z-index: 1300;
+  background: rgba(15, 23, 42, 0.6);
+}
+
 .typing-actions-backdrop {
   z-index: 1150;
 }
 
 .mode-select-card,
 .mode-settings-card,
+.scope-settings-card,
 .typing-actions-card {
   max-width: 480px;
   width: 92%;

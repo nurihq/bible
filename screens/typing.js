@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v14';
+} from '../bible-data.js?v=20261108_v15';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -82,13 +82,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v14';
+} from '../api.js?v=20261108_v15';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v14';
-import { trackEvent } from '../analytics.js?v=20261108_v14';
-import { navigate } from '../router.js?v=20261108_v14';
+} from '../meditate-art.js?v=20261108_v15';
+import { trackEvent } from '../analytics.js?v=20261108_v15';
+import { navigate } from '../router.js?v=20261108_v15';
 
 function escapeHtml(str) {
   return String(str)
@@ -210,9 +210,9 @@ export function renderTypingScreen(container, params = {}) {
   const initialBookId = Number(params.bookId) || store.lastBookId || 1;
   const book = getBookById(initialBookId);
   const initialChapter = Math.max(1, Math.min(Number(params.chapter) || store.lastChapter || 1, book.chapters));
-  const singleVerseMode = Boolean(params.singleVerseMode && params.verse);
-  const targetSingleVerseNum = singleVerseMode ? Math.max(1, Number(params.verse) || 1) : null;
-  const requestedStartVerse = !singleVerseMode && params.startVerse ? Math.max(1, Number(params.startVerse)) : null;
+  let singleVerseMode = Boolean(params.singleVerseMode && params.verse);
+  let targetSingleVerseNum = singleVerseMode ? Math.max(1, Number(params.verse) || 1) : null;
+  let requestedStartVerse = !singleVerseMode && params.startVerse ? Math.max(1, Number(params.startVerse)) : null;
 
   let activeTranslation = getPreferredTranslation() || 'ESV';
   let skipCompletedVerses = getSkipCompletedVersesPref();
@@ -747,40 +747,36 @@ export function renderTypingScreen(container, params = {}) {
             <button type="button" class="options-close-btn" id="mode-settings-close-btn" aria-label="Close mode settings">✕</button>
           </div>
 
-          <!-- Type / Speak Settings Body -->
-          <div class="typing-options-body" id="mode-settings-type-speak-body">
-            <!-- Mode Tabs: Chapter Mode vs Single Verse Mode -->
-            <div class="modal-mode-tabs" role="tablist" aria-label="Passage Scope">
-              <button type="button" class="modal-mode-tab ${!singleVerseMode ? 'active' : ''}" id="tab-btn-chapter" role="tab" aria-selected="${!singleVerseMode}">
-                Chapter Mode
-              </button>
-              <button type="button" class="modal-mode-tab ${singleVerseMode ? 'active' : ''}" id="tab-btn-single" role="tab" aria-selected="${singleVerseMode}">
-                Single Verse Mode
+          <!-- Type / Speak Settings Body: Radio Buttons for Chapter Mode & Single Verse Mode with Settings Gears -->
+          <div class="typing-options-body mode-radio-list" id="mode-settings-type-speak-body">
+            <!-- Scope 1: Chapter Mode -->
+            <div class="mode-radio-item ${!singleVerseMode ? 'is-selected' : ''}" data-scope-item="chapter">
+              <label class="mode-radio-label" for="scope-radio-chapter">
+                <input type="radio" name="bible-scope-radio" id="scope-radio-chapter" value="chapter" class="mode-radio-input scope-radio-input" ${!singleVerseMode ? 'checked' : ''} />
+                <span class="mode-radio-custom"></span>
+                <span class="mode-radio-info">
+                  <strong class="mode-radio-name">📖 Chapter Mode</strong>
+                  <span class="mode-radio-desc">Practice the full chapter continuously verse by verse</span>
+                </span>
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm mode-settings-gear-btn scope-settings-gear-btn" data-open-scope-settings="chapter" title="Chapter Mode Settings" aria-label="Chapter Mode Settings">
+                ⚙️
               </button>
             </div>
 
-            <!-- Mode Panels Wrapper -->
-            <div class="modal-tab-panels-wrapper">
-              <!-- Panel: Chapter Mode -->
-              <div class="modal-tab-panel ${!singleVerseMode ? 'active' : ''}" id="panel-chapter-mode" role="tabpanel">
-                <label class="typing-option-row" for="toggle-skip-done-checkbox">
-                  <span class="option-title">Skip Completed Verses</span>
-                  <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
-                </label>
-              </div>
-
-              <!-- Panel: Single Verse Mode -->
-              <div class="modal-tab-panel ${singleVerseMode ? 'active' : ''}" id="panel-single-mode" role="tabpanel">
-                <label class="typing-option-row" for="toggle-auto-advance-checkbox">
-                  <span class="option-title">Auto-Advance</span>
-                  <input type="checkbox" id="toggle-auto-advance-checkbox" class="option-switch" ${autoAdvance ? 'checked' : ''} />
-                </label>
-
-                <label class="typing-option-row" id="toggle-shuffle-row" for="toggle-shuffle-checkbox">
-                  <span class="option-title">Shuffle Next Verses (Entire Bible)</span>
-                  <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
-                </label>
-              </div>
+            <!-- Scope 2: Single Verse Mode -->
+            <div class="mode-radio-item ${singleVerseMode ? 'is-selected' : ''}" data-scope-item="single">
+              <label class="mode-radio-label" for="scope-radio-single">
+                <input type="radio" name="bible-scope-radio" id="scope-radio-single" value="single" class="mode-radio-input scope-radio-input" ${singleVerseMode ? 'checked' : ''} />
+                <span class="mode-radio-custom"></span>
+                <span class="mode-radio-info">
+                  <strong class="mode-radio-name">🎯 Single Verse Mode</strong>
+                  <span class="mode-radio-desc">Focus on one verse at a time</span>
+                </span>
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm mode-settings-gear-btn scope-settings-gear-btn" data-open-scope-settings="single" title="Single Verse Mode Settings" aria-label="Single Verse Mode Settings">
+                ⚙️
+              </button>
             </div>
           </div>
 
@@ -804,6 +800,41 @@ export function renderTypingScreen(container, params = {}) {
 
           <div class="typing-options-footer">
             <button type="button" class="btn btn-primary btn-sm" id="mode-settings-done-btn">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2b. Scope Settings Modal (Stacked on top of Mode Settings Modal) -->
+      <div class="typing-options-backdrop scope-settings-backdrop" id="scope-settings-backdrop" hidden>
+        <div class="typing-options-card scope-settings-card" role="dialog" aria-modal="true" aria-labelledby="scope-settings-title">
+          <div class="typing-options-header">
+            <h2 class="typing-options-title" id="scope-settings-title">⚙️ Scope Settings</h2>
+            <button type="button" class="options-close-btn" id="scope-settings-close-btn" aria-label="Close scope settings">✕</button>
+          </div>
+
+          <!-- Chapter Mode Settings Body -->
+          <div class="typing-options-body" id="scope-settings-chapter-body">
+            <label class="typing-option-row" for="toggle-skip-done-checkbox">
+              <span class="option-title">Jump Past Completed Verses</span>
+              <input type="checkbox" id="toggle-skip-done-checkbox" class="option-switch" ${skipCompletedVerses ? 'checked' : ''} />
+            </label>
+          </div>
+
+          <!-- Single Verse Mode Settings Body -->
+          <div class="typing-options-body" id="scope-settings-single-body" hidden>
+            <label class="typing-option-row" for="toggle-auto-advance-checkbox">
+              <span class="option-title">Auto-Advance</span>
+              <input type="checkbox" id="toggle-auto-advance-checkbox" class="option-switch" ${autoAdvance ? 'checked' : ''} />
+            </label>
+
+            <label class="typing-option-row" id="toggle-shuffle-row" for="toggle-shuffle-checkbox">
+              <span class="option-title">Shuffle Next Verses (Entire Bible)</span>
+              <input type="checkbox" id="toggle-shuffle-checkbox" class="option-switch" ${shuffleVerses ? 'checked' : ''} />
+            </label>
+          </div>
+
+          <div class="typing-options-footer">
+            <button type="button" class="btn btn-primary btn-sm" id="scope-settings-done-btn">Done</button>
           </div>
         </div>
       </div>
@@ -927,7 +958,7 @@ export function renderTypingScreen(container, params = {}) {
   const speakMicToggleLabel = container.querySelector('#speak-mic-toggle-label');
   const speakStatusPill = container.querySelector('#speak-status-pill');
 
-  // Mode Modal (Base) & Mode Settings Modal (Stacked)
+  // Mode Modal (Base), Mode Settings Modal (Stacked Level 2) & Scope Settings Modal (Stacked Level 3)
   const modeSelectBackdrop = container.querySelector('#mode-select-backdrop');
   const modeSelectCloseBtn = container.querySelector('#mode-select-close-btn');
   const modeSelectDoneBtn = container.querySelector('#mode-select-done-btn');
@@ -937,6 +968,12 @@ export function renderTypingScreen(container, params = {}) {
   const modeSettingsDoneBtn = container.querySelector('#mode-settings-done-btn');
   const modeSettingsTypeSpeakBody = container.querySelector('#mode-settings-type-speak-body');
   const modeSettingsDrawBody = container.querySelector('#mode-settings-draw-body');
+  const scopeSettingsBackdrop = container.querySelector('#scope-settings-backdrop');
+  const scopeSettingsTitle = container.querySelector('#scope-settings-title');
+  const scopeSettingsCloseBtn = container.querySelector('#scope-settings-close-btn');
+  const scopeSettingsDoneBtn = container.querySelector('#scope-settings-done-btn');
+  const scopeSettingsChapterBody = container.querySelector('#scope-settings-chapter-body');
+  const scopeSettingsSingleBody = container.querySelector('#scope-settings-single-body');
 
   // Actions Modal
   const actionsBackdrop = container.querySelector('#typing-actions-backdrop');
@@ -946,10 +983,6 @@ export function renderTypingScreen(container, params = {}) {
   const actionsStatsRow = container.querySelector('#actions-stats-row');
   const actionsRestartRow = container.querySelector('#actions-restart-row');
 
-  const tabBtnChapter = container.querySelector('#tab-btn-chapter');
-  const tabBtnSingle = container.querySelector('#tab-btn-single');
-  const panelChapterMode = container.querySelector('#panel-chapter-mode');
-  const panelSingleMode = container.querySelector('#panel-single-mode');
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
   const toggleAutoAdvanceCheckbox = container.querySelector('#toggle-auto-advance-checkbox');
   const toggleDrawAutoAdvanceCheckbox = container.querySelector('#toggle-draw-auto-advance-checkbox');
@@ -980,70 +1013,129 @@ export function renderTypingScreen(container, params = {}) {
   const telemetrySubStatusEl = null;
   const completionBackdrop = container.querySelector('#completion-modal-backdrop');
 
-  let pendingSingleVerseSwitch = null;
-
   function isAnyModalOpen() {
     return Boolean(
       (modeSelectBackdrop && !modeSelectBackdrop.hidden) ||
       (modeSettingsBackdrop && !modeSettingsBackdrop.hidden) ||
+      (scopeSettingsBackdrop && !scopeSettingsBackdrop.hidden) ||
       (actionsBackdrop && !actionsBackdrop.hidden) ||
       (bookmarkBackdrop && !bookmarkBackdrop.hidden) ||
       (completionBackdrop && !completionBackdrop.hidden)
     );
   }
 
-  // ── 1. Mode Modal, Stacked Mode Settings Modal & Actions Modal ──
-  function setModalTab(isSingle) {
-    if (tabBtnChapter) {
-      tabBtnChapter.classList.toggle('active', !isSingle);
-      tabBtnChapter.setAttribute('aria-selected', String(!isSingle));
-    }
-    if (tabBtnSingle) {
-      tabBtnSingle.classList.toggle('active', isSingle);
-      tabBtnSingle.setAttribute('aria-selected', String(isSingle));
-    }
-
-    if (panelChapterMode) {
-      panelChapterMode.classList.toggle('active', !isSingle);
-      panelChapterMode.removeAttribute('hidden');
-    }
-    if (panelSingleMode) {
-      panelSingleMode.classList.toggle('active', isSingle);
-      panelSingleMode.removeAttribute('hidden');
-    }
+  // ── 1. Mode Modal, Stacked Mode Settings Modal, Stacked Scope Settings Modal & Actions Modal ──
+  function syncScopeRadioUI(isSingle = singleVerseMode) {
+    container.querySelectorAll('[data-scope-item]').forEach(item => {
+      const sc = item.getAttribute('data-scope-item');
+      const isSel = (sc === 'single') === Boolean(isSingle);
+      item.classList.toggle('is-selected', isSel);
+      const radio = item.querySelector('.scope-radio-input');
+      if (radio) radio.checked = isSel;
+    });
   }
 
-  function selectScopeMode(isSingle) {
-    pendingSingleVerseSwitch = isSingle;
-    setSingleVerseModePref(isSingle);
-    setModalTab(isSingle);
-
-    if (advanceStepBtn) {
-      advanceStepBtn.hidden = !isSingle || autoAdvance || activeMode === 'draw';
-      advanceStepBtn.textContent = (isSingle && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+  function updateScopeHeaderAndUrlInPlace() {
+    const titleEl = container.querySelector('#telemetry-heading-title');
+    if (titleEl) {
+      titleEl.textContent = singleVerseMode
+        ? `${book.name} ${initialChapter}:${targetSingleVerseNum || 1}`
+        : `${book.name} ${initialChapter}`;
     }
+    if (prevStepBtn) {
+      prevStepBtn.title = `Previous ${singleVerseMode ? 'Verse' : 'Chapter'}`;
+    }
+    if (nextStepBtn) {
+      nextStepBtn.title = `Next ${singleVerseMode ? 'Verse' : 'Chapter'}`;
+    }
+    if (readFullChapterBtn) {
+      readFullChapterBtn.hidden = !singleVerseMode;
+    }
+    if (advanceStepBtn) {
+      advanceStepBtn.hidden = !singleVerseMode || autoAdvance || activeMode === 'draw';
+      advanceStepBtn.textContent = (singleVerseMode && shuffleVerses) ? '🎲 Advance ›' : 'Advance ›';
+    }
+    const markChRow = container.querySelector('#modal-mark-ch-row');
+    if (markChRow) {
+      markChRow.hidden = singleVerseMode;
+    }
+    const badgeEl = container.querySelector('#telemetry-completed-badge');
+    if (badgeEl) {
+      badgeEl.innerHTML = getProgressBadgeHtml();
+    }
+
     // Update descriptions in Mode Modal
-    container.querySelectorAll('.mode-radio-item').forEach(item => {
+    container.querySelectorAll('[data-mode-item]').forEach(item => {
       const m = item.getAttribute('data-mode-item');
       const desc = item.querySelector('.mode-radio-desc');
       if (desc && m === 'type') {
-        desc.textContent = `Type scripture character by character (${isSingle ? 'Single Verse' : 'Chapter'})`;
+        desc.textContent = `Type scripture character by character (${singleVerseMode ? 'Single Verse' : 'Chapter'})`;
       } else if (desc && m === 'speak') {
-        desc.textContent = `Speak scripture aloud word by word (${isSingle ? 'Single Verse' : 'Chapter'})`;
+        desc.textContent = `Speak scripture aloud word by word (${singleVerseMode ? 'Single Verse' : 'Chapter'})`;
       }
     });
+
+    const cleanTargetUrl = singleVerseMode
+      ? `/${activeMode}/${book.id}/${initialChapter}/${targetSingleVerseNum || 1}`
+      : `/${activeMode}/${book.id}/${initialChapter}`;
+    if (window.location.pathname !== cleanTargetUrl) {
+      window.history.replaceState(null, '', cleanTargetUrl);
+    }
+    const modeTitle = activeMode === 'speak' ? 'Speak' : (activeMode === 'draw' ? 'Draw' : 'Type');
+    document.title = `${book.name} ${initialChapter}${singleVerseMode ? `:${targetSingleVerseNum || 1}` : ''} — ${modeTitle} | Promises to Creation`;
+
+    setLastSelectedChapter(book.id, initialChapter, singleVerseMode ? (targetSingleVerseNum || 1) : (requestedStartVerse || null));
+  }
+
+  function selectScopeMode(isSingle) {
+    const nextIsSingle = Boolean(isSingle);
+    setSingleVerseModePref(nextIsSingle);
+    syncScopeRadioUI(nextIsSingle);
+
+    if (nextIsSingle === singleVerseMode) {
+      updateScopeHeaderAndUrlInPlace();
+      return;
+    }
+
+    if (nextIsSingle) {
+      const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+      const vNum = curVIdx >= 0 && verseRanges[curVIdx]
+        ? verseRanges[curVIdx].verse
+        : (targetSingleVerseNum || requestedStartVerse || 1);
+      singleVerseMode = true;
+      targetSingleVerseNum = vNum;
+      currentArtworkTemplateIdx = Math.abs((book.id * 31 + initialChapter * 7 + (targetSingleVerseNum || 1))) % TOTAL_MEDITATE_ART_TEMPLATES;
+    } else {
+      const vNum = targetSingleVerseNum || 1;
+      singleVerseMode = false;
+      requestedStartVerse = vNum;
+      if (activeMode === 'draw') {
+        activeMode = 'type';
+        meditateMode = false;
+        setActiveModePref('type');
+        syncModeRadioUI();
+      }
+    }
+
+    updateScopeHeaderAndUrlInPlace();
+    if (allChapterVerses && allChapterVerses.length > 0) {
+      buildPassageDOM(allChapterVerses);
+    }
+    updateSingleVerseFavBtn();
+    updateSingleVerseBookmarkBtn();
+    updateReadButtons();
   }
 
   function syncModeRadioUI() {
-    container.querySelectorAll('.mode-radio-item').forEach(item => {
+    container.querySelectorAll('[data-mode-item]').forEach(item => {
       const m = item.getAttribute('data-mode-item');
       const isSel = m === activeMode;
       item.classList.toggle('is-selected', isSel);
-      const radio = item.querySelector('.mode-radio-input');
+      const radio = item.querySelector('input[name="bible-mode-radio"]');
       if (radio) radio.checked = isSel;
     });
     if (modeBtnLabel) {
-      modeBtnLabel.textContent = getModeBtnLabelHtml(activeMode);
+      modeBtnLabel.textContent = getModeBtnLabelHtml();
     }
     const navPromisesBtn = document.getElementById('nav-promises-btn');
     if (navPromisesBtn) {
@@ -1060,69 +1152,50 @@ export function renderTypingScreen(container, params = {}) {
     syncModeRadioUI();
     trackEvent('switch_mode', { mode: activeMode, prevMode });
 
-    // If switching to Draw mode while in Chapter mode, transition to Single Verse mode on current verse
+    // If switching to Draw mode while in Chapter mode, switch to Single Verse mode IN-PLACE without closing modals
+    let scopeChangedToSingle = false;
     if (activeMode === 'draw' && !singleVerseMode) {
-      setSingleVerseModePref(true);
       const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
-      const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : 1;
-      navigate(`/draw/${book.id}/${initialChapter}/${vNum}`, { replace: true });
-      return;
+      const vNum = curVIdx >= 0 && verseRanges[curVIdx]
+        ? verseRanges[curVIdx].verse
+        : (targetSingleVerseNum || requestedStartVerse || 1);
+      singleVerseMode = true;
+      targetSingleVerseNum = vNum;
+      setSingleVerseModePref(true);
+      syncScopeRadioUI(true);
+      currentArtworkTemplateIdx = Math.abs((book.id * 31 + initialChapter * 7 + (targetSingleVerseNum || 1))) % TOTAL_MEDITATE_ART_TEMPLATES;
+      scopeChangedToSingle = true;
     }
-
-    // Update URL cleanly without reloading browser page
-    const cleanTargetUrl = singleVerseMode
-      ? `/${activeMode}/${book.id}/${initialChapter}/${targetSingleVerseNum || 1}`
-      : `/${activeMode}/${book.id}/${initialChapter}`;
-    if (window.location.pathname !== cleanTargetUrl) {
-      window.history.replaceState(null, '', cleanTargetUrl);
-    }
-    const modeTitle = activeMode === 'speak' ? 'Speak' : (activeMode === 'draw' ? 'Draw' : 'Type');
-    document.title = `${book.name} ${initialChapter}${singleVerseMode ? `:${targetSingleVerseNum}` : ''} — ${modeTitle} | Promises to Creation`;
 
     if (activeMode === 'speak') {
       micEnabled = true;
     }
-    applyMeditateModeState();
+
+    updateScopeHeaderAndUrlInPlace();
+    if (scopeChangedToSingle && allChapterVerses && allChapterVerses.length > 0) {
+      buildPassageDOM(allChapterVerses);
+    } else {
+      applyMeditateModeState();
+    }
+    updateSingleVerseFavBtn();
+    updateSingleVerseBookmarkBtn();
+    updateReadButtons();
   }
 
   function openModeSelectModal() {
-    pendingSingleVerseSwitch = null;
     syncModeRadioUI();
     if (modeSelectBackdrop) modeSelectBackdrop.hidden = false;
   }
 
-  function applyPendingScopeSwitchIfNeeded() {
-    if (pendingSingleVerseSwitch !== null && pendingSingleVerseSwitch !== singleVerseMode && activeMode !== 'draw') {
-      const isSingle = pendingSingleVerseSwitch;
-      pendingSingleVerseSwitch = null;
-      if (isSingle) {
-        if (shuffleVerses) {
-          const randRef = getNextPreloadedRandomVerse(activeTranslation, { bookId: book.id, chapter: initialChapter, verse: targetSingleVerseNum || 1 });
-          navigate(`/${activeMode}/${randRef.bookId}/${randRef.chapter}/${randRef.verse}`);
-        } else {
-          const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
-          const vNum = curVIdx >= 0 && verseRanges[curVIdx] ? verseRanges[curVIdx].verse : (targetSingleVerseNum || 1);
-          navigate(`/${activeMode}/${book.id}/${initialChapter}/${vNum}`);
-        }
-      } else {
-        const vNum = targetSingleVerseNum || 1;
-        navigate(`/${activeMode}/${book.id}/${initialChapter}?verse=${vNum}`);
-      }
-      return true;
-    }
-    return false;
-  }
-
   function closeModeSelectModal() {
+    if (scopeSettingsBackdrop) scopeSettingsBackdrop.hidden = true;
     if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = true;
     if (modeSelectBackdrop) modeSelectBackdrop.hidden = true;
-    if (applyPendingScopeSwitchIfNeeded()) return;
     focusTypingInput();
   }
 
   function openModeSettingsModal(targetMode) {
-    const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
-    setModalTab(isSingle);
+    syncScopeRadioUI(singleVerseMode);
     if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
     if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
     if (toggleDrawAutoAdvanceCheckbox) toggleDrawAutoAdvanceCheckbox.checked = autoAdvance;
@@ -1147,7 +1220,30 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function closeModeSettingsModal() {
+    if (scopeSettingsBackdrop) scopeSettingsBackdrop.hidden = true;
     if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = true;
+  }
+
+  function openScopeSettingsModal(targetScope) {
+    if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
+    if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
+    if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
+
+    if (targetScope === 'single') {
+      if (scopeSettingsTitle) scopeSettingsTitle.textContent = '🎯 Single Verse Mode Settings';
+      if (scopeSettingsChapterBody) scopeSettingsChapterBody.hidden = true;
+      if (scopeSettingsSingleBody) scopeSettingsSingleBody.hidden = false;
+    } else {
+      if (scopeSettingsTitle) scopeSettingsTitle.textContent = '📖 Chapter Mode Settings';
+      if (scopeSettingsChapterBody) scopeSettingsChapterBody.hidden = false;
+      if (scopeSettingsSingleBody) scopeSettingsSingleBody.hidden = true;
+    }
+
+    if (scopeSettingsBackdrop) scopeSettingsBackdrop.hidden = false;
+  }
+
+  function closeScopeSettingsModal() {
+    if (scopeSettingsBackdrop) scopeSettingsBackdrop.hidden = true;
   }
 
   function openActionsModal() {
@@ -1185,8 +1281,8 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
-  // Radio selection inside Mode Modal
-  container.querySelectorAll('.mode-radio-input').forEach(radio => {
+  // Radio selection inside Mode Modal (Type, Draw, Speak)
+  container.querySelectorAll('input[name="bible-mode-radio"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
       if (e.target.checked) {
         switchActiveMode(e.target.value);
@@ -1195,11 +1291,29 @@ export function renderTypingScreen(container, params = {}) {
   });
 
   // Settings gear buttons inside Mode Modal (opens Stacked Mode Settings Modal)
-  container.querySelectorAll('.mode-settings-gear-btn').forEach(gearBtn => {
+  container.querySelectorAll('[data-open-mode-settings]').forEach(gearBtn => {
     gearBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const targetMode = gearBtn.getAttribute('data-open-mode-settings') || activeMode;
       openModeSettingsModal(targetMode);
+    });
+  });
+
+  // Radio selection inside Mode Settings Modal (Chapter Mode vs Single Verse Mode)
+  container.querySelectorAll('input[name="bible-scope-radio"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        selectScopeMode(e.target.value === 'single');
+      }
+    });
+  });
+
+  // Settings gear buttons inside Mode Settings Modal (opens Stacked Scope Settings Modal)
+  container.querySelectorAll('[data-open-scope-settings]').forEach(gearBtn => {
+    gearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetScope = gearBtn.getAttribute('data-open-scope-settings') || (singleVerseMode ? 'single' : 'chapter');
+      openScopeSettingsModal(targetScope);
     });
   });
 
@@ -1215,6 +1329,18 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
+  if (scopeSettingsCloseBtn) {
+    scopeSettingsCloseBtn.addEventListener('click', () => closeScopeSettingsModal());
+  }
+  if (scopeSettingsDoneBtn) {
+    scopeSettingsDoneBtn.addEventListener('click', () => closeScopeSettingsModal());
+  }
+  if (scopeSettingsBackdrop) {
+    scopeSettingsBackdrop.addEventListener('click', (e) => {
+      if (e.target === scopeSettingsBackdrop) closeScopeSettingsModal();
+    });
+  }
+
   if (actionsBtn) {
     actionsBtn.addEventListener('click', () => openActionsModal());
   }
@@ -1227,18 +1353,6 @@ export function renderTypingScreen(container, params = {}) {
   if (actionsBackdrop) {
     actionsBackdrop.addEventListener('click', (e) => {
       if (e.target === actionsBackdrop) closeActionsModal();
-    });
-  }
-
-  if (tabBtnChapter) {
-    tabBtnChapter.addEventListener('click', () => {
-      selectScopeMode(false);
-    });
-  }
-
-  if (tabBtnSingle) {
-    tabBtnSingle.addEventListener('click', () => {
-      selectScopeMode(true);
     });
   }
 
@@ -1267,8 +1381,7 @@ export function renderTypingScreen(container, params = {}) {
     if (toggleDrawAutoAdvanceCheckbox) toggleDrawAutoAdvanceCheckbox.checked = autoAdvance;
     trackEvent('toggle_auto_advance', { enabled: autoAdvance });
     if (advanceStepBtn) {
-      const isSingle = pendingSingleVerseSwitch !== null ? pendingSingleVerseSwitch : singleVerseMode;
-      advanceStepBtn.hidden = !isSingle || autoAdvance || activeMode === 'draw';
+      advanceStepBtn.hidden = !singleVerseMode || autoAdvance || activeMode === 'draw';
     }
   };
 
@@ -3992,7 +4105,7 @@ export function renderTypingScreen(container, params = {}) {
             const nextIncompleteVerse = verseRanges[targetIncompleteVIdx].verse;
             jumpToVerse(nextIncompleteVerse, {
               isSkipJump: true,
-              statusMessage: `⏭️ Verse ${currentVRange.verse} saved! Skipped completed verse(s) → jumped to <strong>Verse ${nextIncompleteVerse}</strong>.`
+              statusMessage: `⏭️ Verse ${currentVRange.verse} saved! Jumped past completed verse(s) → <strong>Verse ${nextIncompleteVerse}</strong>.`
             });
             updateLiveMetrics();
             return;
@@ -4030,6 +4143,10 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function closeTopmostModal() {
+    if (scopeSettingsBackdrop && !scopeSettingsBackdrop.hidden) {
+      closeScopeSettingsModal();
+      return true;
+    }
     if (modeSettingsBackdrop && !modeSettingsBackdrop.hidden) {
       closeModeSettingsModal();
       return true;
