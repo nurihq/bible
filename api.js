@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261108_v24';
+import { CONFIG } from './config.js?v=20261108_v25';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261108_v24';
+} from './bible-data.js?v=20261108_v25';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -616,18 +616,13 @@ export function saveVerseDrawing({
   const existing = store.drawings[key] || store.meditations[key] || {};
   const mergedFills = { ...(existing.fills || {}), ...(fills || {}) };
 
-  // First colour equals save: only persist if user has colored at least one segment
-  if (!mergedFills || Object.keys(mergedFills).length === 0) {
-    return null;
-  }
-
   const determinedCase = fontCase !== undefined
     ? (fontCase === 'uppercase' ? 'uppercase' : 'none')
-    : (existing.fontCase === 'uppercase' ? 'uppercase' : (store.meditateFontCase === 'uppercase' ? 'uppercase' : 'none'));
+    : (existing.fontCase === 'uppercase' ? 'uppercase' : 'none');
 
   const determinedColor = typeof fontColor === 'string'
     ? fontColor
-    : (typeof existing.fontColor === 'string' ? existing.fontColor : (store.meditateFontColor || DEFAULT_MEDITATE_FONT_COLOR));
+    : (typeof existing.fontColor === 'string' ? existing.fontColor : (DEFAULT_MEDITATE_FONT_COLOR || ''));
 
   const record = {
     key,
@@ -639,11 +634,11 @@ export function saveVerseDrawing({
     translation: String(translation || 'ESV'),
     templateIdx: Number(templateIdx || 0),
     fills: mergedFills,
-    fontFamily: fontFamily || existing.fontFamily || store.meditateFont || DEFAULT_MEDITATE_FONT,
-    fontSize: typeof fontSize === 'number' ? fontSize : (typeof existing.fontSize === 'number' ? existing.fontSize : (store.meditateFontSize || DEFAULT_MEDITATE_FONT_SIZE)),
+    fontFamily: fontFamily || existing.fontFamily || DEFAULT_MEDITATE_FONT,
+    fontSize: typeof fontSize === 'number' ? fontSize : (typeof existing.fontSize === 'number' ? existing.fontSize : DEFAULT_MEDITATE_FONT_SIZE),
     fontCase: determinedCase,
     fontColor: determinedColor,
-    boxWidth: typeof boxWidth === 'number' ? boxWidth : (typeof existing.boxWidth === 'number' ? existing.boxWidth : (store.meditateBoxWidth || DEFAULT_MEDITATE_BOX_WIDTH)),
+    boxWidth: typeof boxWidth === 'number' ? boxWidth : (typeof existing.boxWidth === 'number' ? existing.boxWidth : DEFAULT_MEDITATE_BOX_WIDTH),
     textX: typeof textX === 'number' ? textX : (typeof existing.textX === 'number' ? existing.textX : 50),
     textY: typeof textY === 'number' ? textY : (typeof existing.textY === 'number' ? existing.textY : 76),
     updatedAt: new Date().toISOString()
@@ -662,9 +657,6 @@ export function getVerseDrawing(bookId, chapter, verse) {
   const key = `${bookId}:${chapter}:${verse}`;
   const med = store.drawings?.[key] || store.meditations?.[key] || null;
   if (!med) return null;
-  if (!med.fills || typeof med.fills !== 'object' || Object.keys(med.fills).length === 0) {
-    return null;
-  }
   if (!med.fontFamily || med.fontFamily.includes('Playfair')) {
     med.fontFamily = DEFAULT_MEDITATE_FONT;
   }

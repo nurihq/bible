@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v24';
+} from '../bible-data.js?v=20261108_v25';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v24';
+} from '../api.js?v=20261108_v25';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v24';
-import { trackEvent } from '../analytics.js?v=20261108_v24';
-import { navigate } from '../router.js?v=20261108_v24';
+} from '../meditate-art.js?v=20261108_v25';
+import { trackEvent } from '../analytics.js?v=20261108_v25';
+import { navigate } from '../router.js?v=20261108_v25';
 
 function escapeHtml(str) {
   return String(str)
@@ -2702,19 +2702,15 @@ export function renderTypingScreen(container, params = {}) {
     let savedFills = existingMed?.fills ? { ...existingMed.fills } : {};
     let activeFont = (existingMed?.fontFamily && !existingMed.fontFamily.includes('Playfair'))
       ? existingMed.fontFamily
-      : getMeditateFontPref();
-    let activeFontSize = typeof existingMed?.fontSize === 'number' ? existingMed.fontSize : getMeditateFontSizePref();
-    let activeFontCase = existingMed?.fontCase === 'uppercase' ? 'uppercase' : (getMeditateFontCasePref() === 'uppercase' ? 'uppercase' : 'none');
-    let activeFontColor = typeof existingMed?.fontColor === 'string' ? existingMed.fontColor : getMeditateFontColorPref();
-    let activeBoxWidth = typeof existingMed?.boxWidth === 'number' ? existingMed.boxWidth : getMeditateBoxWidthPref();
+      : DEFAULT_MEDITATE_FONT;
+    let activeFontSize = typeof existingMed?.fontSize === 'number' ? existingMed.fontSize : DEFAULT_MEDITATE_FONT_SIZE;
+    let activeFontCase = existingMed?.fontCase === 'uppercase' ? 'uppercase' : 'none';
+    let activeFontColor = typeof existingMed?.fontColor === 'string' ? existingMed.fontColor : DEFAULT_MEDITATE_FONT_COLOR;
+    let activeBoxWidth = typeof existingMed?.boxWidth === 'number' ? existingMed.boxWidth : DEFAULT_MEDITATE_BOX_WIDTH;
     let textX = typeof existingMed?.textX === 'number' ? existingMed.textX : 50;
     let textY = typeof existingMed?.textY === 'number' ? existingMed.textY : 76;
 
     function persistMeditation() {
-      // First colour equals save: only save if user has started coloring
-      if (!savedFills || Object.keys(savedFills).length === 0) {
-        return;
-      }
       saveVerseMeditation({
         bookId: book.id,
         chapter: initialChapter,
@@ -3147,7 +3143,6 @@ export function renderTypingScreen(container, params = {}) {
     if (fontSelect) {
       fontSelect.addEventListener('change', (e) => {
         activeFont = e.target.value;
-        setMeditateFontPref(activeFont);
         if (dragBox) dragBox.style.fontFamily = activeFont;
         if (defaultBtn) {
           defaultBtn.classList.toggle('is-active', activeFont.includes('Arial') && activeFontCase !== 'uppercase');
@@ -3165,12 +3160,6 @@ export function renderTypingScreen(container, params = {}) {
         activeFontCase = DEFAULT_MEDITATE_FONT_CASE; // 'none'
         activeFontColor = DEFAULT_MEDITATE_FONT_COLOR; // ''
         activeBoxWidth = DEFAULT_MEDITATE_BOX_WIDTH;
-
-        setMeditateFontPref(activeFont);
-        setMeditateFontSizePref(activeFontSize);
-        setMeditateFontCasePref(activeFontCase);
-        setMeditateFontColorPref(activeFontColor);
-        setMeditateBoxWidthPref(activeBoxWidth);
 
         if (fontSelect) fontSelect.value = DEFAULT_MEDITATE_FONT;
         if (fontSizeLbl) fontSizeLbl.textContent = `${activeFontSize}px`;
@@ -3200,7 +3189,6 @@ export function renderTypingScreen(container, params = {}) {
       allCapsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         activeFontCase = 'uppercase';
-        setMeditateFontCasePref(activeFontCase);
         allCapsBtn.classList.add('is-active');
         if (defaultBtn) defaultBtn.classList.remove('is-active');
         if (dragBox) dragBox.style.textTransform = 'uppercase';
@@ -3214,7 +3202,6 @@ export function renderTypingScreen(container, params = {}) {
 
     const updateFontSize = (newSize) => {
       activeFontSize = Math.max(13, Math.min(42, newSize));
-      setMeditateFontSizePref(activeFontSize);
       if (fontSizeLbl) fontSizeLbl.textContent = `${activeFontSize}px`;
       if (dragBox) dragBox.style.fontSize = `${activeFontSize}px`;
       persistMeditation();
@@ -3239,7 +3226,6 @@ export function renderTypingScreen(container, params = {}) {
 
     const updateFontColor = (newColor) => {
       activeFontColor = newColor || '';
-      setMeditateFontColorPref(activeFontColor);
 
       fontColorSwatches.forEach(btn => {
         const c = btn.getAttribute('data-color') || '';
