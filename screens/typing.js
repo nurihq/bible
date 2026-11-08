@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v21';
+} from '../bible-data.js?v=20261108_v22';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v21';
+} from '../api.js?v=20261108_v22';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v21';
-import { trackEvent } from '../analytics.js?v=20261108_v21';
-import { navigate } from '../router.js?v=20261108_v21';
+} from '../meditate-art.js?v=20261108_v22';
+import { trackEvent } from '../analytics.js?v=20261108_v22';
+import { navigate } from '../router.js?v=20261108_v22';
 
 function escapeHtml(str) {
   return String(str)
@@ -642,7 +642,7 @@ export function renderTypingScreen(container, params = {}) {
               title="Open the full chapter (${escapeHtml(book.name)} ${initialChapter})"
               ${singleVerseMode ? '' : 'hidden'}
             >
-              📖 Read Full Chapter
+              📖 Full Chapter
             </button>
             <button type="button" class="btn btn-secondary btn-sm summary-action-btn typing-actions-btn" id="typing-actions-btn" title="General Options &amp; Actions">
               ⚡ Actions
@@ -2584,7 +2584,7 @@ export function renderTypingScreen(container, params = {}) {
 
     jumpToVerse(initialTargetVerseNum, {
       statusMessage: initialSkipNotice || (singleVerseMode
-        ? `Single-verse mode — ${activeMode === 'speak' ? 'speak' : 'type'} Verse ${targetSingleVerseNum}, or click "Read Full Chapter" to view all ${allChapterVerses.length} verses.`
+        ? `Single-verse mode — ${activeMode === 'speak' ? 'speak' : 'type'} Verse ${targetSingleVerseNum}, or click "Full Chapter" to view all ${allChapterVerses.length} verses.`
         : `Click any verse in the chapter to start from that verse. Completed verses are remembered automatically.`)
     });
 
