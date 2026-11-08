@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v22';
+} from '../bible-data.js?v=20261108_v23';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v22';
+} from '../api.js?v=20261108_v23';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v22';
-import { trackEvent } from '../analytics.js?v=20261108_v22';
-import { navigate } from '../router.js?v=20261108_v22';
+} from '../meditate-art.js?v=20261108_v23';
+import { trackEvent } from '../analytics.js?v=20261108_v23';
+import { navigate } from '../router.js?v=20261108_v23';
 
 function escapeHtml(str) {
   return String(str)
@@ -610,7 +610,13 @@ export function renderTypingScreen(container, params = {}) {
               title="Toggle microphone for Speak Mode"
               ${activeMode === 'speak' ? '' : 'hidden'}
             >
-              <span id="speak-mic-toggle-label">${micEnabled ? '🎙️ Mic On' : '🔇 Mic Off'}</span>
+              <svg class="speak-mic-icon" width="14" height="14" viewBox="0 0 24 24" fill="${micEnabled ? 'rgba(16, 185, 129, 0.28)' : 'none'}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+                <line x1="8" y1="22" x2="16" y2="22"/>
+              </svg>
+              <span id="speak-mic-toggle-label">${micEnabled ? 'Pause' : 'Start'}</span>
             </button>
           </div>
 
@@ -2596,16 +2602,20 @@ export function renderTypingScreen(container, params = {}) {
     const isSpeak = activeMode === 'speak';
     speakMicToggleBtn.hidden = !isSpeak;
     speakMicToggleBtn.classList.toggle('is-mic-active', Boolean(isSpeak && micEnabled));
+    const micIcon = speakMicToggleBtn.querySelector('.speak-mic-icon');
+    if (micIcon) {
+      micIcon.setAttribute('fill', micEnabled ? 'rgba(16, 185, 129, 0.28)' : 'none');
+    }
     if (speakMicToggleLabel) {
-      speakMicToggleLabel.textContent = micEnabled ? '🎙️ Mic On' : '🔇 Mic Off';
+      speakMicToggleLabel.textContent = micEnabled ? 'Pause' : 'Start';
     }
     if (isSpeak) {
       if (!speechSupported) {
         speakMicToggleBtn.title = 'Speech recognition unsupported in this browser (try Chrome/Edge/Safari)';
       } else if (!micEnabled) {
-        speakMicToggleBtn.title = 'Mic paused — click "Mic On" to resume speaking';
+        speakMicToggleBtn.title = 'Microphone paused — click "Start" to resume speaking';
       } else {
-        speakMicToggleBtn.title = '🎙️ Listening — speak each word naturally (click to pause)';
+        speakMicToggleBtn.title = 'Microphone listening — click "Pause" to pause speaking';
       }
     }
   }

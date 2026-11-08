@@ -5635,6 +5635,21 @@ sup.verse-num.is-both {
   line-height: 1;
 }
 
+.speak-mic-toggle-btn .speak-mic-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.45;
+  filter: grayscale(1);
+  transition: all var(--transition-fast);
+}
+
+.speak-mic-toggle-btn:not(.is-mic-active) {
+  color: var(--text-secondary);
+}
+
 .speak-mic-toggle-btn.is-mic-active {
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.5);
@@ -5642,10 +5657,21 @@ sup.verse-num.is-both {
   font-weight: 700;
 }
 
+.speak-mic-toggle-btn.is-mic-active .speak-mic-icon {
+  color: #059669;
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.7));
+}
+
 [data-theme="dark"] .speak-mic-toggle-btn.is-mic-active {
   background: rgba(16, 185, 129, 0.2);
   border-color: rgba(52, 211, 153, 0.55);
   color: #34d399;
+}
+
+[data-theme="dark"] .speak-mic-toggle-btn.is-mic-active .speak-mic-icon {
+  color: #34d399;
+  filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.85));
 }
 
 /* Word-level active & non-blocking mispronounced state in Speak Mode */
