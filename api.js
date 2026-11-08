@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261108_v15';
+import { CONFIG } from './config.js?v=20261108_v16';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261108_v15';
+} from './bible-data.js?v=20261108_v16';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -456,6 +456,38 @@ export function getMeditateModePref() {
 
 export function setMeditateModePref(enabled) {
   setActiveModePref(enabled ? 'draw' : 'type');
+}
+
+export function getSpeakStrictnessPref() {
+  const store = getLocalStore();
+  if (['lenient', 'standard', 'strict'].includes(store.speakStrictness)) {
+    return store.speakStrictness;
+  }
+  return 'lenient';
+}
+
+export function setSpeakStrictnessPref(strictness) {
+  const clean = ['lenient', 'standard', 'strict'].includes(strictness) ? strictness : 'lenient';
+  const store = getLocalStore();
+  store.speakStrictness = clean;
+  saveLocalStore(store);
+  syncPreferencesToCloud();
+}
+
+export function getSpeakTrackingModePref() {
+  const store = getLocalStore();
+  if (['realtime', 'phrase'].includes(store.speakTrackingMode)) {
+    return store.speakTrackingMode;
+  }
+  return 'realtime';
+}
+
+export function setSpeakTrackingModePref(mode) {
+  const clean = ['realtime', 'phrase'].includes(mode) ? mode : 'realtime';
+  const store = getLocalStore();
+  store.speakTrackingMode = clean;
+  saveLocalStore(store);
+  syncPreferencesToCloud();
 }
 
 export function getMeditatePalettePref() {

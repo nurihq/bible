@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261108_v15';
+} from '../bible-data.js?v=20261108_v16';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -31,6 +31,10 @@ import {
   setActiveModePref,
   getMeditateModePref,
   setMeditateModePref,
+  getSpeakStrictnessPref,
+  setSpeakStrictnessPref,
+  getSpeakTrackingModePref,
+  setSpeakTrackingModePref,
   getMeditatePalettePref,
   setMeditatePalettePref,
   DEFAULT_MEDITATE_PALETTE,
@@ -82,13 +86,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261108_v15';
+} from '../api.js?v=20261108_v16';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261108_v15';
-import { trackEvent } from '../analytics.js?v=20261108_v15';
-import { navigate } from '../router.js?v=20261108_v15';
+} from '../meditate-art.js?v=20261108_v16';
+import { trackEvent } from '../analytics.js?v=20261108_v16';
+import { navigate } from '../router.js?v=20261108_v16';
 
 function escapeHtml(str) {
   return String(str)
@@ -114,6 +118,67 @@ const NUMBER_WORDS_MAP = {
   '70': 'seventy', '80': 'eighty', '90': 'ninety', '100': 'hundred', '1000': 'thousand'
 };
 
+const HOMOPHONE_GROUPS = [
+  ['to', 'too', 'two'],
+  ['for', 'four', 'fore'],
+  ['there', 'their', 'theyre'],
+  ['hear', 'here'],
+  ['know', 'no'],
+  ['knew', 'new'],
+  ['peace', 'piece'],
+  ['whole', 'hole'],
+  ['holy', 'wholly'],
+  ['soul', 'sole'],
+  ['sun', 'son'],
+  ['see', 'sea'],
+  ['weak', 'week'],
+  ['right', 'write', 'rite'],
+  ['pray', 'prey'],
+  ['praise', 'prays'],
+  ['reign', 'rain', 'rein'],
+  ['altar', 'alter'],
+  ['prophet', 'profit'],
+  ['prophets', 'profits'],
+  ['bear', 'bare'],
+  ['sight', 'site', 'cite'],
+  ['wait', 'weight'],
+  ['morning', 'mourning'],
+  ['threw', 'through', 'thru'],
+  ['none', 'nun'],
+  ['one', 'won'],
+  ['our', 'hour'],
+  ['by', 'buy', 'bye'],
+  ['be', 'bee'],
+  ['in', 'inn'],
+  ['him', 'hymn'],
+  ['not', 'knot'],
+  ['made', 'maid'],
+  ['meat', 'meet'],
+  ['die', 'dye'],
+  ['heal', 'heel'],
+  ['steal', 'steel'],
+  ['flee', 'flea'],
+  ['bread', 'bred'],
+  ['led', 'lead'],
+  ['heard', 'herd'],
+  ['sent', 'scent', 'cent'],
+  ['lord', 'laud', 'lawd'],
+  ['oh', 'o'],
+  ['who', 'hoo']
+];
+
+const HOMOPHONE_CANONICAL_MAP = new Map();
+for (const grp of HOMOPHONE_GROUPS) {
+  const canonical = grp[0];
+  for (const w of grp) {
+    HOMOPHONE_CANONICAL_MAP.set(w, canonical);
+  }
+}
+
+const UNSTRESSED_SHORT_WORDS = new Set([
+  'the', 'a', 'an', 'to', 'for', 'of', 'in', 'on', 'at', 'by', 'and', 'or', 'as', 'is', 'be', 'who', 'he', 'it', 'o', 'oh'
+]);
+
 export function normalizeSpokenWord(raw) {
   const cleaned = String(raw || '')
     .toLowerCase()
@@ -122,6 +187,32 @@ export function normalizeSpokenWord(raw) {
     .replace(/'s$/g, 's')
     .replace(/'/g, '');
   return NUMBER_WORDS_MAP[cleaned] || cleaned;
+}
+
+function getWordStem(word) {
+  if (!word || word.length <= 3) return word;
+  return word
+    .replace(/(?:ing|ed|es|er|s)$/, '');
+}
+
+function areWordsHomophonesOrStemMatch(spoken, target, strictness = 'lenient') {
+  if (spoken === target) return true;
+  const cSpoken = HOMOPHONE_CANONICAL_MAP.get(spoken) || spoken;
+  const cTarget = HOMOPHONE_CANONICAL_MAP.get(target) || target;
+  if (cSpoken === cTarget) return true;
+  if (strictness === 'strict') return false;
+
+  // Check inflectional stem equivalence (e.g. execute/executes, oppress/oppressed, prisoner/prisoners)
+  const minStemLen = strictness === 'lenient' ? 3 : 4;
+  const stemSpoken = getWordStem(spoken);
+  const stemTarget = getWordStem(target);
+  if (stemSpoken.length >= minStemLen && stemSpoken === stemTarget) {
+    return true;
+  }
+  if (spoken.length >= 4 && target.length >= 4 && (spoken.startsWith(target) || target.startsWith(spoken)) && Math.abs(spoken.length - target.length) <= 2) {
+    return true;
+  }
+  return false;
 }
 
 function editDistance(a, b) {
@@ -150,31 +241,39 @@ export function computeWordSimilarity(spokenRaw, targetClean) {
   if (!target && !spoken) return 1;
   if (!target || !spoken) return 0;
   if (spoken === target) return 1;
+  if ((HOMOPHONE_CANONICAL_MAP.get(spoken) || spoken) === (HOMOPHONE_CANONICAL_MAP.get(target) || target)) {
+    return 1;
+  }
   const dist = editDistance(spoken, target);
   const maxLen = Math.max(spoken.length, target.length, 1);
   return Math.max(0, 1 - dist / maxLen);
 }
 
-export function isSpokenWordMatch(spokenRaw, targetClean) {
+export function isSpokenWordMatch(spokenRaw, targetClean, strictness = 'lenient') {
   const spoken = normalizeSpokenWord(spokenRaw);
   const target = normalizeSpokenWord(targetClean);
   if (!target) return true;
   if (!spoken) return false;
-  if (spoken === target) return true;
-  // Allow slight 1-character phonetic variation on longer words (6+ chars, e.g. biblical proper nouns)
-  if (target.length >= 6 && spoken.length >= 4 && editDistance(spoken, target) <= 1) {
-    return true;
+  if (areWordsHomophonesOrStemMatch(spoken, target, strictness)) return true;
+  if (strictness === 'strict') return false;
+
+  const dist = editDistance(spoken, target);
+  if (strictness === 'lenient') {
+    if (target.length >= 4 && spoken.length >= 3 && dist <= 1) return true;
+    if (target.length >= 7 && spoken.length >= 5 && dist <= 2) return true;
+  } else {
+    if (target.length >= 5 && spoken.length >= 4 && dist <= 1) return true;
   }
   return false;
 }
 
-export function evaluateSpokenWord(spokenRaw, targetClean, recognizerConfidence = 0.92) {
+export function evaluateSpokenWord(spokenRaw, targetClean, recognizerConfidence = 0.92, strictness = 'lenient') {
   const spoken = normalizeSpokenWord(spokenRaw);
   const target = normalizeSpokenWord(targetClean);
   const rawConf = (typeof recognizerConfidence === 'number' && recognizerConfidence > 0)
     ? recognizerConfidence
     : 0.92;
-  const normConf = Math.min(1, Math.max(0.55, rawConf / 0.93));
+  const normConf = Math.min(1, Math.max(0.65, rawConf / 0.92));
 
   if (!target) {
     return { matched: true, exact: true, similarity: 1, pronunciationScore: 100, enunciationScore: 100 };
@@ -183,15 +282,17 @@ export function evaluateSpokenWord(spokenRaw, targetClean, recognizerConfidence 
     return { matched: false, exact: false, similarity: 0, pronunciationScore: 0, enunciationScore: 25 };
   }
   const sim = computeWordSimilarity(spoken, target);
-  if (spoken === target) {
-    const enun = Math.round(Math.min(100, (normConf * 0.55 + 0.45) * 100));
+  const cSpoken = HOMOPHONE_CANONICAL_MAP.get(spoken) || spoken;
+  const cTarget = HOMOPHONE_CANONICAL_MAP.get(target) || target;
+  if (spoken === target || cSpoken === cTarget) {
+    const enun = Math.round(Math.min(100, (normConf * 0.5 + 0.5) * 100));
     return { matched: true, exact: true, similarity: 1, pronunciationScore: 100, enunciationScore: enun };
   }
-  if (target.length >= 6 && spoken.length >= 4 && editDistance(spoken, target) <= 1) {
-    const enun = Math.round(Math.min(95, (normConf * 0.45 + sim * 0.55) * 92));
-    return { matched: true, exact: false, similarity: sim, pronunciationScore: 92, enunciationScore: enun };
+  if (isSpokenWordMatch(spoken, target, strictness)) {
+    const enun = Math.round(Math.min(96, (normConf * 0.45 + Math.max(sim, 0.85) * 0.55) * 95));
+    return { matched: true, exact: false, similarity: Math.max(sim, 0.85), pronunciationScore: 95, enunciationScore: enun };
   }
-  const enun = Math.round(Math.max(20, sim * 68));
+  const enun = Math.round(Math.max(25, sim * 70));
   return { matched: false, exact: false, similarity: sim, pronunciationScore: 0, enunciationScore: enun };
 }
 
@@ -219,6 +320,8 @@ export function renderTypingScreen(container, params = {}) {
   let showTypingStats = getShowTypingStatsPref();
   let autoAdvance = getAutoAdvancePref();
   let shuffleVerses = getShuffleVersesPref();
+  let speakStrictness = getSpeakStrictnessPref();
+  let speakTrackingMode = getSpeakTrackingModePref();
   let activeMode = ['type', 'speak', 'draw'].includes(params.mode) ? params.mode : getActiveModePref();
   if (!singleVerseMode && activeMode === 'draw') {
     activeMode = 'type';
@@ -235,7 +338,7 @@ export function renderTypingScreen(container, params = {}) {
   let wordsList = []; // [{ wordIdx, verse, vIdx, rawWord, cleanWord, startCharIdx, endCharIdx, nextCursorCharIdx, isLastWordOfVerse, wordEl }]
   let charToWordIdxMap = [];
   let currentWordIdx = 0;
-  let speechProcessedMap = new Map(); // resultIndex -> number of tokens processed
+  let speechProcessedMap = new Map(); // resultIndex -> alignment state
   let speechInterimErrorTimer = null;
   let speechAutoAdvanceTimer = null;
   let spokenWordErrors = []; // [{ wordIdx, verse, expected, spoken }]
@@ -780,6 +883,30 @@ export function renderTypingScreen(container, params = {}) {
             </div>
           </div>
 
+          <!-- Speak Mode Speech Recognition Tuning Section -->
+          <div class="typing-options-body" id="mode-settings-speak-tuning" hidden style="padding-top:0; border-top:1px solid var(--border-subtle, rgba(255,255,255,0.08)); margin-top:4px;">
+            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:10px;">
+              <label class="option-title" for="speak-strictness-select" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>🎙️ Pronunciation Strictness</span>
+              </label>
+              <select id="speak-strictness-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
+                <option value="lenient" ${speakStrictness === 'lenient' ? 'selected' : ''}>Lenient / Natural (Forgives mic-dropped "the/to/who" &amp; homophones)</option>
+                <option value="standard" ${speakStrictness === 'standard' ? 'selected' : ''}>Standard (Balanced phonetic &amp; stem matching)</option>
+                <option value="strict" ${speakStrictness === 'strict' ? 'selected' : ''}>Strict (Exact pronunciation match)</option>
+              </select>
+            </div>
+
+            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:8px;">
+              <label class="option-title" for="speak-tracking-mode-select" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>⏱️ Recognition Timing</span>
+              </label>
+              <select id="speak-tracking-mode-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
+                <option value="realtime" ${speakTrackingMode === 'realtime' ? 'selected' : ''}>Real-Time Word by Word (Live cursor with anti-drift alignment)</option>
+                <option value="phrase" ${speakTrackingMode === 'phrase' ? 'selected' : ''}>Phrase by Phrase (Waits for short pause — highest accuracy)</option>
+              </select>
+            </div>
+          </div>
+
           <!-- Draw Settings Body -->
           <div class="typing-options-body" id="mode-settings-draw-body" hidden>
             <label class="typing-option-row" for="toggle-draw-auto-advance-checkbox">
@@ -967,6 +1094,9 @@ export function renderTypingScreen(container, params = {}) {
   const modeSettingsCloseBtn = container.querySelector('#mode-settings-close-btn');
   const modeSettingsDoneBtn = container.querySelector('#mode-settings-done-btn');
   const modeSettingsTypeSpeakBody = container.querySelector('#mode-settings-type-speak-body');
+  const modeSettingsSpeakTuning = container.querySelector('#mode-settings-speak-tuning');
+  const speakStrictnessSelect = container.querySelector('#speak-strictness-select');
+  const speakTrackingModeSelect = container.querySelector('#speak-tracking-mode-select');
   const modeSettingsDrawBody = container.querySelector('#mode-settings-draw-body');
   const scopeSettingsBackdrop = container.querySelector('#scope-settings-backdrop');
   const scopeSettingsTitle = container.querySelector('#scope-settings-title');
@@ -1201,18 +1331,23 @@ export function renderTypingScreen(container, params = {}) {
     if (toggleDrawAutoAdvanceCheckbox) toggleDrawAutoAdvanceCheckbox.checked = autoAdvance;
     if (toggleDrawShuffleCheckbox) toggleDrawShuffleCheckbox.checked = shuffleVerses;
     if (toggleSkipDoneCheckbox) toggleSkipDoneCheckbox.checked = skipCompletedVerses;
+    if (speakStrictnessSelect) speakStrictnessSelect.value = speakStrictness;
+    if (speakTrackingModeSelect) speakTrackingModeSelect.value = speakTrackingMode;
 
     if (targetMode === 'draw') {
       if (modeSettingsTitle) modeSettingsTitle.textContent = '🎨 Draw Mode Settings';
       if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = true;
+      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
       if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = false;
     } else if (targetMode === 'speak') {
       if (modeSettingsTitle) modeSettingsTitle.textContent = '🗣️ Speak Mode Settings';
       if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
+      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = false;
       if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
     } else {
       if (modeSettingsTitle) modeSettingsTitle.textContent = '⌨️ Type Mode Settings';
       if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
+      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
       if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
     }
 
@@ -1316,6 +1451,22 @@ export function renderTypingScreen(container, params = {}) {
       openScopeSettingsModal(targetScope);
     });
   });
+
+  if (speakStrictnessSelect) {
+    speakStrictnessSelect.addEventListener('change', () => {
+      speakStrictness = speakStrictnessSelect.value;
+      setSpeakStrictnessPref(speakStrictness);
+      trackEvent('speak_strictness_change', { strictness: speakStrictness });
+    });
+  }
+
+  if (speakTrackingModeSelect) {
+    speakTrackingModeSelect.addEventListener('change', () => {
+      speakTrackingMode = speakTrackingModeSelect.value;
+      setSpeakTrackingModePref(speakTrackingMode);
+      trackEvent('speak_tracking_mode_change', { trackingMode: speakTrackingMode });
+    });
+  }
 
   if (modeSettingsCloseBtn) {
     modeSettingsCloseBtn.addEventListener('click', () => closeModeSettingsModal());
@@ -3869,6 +4020,12 @@ export function renderTypingScreen(container, params = {}) {
       if (!alt || !alt.transcript) continue;
 
       const isFinal = Boolean(res.isFinal);
+
+      // In 'phrase' tracking mode, wait until the browser finalizes the phrase for highest accuracy
+      if (speakTrackingMode === 'phrase' && !isFinal) {
+        continue;
+      }
+
       const conf = typeof alt.confidence === 'number' && alt.confidence > 0 ? alt.confidence : 0.92;
       const rawTokens = alt.transcript
         .trim()
@@ -3876,12 +4033,26 @@ export function renderTypingScreen(container, params = {}) {
         .map(t => normalizeSpokenWord(t))
         .filter(Boolean);
 
+      // Collect alternative transcripts (when maxAlternatives > 1) to check if an alternative hypothesis matches
+      const altTokenLists = [];
+      for (let aIdx = 1; aIdx < res.length; aIdx++) {
+        const altItem = res[aIdx];
+        if (altItem && altItem.transcript) {
+          altTokenLists.push(
+            altItem.transcript
+              .trim()
+              .split(/\s+/)
+              .map(t => normalizeSpokenWord(t))
+              .filter(Boolean)
+          );
+        }
+      }
+
       const alreadyConsumed = speechProcessedMap.get(rIdx) || 0;
       let tIdx = alreadyConsumed;
 
       while (tIdx < rawTokens.length && currentWordIdx < wordsList.length && !isCompleted) {
         const spokenTok = rawTokens[tIdx];
-        const hasMoreTokensAfter = tIdx < rawTokens.length - 1;
         const targetWordObj = wordsList[currentWordIdx];
 
         // Auto-pass punctuation-only token if needed
@@ -3893,60 +4064,168 @@ export function renderTypingScreen(container, params = {}) {
           continue;
         }
 
-        const evalCurr = evaluateSpokenWord(spokenTok, targetWordObj.cleanWord, conf);
+        // 1. Direct Match (or match via N-best SpeechRecognitionAlternative at same token position)
+        let evalCurr = evaluateSpokenWord(spokenTok, targetWordObj.cleanWord, conf, speakStrictness);
+        let matchedSpokenTok = spokenTok;
+
+        if (!evalCurr.matched && altTokenLists.length > 0) {
+          for (const altTokens of altTokenLists) {
+            if (tIdx < altTokens.length) {
+              const altEval = evaluateSpokenWord(altTokens[tIdx], targetWordObj.cleanWord, conf, speakStrictness);
+              if (altEval.matched) {
+                evalCurr = altEval;
+                matchedSpokenTok = altTokens[tIdx];
+                break;
+              }
+            }
+          }
+        }
 
         if (evalCurr.matched) {
-          // Spoken word matches current expected word! Advance immediately.
           tIdx++;
           speechProcessedMap.set(rIdx, tIdx);
-          advanceSpokenWordNonBlocking(evalCurr, spokenTok);
+          advanceSpokenWordNonBlocking(evalCurr, matchedSpokenTok);
           continue;
         }
 
-        // Current spoken token did NOT match targetWordObj.
-        // If this is the very last token of an still-open interim utterance, wait briefly
-        // in case the user is mid-syllable (e.g. "begin" -> "beginning") before advancing.
-        if (!isFinal && !hasMoreTokensAfter) {
-          const capturedRIdx = rIdx;
-          const capturedTIdx = tIdx;
-          const capturedWordIdx = currentWordIdx;
-          const capturedSpokenTok = spokenTok;
-          speechInterimErrorTimer = setTimeout(() => {
-            if (
-              activeMode === 'speak' &&
-              micEnabled &&
-              !isCompleted &&
-              currentWordIdx === capturedWordIdx &&
-              (speechProcessedMap.get(capturedRIdx) || 0) === capturedTIdx
-            ) {
-              speechProcessedMap.set(capturedRIdx, capturedTIdx + 1);
-              const wNow = wordsList[currentWordIdx];
-              if (wNow) {
-                const ev = evaluateSpokenWord(capturedSpokenTok, wNow.cleanWord, conf);
-                advanceSpokenWordNonBlocking(ev, capturedSpokenTok);
-              }
+        // 2. Compound 2-Tokens-Into-1 Match (e.g. recognizer split "executes" into "ex ecutes" or "unto" into "un to")
+        if (tIdx + 1 < rawTokens.length) {
+          const combinedTwo = spokenTok + rawTokens[tIdx + 1];
+          const evalCombined = evaluateSpokenWord(combinedTwo, targetWordObj.cleanWord, conf, speakStrictness);
+          if (evalCombined.matched) {
+            tIdx += 2;
+            speechProcessedMap.set(rIdx, tIdx);
+            advanceSpokenWordNonBlocking(evalCombined, combinedTwo);
+            continue;
+          }
+        }
+
+        // 3. Extra Noise/Filler Token in Transcript (tIdx + 1 matches current targetWordObj)
+        // Skip the extra noise token without advancing currentWordIdx so alignment never drifts!
+        if (
+          tIdx + 1 < rawTokens.length &&
+          isSpokenWordMatch(rawTokens[tIdx + 1], targetWordObj.cleanWord, speakStrictness)
+        ) {
+          tIdx++;
+          speechProcessedMap.set(rIdx, tIdx);
+          continue;
+        }
+
+        // 4. 1-for-1 Word Substitution (user mispronounced targetWordObj as spokenTok, and tIdx + 1 matches currentWordIdx + 1)
+        const nextWordObj = currentWordIdx + 1 < wordsList.length ? wordsList[currentWordIdx + 1] : null;
+        if (
+          tIdx + 1 < rawTokens.length &&
+          nextWordObj &&
+          nextWordObj.verse === targetWordObj.verse &&
+          !isSpokenWordMatch(spokenTok, nextWordObj.cleanWord, speakStrictness) &&
+          isSpokenWordMatch(rawTokens[tIdx + 1], nextWordObj.cleanWord, speakStrictness)
+        ) {
+          tIdx++;
+          speechProcessedMap.set(rIdx, tIdx);
+          if (speakStrictness === 'lenient' && UNSTRESSED_SHORT_WORDS.has(targetWordObj.cleanWord)) {
+            advanceSpokenWordNonBlocking(
+              { matched: true, exact: false, similarity: 0.9, pronunciationScore: 92, enunciationScore: 88 },
+              targetWordObj.cleanWord
+            );
+          } else {
+            advanceSpokenWordNonBlocking(evalCurr, spokenTok);
+          }
+          continue;
+        }
+
+        // 5. Windowed Lookahead in Verse (wOffset = 1..3 within the same verse)
+        // Handles mic-clipped leading/unstressed words (like "who", "the", "to") or skipped words without losing sync!
+        let matchedOffset = 0;
+        const maxLookahead = Math.min(3, wordsList.length - 1 - currentWordIdx);
+        for (let wOffset = 1; wOffset <= maxLookahead; wOffset++) {
+          const aheadWordObj = wordsList[currentWordIdx + wOffset];
+          if (!aheadWordObj || aheadWordObj.verse !== targetWordObj.verse) break;
+          if (!isSpokenWordMatch(spokenTok, aheadWordObj.cleanWord, speakStrictness)) continue;
+
+          // Check if we have a 2-word anchor confirmation (rawTokens[tIdx + 1] also matches aheadWordObj + 1)
+          const aheadNextObj = currentWordIdx + wOffset + 1 < wordsList.length
+            ? wordsList[currentWordIdx + wOffset + 1]
+            : null;
+          const hasTwoWordAnchor = Boolean(
+            tIdx + 1 < rawTokens.length &&
+            aheadNextObj &&
+            aheadNextObj.verse === targetWordObj.verse &&
+            isSpokenWordMatch(rawTokens[tIdx + 1], aheadNextObj.cleanWord, speakStrictness)
+          );
+
+          if (hasTwoWordAnchor) {
+            matchedOffset = wOffset;
+            break;
+          }
+
+          if (wOffset === 1) {
+            // 1-word skip: allow immediately if the skipped word was a short unstressed word (e.g. "who", "the", "to")
+            // or if the phrase is finalized or has subsequent tokens
+            if (isFinal || UNSTRESSED_SHORT_WORDS.has(targetWordObj.cleanWord) || tIdx + 1 < rawTokens.length) {
+              matchedOffset = 1;
+              break;
             }
-          }, 750);
+          } else if (isFinal && !UNSTRESSED_SHORT_WORDS.has(spokenTok)) {
+            // Multi-word jump on finalized result when spokenTok is a content word (e.g. "justice", "oppressed", "hungry")
+            matchedOffset = wOffset;
+            break;
+          }
+        }
+
+        if (matchedOffset > 0) {
+          for (let k = 0; k < matchedOffset; k++) {
+            if (isCompleted || currentWordIdx >= wordsList.length) break;
+            const skippedObj = wordsList[currentWordIdx];
+            if (speakStrictness === 'lenient' && UNSTRESSED_SHORT_WORDS.has(skippedObj.cleanWord)) {
+              // Forgive mic-clipped short unstressed word in Lenient mode
+              advanceSpokenWordNonBlocking(
+                { matched: true, exact: false, similarity: 0.9, pronunciationScore: 94, enunciationScore: 88 },
+                skippedObj.cleanWord
+              );
+            } else {
+              advanceSpokenWordNonBlocking(
+                { matched: false, exact: false, similarity: 0, pronunciationScore: 0, enunciationScore: 40 },
+                '(skipped)'
+              );
+            }
+          }
+          // Do not increment tIdx yet: the next loop iteration will match spokenTok against the newly aligned currentWordIdx!
+          continue;
+        }
+
+        // 6. Unconfirmed Mismatch:
+        // During live interim results (!isFinal), NEVER advance currentWordIdx on an unconfirmed mismatch!
+        // Waiting for more words or isFinal completely prevents cascading index drift.
+        if (!isFinal) {
           break;
         }
 
-        // Either isFinal is true OR the user has already spoken subsequent word(s) after spokenTok!
-        // Check 1-word lookahead within the same verse: did the user skip targetWordObj and say the next word?
-        const nextWordObj = currentWordIdx + 1 < wordsList.length ? wordsList[currentWordIdx + 1] : null;
-        if (
-          nextWordObj &&
-          nextWordObj.verse === targetWordObj.verse &&
-          isSpokenWordMatch(spokenTok, nextWordObj.cleanWord)
-        ) {
-          // Mark targetWordObj as missed/skipped without consuming spokenTok yet, then match nextWordObj on next loop iteration!
-          advanceSpokenWordNonBlocking(
-            { matched: false, exact: false, similarity: 0, pronunciationScore: 0, enunciationScore: 35 },
-            '(skipped)'
-          );
+        // In a finalized result (isFinal === true):
+        // Check if any later token in rawTokens matches the current window (currentWordIdx .. currentWordIdx + 2).
+        // If so, discard this unrecognized spokenTok as noise without advancing currentWordIdx!
+        let laterTokenMatchesWindow = false;
+        for (let futureT = tIdx + 1; futureT < rawTokens.length; futureT++) {
+          for (let wOff = 0; wOff <= Math.min(2, wordsList.length - 1 - currentWordIdx); wOff++) {
+            const candidateW = wordsList[currentWordIdx + wOff];
+            if (
+              candidateW &&
+              candidateW.verse === targetWordObj.verse &&
+              isSpokenWordMatch(rawTokens[futureT], candidateW.cleanWord, speakStrictness)
+            ) {
+              laterTokenMatchesWindow = true;
+              break;
+            }
+          }
+          if (laterTokenMatchesWindow) break;
+        }
+
+        if (laterTokenMatchesWindow) {
+          tIdx++;
+          speechProcessedMap.set(rIdx, tIdx);
           continue;
         }
 
-        // Otherwise, targetWordObj was mispronounced as spokenTok. Record error and advance cursor non-blockingly!
+        // Otherwise, no future token in this finalized phrase matched the window: advance non-blockingly
         tIdx++;
         speechProcessedMap.set(rIdx, tIdx);
         advanceSpokenWordNonBlocking(evalCurr, spokenTok);
@@ -3969,7 +4248,7 @@ export function renderTypingScreen(container, params = {}) {
       const rec = new SpeechRec();
       rec.continuous = true;
       rec.interimResults = true;
-      rec.maxAlternatives = 1;
+      rec.maxAlternatives = 4;
       rec.lang = 'en-US';
       speechProcessedMap.clear();
 

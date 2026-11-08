@@ -1,4 +1,4 @@
-import { Navbar } from './components/navbar.js?v=20261108_v15';
+import { Navbar } from './components/navbar.js?v=20261108_v16';
 import {
   Auth,
   syncLocalToCloud,
@@ -9,19 +9,19 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261108_v15';
-import { initGA, trackPageView } from './analytics.js?v=20261108_v15';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261108_v15';
-import { navigate, parseActiveRoute } from './router.js?v=20261108_v15';
-export { navigate, parseActiveRoute } from './router.js?v=20261108_v15';
+} from './api.js?v=20261108_v16';
+import { initGA, trackPageView } from './analytics.js?v=20261108_v16';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261108_v16';
+import { navigate, parseActiveRoute } from './router.js?v=20261108_v16';
+export { navigate, parseActiveRoute } from './router.js?v=20261108_v16';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261108_v15';
-import { renderLandingScreen } from './screens/home.js?v=20261108_v15';
-import { renderTypingScreen } from './screens/typing.js?v=20261108_v15';
-import { renderProgressScreen } from './screens/progress.js?v=20261108_v15';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261108_v15';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261108_v15';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261108_v15';
+import { renderSignInScreen } from './screens/signin.js?v=20261108_v16';
+import { renderLandingScreen } from './screens/home.js?v=20261108_v16';
+import { renderTypingScreen } from './screens/typing.js?v=20261108_v16';
+import { renderProgressScreen } from './screens/progress.js?v=20261108_v16';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261108_v16';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261108_v16';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261108_v16';
 
 class App {
   constructor() {
