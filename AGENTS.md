@@ -25,7 +25,8 @@ Applies to paths matching:
      - `Open Whole Ch.`
    - **Share button**:
      - Invokes native iOS / mobile `navigator.share` tray.
-     - Generates and attaches a clean, uncurved card image (pure flat poster with background artwork, chapter & verse title, quote, and branding without rounded outer card edges).
+     - Generates and attaches a clean card image matching the actual VOTD card aesthetic (full-bleed background artwork, reference header, translation, and quote typography with no white plaque or site branding footer).
+     - Shares the image file together with the link to the verse/domain.
      - Falls back gracefully to sharing verse text/link or clipboard copy.
 5. **Procedural Background Image**:
    - Each verse renders an elegant, soft procedural background SVG artwork behind the card text on mobile (`generateArtBackgroundSvg(templateIdx)` in `meditate-art.js`), keyed deterministically to the verse reference.

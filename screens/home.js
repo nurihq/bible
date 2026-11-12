@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261112_v4';
+} from '../api.js?v=20261112_v5';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v4';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v4';
-import { trackEvent } from '../analytics.js?v=20261112_v4';
-import { navigate } from '../router.js?v=20261112_v4';
+} from '../bible-data.js?v=20261112_v5';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v5';
+import { trackEvent } from '../analytics.js?v=20261112_v5';
+import { navigate } from '../router.js?v=20261112_v5';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -1274,17 +1274,18 @@ export function renderLandingScreen(container) {
             canvas.width = W;
             canvas.height = H;
 
-            // 1. Draw Clean Flat Background
+            // 1. Draw Clean Flat Base Background
             ctx.fillStyle = '#f8fafc';
             ctx.fillRect(0, 0, W, H);
 
-            // 2. Render SVG background artwork to canvas
+            // 2. Render SVG background artwork to canvas full-bleed across entire card
             const blobSvg = new Blob([bgSvg], { type: 'image/svg+xml;charset=utf-8' });
             const svgUrl = URL.createObjectURL(blobSvg);
             const img = new Image();
             await new Promise((resolve) => {
               img.onload = () => {
-                ctx.globalAlpha = 0.55;
+                // Same subtle opacity as the mobile VOTD card art layer
+                ctx.globalAlpha = 0.28;
                 ctx.drawImage(img, 0, 0, W, H);
                 ctx.globalAlpha = 1.0;
                 URL.revokeObjectURL(svgUrl);
@@ -1297,29 +1298,32 @@ export function renderLandingScreen(container) {
               img.src = svgUrl;
             });
 
-            // 3. Draw Clean Center Plaque with soft shadow (no rounded card outer edges)
-            const pad = 80;
-            const boxW = W - pad * 2;
-            const boxH = H - pad * 2;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-            ctx.fillRect(pad, pad, boxW, boxH);
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(pad, pad, boxW, boxH);
+            // 3. Header: Reference and Translation (Clean, modern matching the card header)
+            const padX = 110;
+            const topY = 130;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
 
-            // 4. Header: Reference & Translation
-            ctx.fillStyle = '#1e293b';
-            ctx.font = 'bold 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            const refTitle = `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}  ·  ${activeTranslation}`;
-            ctx.fillText(refTitle, W / 2, pad + 60);
-
-            // 5. Verse Quote Text (Word Wrapped)
-            ctx.font = 'italic 38px Georgia, serif';
+            // Reference title (e.g. John 3:16)
             ctx.fillStyle = '#0f172a';
-            const maxTextWidth = boxW - 120;
-            const lineHeight = 58;
+            ctx.font = '700 48px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            const refTitle = `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`;
+            ctx.fillText(refTitle, padX, topY);
+
+            // Translation badge / subtitle (e.g. ESV)
+            const refMetrics = ctx.measureText(refTitle);
+            ctx.fillStyle = '#64748b';
+            ctx.font = '600 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(activeTranslation, padX + refMetrics.width + 24, topY);
+
+            // 4. Verse Quote Text (Word Wrapped with beautiful typography matching the card)
+            ctx.fillStyle = '#0f172a';
+            ctx.font = '400 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+
+            const maxTextWidth = W - padX * 2;
+            const lineHeight = 68;
             const words = (currentVerse.text || '').split(' ');
             const lines = [];
             let currentLine = '“';
@@ -1334,21 +1338,16 @@ export function renderLandingScreen(container) {
             }
             lines.push(currentLine + '”');
 
-            const totalTextHeight = lines.length * lineHeight;
-            let startY = (H / 2) - (totalTextHeight / 2) + 20;
+            // Vertically center the quote within the remaining card height
+            const quoteStartY = topY + 70;
             for (let l = 0; l < lines.length; l++) {
-              ctx.fillText(lines[l], W / 2, startY + l * lineHeight);
+              ctx.fillText(lines[l], padX, quoteStartY + l * lineHeight);
             }
-
-            // 6. Footer: App branding and domain
-            ctx.font = '600 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.fillStyle = '#64748b';
-            ctx.fillText('Promises to Creation  ·  promisestocreation.org', W / 2, pad + boxH - 65);
 
             // Convert canvas to File blob
             const imageBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
             if (imageBlob) {
-              imageFile = new File([imageBlob], `promises-${currentVerse.bookName}-${currentVerse.chapter}-${currentVerse.verse}.png`, { type: 'image/png' });
+              imageFile = new File([imageBlob], `${currentVerse.bookName}-${currentVerse.chapter}-${currentVerse.verse}.png`, { type: 'image/png' });
             }
           }
         } catch (err) {
@@ -1359,9 +1358,9 @@ export function renderLandingScreen(container) {
         if (navigator.share) {
           try {
             if (imageFile && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+              // Share image file along with clean domain/verse URL
               await navigator.share({
                 title: shareTitle,
-                text: shareText,
                 url: shareUrl,
                 files: [imageFile]
               });
