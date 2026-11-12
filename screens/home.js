@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261112_v3';
+} from '../api.js?v=20261112_v4';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v3';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v3';
-import { trackEvent } from '../analytics.js?v=20261112_v3';
-import { navigate } from '../router.js?v=20261112_v3';
+} from '../bible-data.js?v=20261112_v4';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v4';
+import { trackEvent } from '../analytics.js?v=20261112_v4';
+import { navigate } from '../router.js?v=20261112_v4';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -809,7 +809,12 @@ export function renderLandingScreen(container) {
                 </div>
                 <button type="button" class="votd-action-hint" id="votd-open-verse-btn" title="Open verse in ${activeMode} mode" aria-label="Open verse">
                   <span class="votd-open-text">Open verse →</span>
-                  <span class="votd-open-arrow">→</span>
+                  <span class="votd-open-arrow">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                      <polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                  </span>
                 </button>
               </div>
 

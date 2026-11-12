@@ -13,7 +13,7 @@ Applies to paths matching:
 2. **Tag Removal**:
    - The theme tag (e.g. `"Hope & Future"`, `votd-tag`) must NOT appear on mobile.
 3. **Open Verse Action**:
-   - On mobile, replace the text `"Open verse →"` with just the circle arrow button (`→`).
+   - On mobile, replace the text `"Open verse →"` with just the arrow outline icon (`→`), with no circular background or button border.
 4. **Four Bottom Actions on Mobile**:
    - **Order**: `Favourite`, `Bookmark`, `Share`, `Ellipses (⋯)`.
    - **Even Spacing & Centered Width**: Actions are centered and evenly spaced across ~80% of the card width (no left/right splitting).
