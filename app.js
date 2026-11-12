@@ -1,5 +1,5 @@
-import { Navbar } from './components/navbar.js?v=20261108_v26';
-import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261108_v26';
+import { Navbar } from './components/navbar.js?v=20261112_v1';
+import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261112_v1';
 import {
   Auth,
   syncLocalToCloud,
@@ -10,19 +10,19 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261108_v26';
-import { initGA, trackPageView } from './analytics.js?v=20261108_v26';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261108_v26';
-import { navigate, parseActiveRoute } from './router.js?v=20261108_v26';
-export { navigate, parseActiveRoute } from './router.js?v=20261108_v26';
+} from './api.js?v=20261112_v1';
+import { initGA, trackPageView } from './analytics.js?v=20261112_v1';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261112_v1';
+import { navigate, parseActiveRoute } from './router.js?v=20261112_v1';
+export { navigate, parseActiveRoute } from './router.js?v=20261112_v1';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261108_v26';
-import { renderLandingScreen } from './screens/home.js?v=20261108_v26';
-import { renderTypingScreen } from './screens/typing.js?v=20261108_v26';
-import { renderProgressScreen } from './screens/progress.js?v=20261108_v26';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261108_v26';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261108_v26';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261108_v26';
+import { renderSignInScreen } from './screens/signin.js?v=20261112_v1';
+import { renderLandingScreen } from './screens/home.js?v=20261112_v1';
+import { renderTypingScreen } from './screens/typing.js?v=20261112_v1';
+import { renderProgressScreen } from './screens/progress.js?v=20261112_v1';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261112_v1';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261112_v1';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261112_v1';
 
 class App {
   constructor() {
