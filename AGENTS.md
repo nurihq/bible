@@ -15,11 +15,14 @@ Applies to paths matching:
 3. **Open Verse Action**:
    - On mobile, replace the text `"Open verse →"` with just the circle arrow button (`→`).
 4. **Four Bottom Actions on Mobile**:
-   - **Three Horizontal Dots (`⋯`)** on the bottom-left: Opens a popup menu containing:
+   - **Order**: `Favourite`, `Bookmark`, `Share`, `Ellipses (⋯)`.
+   - **Even Spacing & Centered Width**: Actions are centered and evenly spaced across ~80% of the card width (no left/right splitting).
+   - **No Dividing Line**: No border line or divider between the verse text and the bottom actions row.
+   - **No Button Background/Box (Icon Outline Only)**: Actions must have no button container, background, or box border — only clean SVG icon outlines.
+   - **Heart Outline Only**: The favourite heart icon must never be solid/filled — it must remain an outline (`fill="none"`), brightening/coloring the stroke when favorited.
+   - **Ellipses (`⋯`)**: Opens a popup menu containing:
      - `Mark Verse Read`
      - `Open Whole Ch.`
-   - **Favourite (`❤️` / `🤍`)**: Toggles verse in favorites (`toggleVerseFavorite`).
-   - **Bookmark ribbon icon**: Opens the bookmark modal to search or create/update a bookmark for today's verse (`toggleVerseBookmark` / `createBookmark`).
    - **Share button**:
      - Invokes native iOS / mobile `navigator.share` tray.
      - Generates and attaches a clean, uncurved card image (pure flat poster with background artwork, chapter & verse title, quote, and branding without rounded outer card edges).

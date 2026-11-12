@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261112_v2';
+} from '../api.js?v=20261112_v3';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v2';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v2';
-import { trackEvent } from '../analytics.js?v=20261112_v2';
-import { navigate } from '../router.js?v=20261112_v2';
+} from '../bible-data.js?v=20261112_v3';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v3';
+import { trackEvent } from '../analytics.js?v=20261112_v3';
+import { navigate } from '../router.js?v=20261112_v3';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -839,20 +839,66 @@ export function renderLandingScreen(container) {
                 </a>
               </div>
 
-              <!-- Mobile Bottom Actions (Cute 4-Action Bar: Favourite, Bookmark, Share, 3-Dots) -->
-              <div class="votd-mobile-actions mobile-only-votd" data-stop-card-nav="true">
-                <div class="votd-mobile-actions-left">
+              <!-- Mobile Bottom Actions (Cute 4-Action Bar: Fav, Bookmark, Share, 3-Dots) -->
+              <div class="votd-mobile-actions-wrapper mobile-only-votd" data-stop-card-nav="true">
+                <div class="votd-mobile-actions">
+                  <!-- 1. Favourite (Heart Outline) -->
+                  <button
+                    type="button"
+                    class="votd-mobile-action-btn votd-fav-btn ${isFav ? 'is-favorited' : ''}"
+                    id="votd-mobile-fav-btn"
+                    title="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
+                    aria-label="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
+                  >
+                    <svg class="votd-heart-icon" width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                  </button>
+
+                  <!-- 2. Bookmark (Ribbon Outline) -->
+                  <button
+                    type="button"
+                    class="votd-mobile-action-btn votd-bookmark-btn ${isBookmarked ? 'is-bookmarked' : ''}"
+                    id="votd-mobile-bookmark-btn"
+                    title="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
+                    aria-label="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
+                  >
+                    <svg class="votd-bookmark-icon" width="21" height="21" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </button>
+
+                  <!-- 3. Share (Tray Outline) -->
+                  <button
+                    type="button"
+                    class="votd-mobile-action-btn votd-share-btn"
+                    id="votd-mobile-share-btn"
+                    title="Share verse card"
+                    aria-label="Share verse card"
+                  >
+                    <svg class="votd-share-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                      <polyline points="16 6 12 2 8 6"/>
+                      <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
+
+                  <!-- 4. Ellipses (Three Horizontal Dots) -->
                   <div class="votd-dots-wrapper">
                     <button
                       type="button"
-                      class="btn btn-secondary btn-sm votd-mobile-action-btn votd-dots-btn"
+                      class="votd-mobile-action-btn votd-dots-btn"
                       id="votd-mobile-dots-btn"
                       aria-label="More actions"
                       title="More actions"
                       aria-haspopup="true"
                       aria-expanded="false"
                     >
-                      <span class="votd-dots-icon">⋯</span>
+                      <svg class="votd-dots-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="1.25" fill="currentColor"/>
+                        <circle cx="19" cy="12" r="1.25" fill="currentColor"/>
+                        <circle cx="5" cy="12" r="1.25" fill="currentColor"/>
+                      </svg>
                     </button>
                     <!-- Three Horizontal Dots Dropdown Popover -->
                     <div class="votd-dots-menu" id="votd-dots-menu" hidden>
@@ -874,42 +920,6 @@ export function renderLandingScreen(container) {
                       </a>
                     </div>
                   </div>
-                </div>
-
-                <div class="votd-mobile-actions-right">
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm votd-mobile-action-btn votd-fav-btn ${isFav ? 'is-favorited' : ''}"
-                    id="votd-mobile-fav-btn"
-                    title="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
-                    aria-label="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
-                  >
-                    <span>${isFav ? '❤️' : '🤍'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm votd-mobile-action-btn votd-bookmark-btn ${isBookmarked ? 'is-bookmarked' : ''}"
-                    id="votd-mobile-bookmark-btn"
-                    title="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
-                    aria-label="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm votd-mobile-action-btn votd-share-btn"
-                    id="votd-mobile-share-btn"
-                    title="Share verse card"
-                    aria-label="Share verse card"
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                      <polyline points="16 6 12 2 8 6"/>
-                      <line x1="12" y1="2" x2="12" y2="15"/>
-                    </svg>
-                  </button>
                 </div>
               </div>
             </div>
@@ -1079,7 +1089,6 @@ export function renderLandingScreen(container) {
           translation: activeTranslation
         });
         mobileFavBtn.classList.toggle('is-favorited', nowFav);
-        mobileFavBtn.innerHTML = `<span>${nowFav ? '❤️' : '🤍'}</span>`;
         mobileFavBtn.title = nowFav ? 'Remove from favorites' : 'Save to favorites';
         mobileFavBtn.setAttribute('aria-label', mobileFavBtn.title);
         trackEvent('toggle_verse_favorite', {
@@ -1144,8 +1153,6 @@ export function renderLandingScreen(container) {
           }
           if (mobileBookmarkBtn) {
             mobileBookmarkBtn.classList.add('is-bookmarked');
-            const svgEl = mobileBookmarkBtn.querySelector('svg');
-            if (svgEl) svgEl.setAttribute('fill', 'currentColor');
           }
           renderRecentBookmarks(bookmarkSearchInput ? bookmarkSearchInput.value : '');
         });
@@ -1196,8 +1203,6 @@ export function renderLandingScreen(container) {
       }
       if (mobileBookmarkBtn) {
         mobileBookmarkBtn.classList.add('is-bookmarked');
-        const svgEl = mobileBookmarkBtn.querySelector('svg');
-        if (svgEl) svgEl.setAttribute('fill', 'currentColor');
       }
       renderRecentBookmarks(bookmarkSearchInput.value);
     }
@@ -1370,12 +1375,15 @@ export function renderLandingScreen(container) {
           // Desktop or non-supporting browser fallback: copy link to clipboard
           try {
             await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-            const btnSpan = mobileShareBtn.querySelector('svg');
-            mobileShareBtn.innerHTML = `<span>✓</span>`;
+            mobileShareBtn.innerHTML = `
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            `;
             setTimeout(() => {
               if (mobileShareBtn) {
                 mobileShareBtn.innerHTML = `
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg class="votd-share-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
                     <polyline points="16 6 12 2 8 6"/>
                     <line x1="12" y1="2" x2="12" y2="15"/>
