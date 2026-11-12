@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261112_v1';
+} from '../bible-data.js?v=20261112_v2';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261112_v1';
+} from '../api.js?v=20261112_v2';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261112_v1';
-import { trackEvent } from '../analytics.js?v=20261112_v1';
-import { navigate } from '../router.js?v=20261112_v1';
+} from '../meditate-art.js?v=20261112_v2';
+import { trackEvent } from '../analytics.js?v=20261112_v2';
+import { navigate } from '../router.js?v=20261112_v2';
 
 function escapeHtml(str) {
   return String(str)

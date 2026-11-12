@@ -8,8 +8,15 @@ import {
   isVerseCovered,
   markVerseAsRead,
   toggleChapterRead,
-  toggleVerseRead
-} from '../api.js?v=20261112_v1';
+  toggleVerseRead,
+  isVerseFavorited,
+  toggleVerseFavorite,
+  isVerseBookmarked,
+  getAllBookmarks,
+  createBookmark,
+  updateBookmarkLocation,
+  findBookmarkByName
+} from '../api.js?v=20261112_v2';
 import {
   getBookById,
   getNextChapterRef,
@@ -20,9 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v1';
-import { trackEvent } from '../analytics.js?v=20261112_v1';
-import { navigate } from '../router.js?v=20261112_v1';
+} from '../bible-data.js?v=20261112_v2';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v2';
+import { trackEvent } from '../analytics.js?v=20261112_v2';
+import { navigate } from '../router.js?v=20261112_v2';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -761,6 +769,12 @@ export function renderLandingScreen(container) {
   function renderCard() {
     const isCompleted = isVerseCompletedForUser(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
     const activeMode = getActiveModePref() || 'type';
+    const isFav = isVerseFavorited(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
+    const isBookmarked = isVerseBookmarked(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
+
+    // Deterministic template index for background artwork based on verse reference
+    const templateIdx = ((Number(currentVerse.bookId) * 31 + Number(currentVerse.chapter) * 7 + Number(currentVerse.verse)) % 1000 + 1000) % 1000;
+    const bgSvg = generateArtBackgroundSvg(templateIdx);
 
     container.innerHTML = `
       <div class="hero-wrapper">
@@ -784,41 +798,170 @@ export function renderLandingScreen(container) {
         <!-- Daily Random Verse Card with Direct Read & Type Controls -->
         <div class="votd-card-wrapper">
           <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to open ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
-            <div class="votd-top-row">
-              <div class="votd-ref-header">
-                <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
-                <span class="votd-ref-sub">${escapeHtml(activeTranslation)}</span>
-                ${currentVerse.theme ? `<span class="votd-tag">${escapeHtml(currentVerse.theme)}</span>` : ''}
+            <!-- Background Artwork (Mobile-Only Art Layer) -->
+            <div class="votd-bg-art" aria-hidden="true">${bgSvg}</div>
+            <div class="votd-card-content">
+              <div class="votd-top-row">
+                <div class="votd-ref-header">
+                  <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
+                  <span class="votd-ref-sub">${escapeHtml(activeTranslation)}</span>
+                  ${currentVerse.theme ? `<span class="votd-tag">${escapeHtml(currentVerse.theme)}</span>` : ''}
+                </div>
+                <button type="button" class="votd-action-hint" id="votd-open-verse-btn" title="Open verse in ${activeMode} mode" aria-label="Open verse">
+                  <span class="votd-open-text">Open verse →</span>
+                  <span class="votd-open-arrow">→</span>
+                </button>
               </div>
-              <span class="votd-action-hint">Open verse →</span>
-            </div>
 
-            <div class="votd-quote">
-              “${escapeHtml(currentVerse.text || 'Loading verse text...')}”
-            </div>
+              <div class="votd-quote">
+                “${escapeHtml(currentVerse.text || 'Loading verse text...')}”
+              </div>
 
-            <div class="votd-bottom-row">
-              <button
-                type="button"
-                class="btn ${isCompleted ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
-                id="votd-mark-verse-btn"
-                data-stop-card-nav="true"
-                title="Mark verse ${currentVerse.verse} as read and load a new daily verse"
-              >
-                ${isCompleted ? '✓ Marked Read' : '📖 Mark Verse Read'}
-              </button>
-              <a
-                href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
-                class="btn btn-secondary btn-sm"
-                id="votd-type-chapter-btn"
-                data-stop-card-nav="true"
-                title="Open the full chapter"
-              >
-                📖 Open Whole Ch.
-              </a>
+              <!-- Desktop Bottom Actions (Unchanged) -->
+              <div class="votd-bottom-row desktop-only-votd">
+                <button
+                  type="button"
+                  class="btn ${isCompleted ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
+                  id="votd-mark-verse-btn"
+                  data-stop-card-nav="true"
+                  title="Mark verse ${currentVerse.verse} as read and load a new daily verse"
+                >
+                  ${isCompleted ? '✓ Marked Read' : '📖 Mark Verse Read'}
+                </button>
+                <a
+                  href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
+                  class="btn btn-secondary btn-sm"
+                  id="votd-type-chapter-btn"
+                  data-stop-card-nav="true"
+                  title="Open the full chapter"
+                >
+                  📖 Open Whole Ch.
+                </a>
+              </div>
+
+              <!-- Mobile Bottom Actions (Cute 4-Action Bar: Favourite, Bookmark, Share, 3-Dots) -->
+              <div class="votd-mobile-actions mobile-only-votd" data-stop-card-nav="true">
+                <div class="votd-mobile-actions-left">
+                  <div class="votd-dots-wrapper">
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm votd-mobile-action-btn votd-dots-btn"
+                      id="votd-mobile-dots-btn"
+                      aria-label="More actions"
+                      title="More actions"
+                      aria-haspopup="true"
+                      aria-expanded="false"
+                    >
+                      <span class="votd-dots-icon">⋯</span>
+                    </button>
+                    <!-- Three Horizontal Dots Dropdown Popover -->
+                    <div class="votd-dots-menu" id="votd-dots-menu" hidden>
+                      <button
+                        type="button"
+                        class="votd-dots-item ${isCompleted ? 'is-read' : ''}"
+                        id="votd-mobile-mark-btn"
+                      >
+                        <span class="dots-item-icon">${isCompleted ? '✓' : '📖'}</span>
+                        <span>${isCompleted ? 'Marked Read' : 'Mark Verse Read'}</span>
+                      </button>
+                      <a
+                        href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
+                        class="votd-dots-item"
+                        id="votd-mobile-chapter-btn"
+                      >
+                        <span class="dots-item-icon">📜</span>
+                        <span>Open Whole Ch.</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="votd-mobile-actions-right">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm votd-mobile-action-btn votd-fav-btn ${isFav ? 'is-favorited' : ''}"
+                    id="votd-mobile-fav-btn"
+                    title="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
+                    aria-label="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
+                  >
+                    <span>${isFav ? '❤️' : '🤍'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm votd-mobile-action-btn votd-bookmark-btn ${isBookmarked ? 'is-bookmarked' : ''}"
+                    id="votd-mobile-bookmark-btn"
+                    title="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
+                    aria-label="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm votd-mobile-action-btn votd-share-btn"
+                    id="votd-mobile-share-btn"
+                    title="Share verse card"
+                    aria-label="Share verse card"
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                      <polyline points="16 6 12 2 8 6"/>
+                      <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- Bookmark Modal Backdrop for Mobile Home Card -->
+        <div class="typing-options-backdrop votd-bookmark-backdrop" id="votd-bookmark-backdrop" hidden>
+          <div class="typing-options-card typing-bookmark-card" role="dialog" aria-modal="true" aria-labelledby="votd-bookmark-modal-title">
+            <div class="typing-options-header">
+              <div>
+                <h2 class="typing-options-title" id="votd-bookmark-modal-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                  </svg>Bookmark Verse
+                </h2>
+                <p class="bookmark-modal-subtitle" id="votd-bookmark-modal-subtitle">
+                  ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse} (${escapeHtml(activeTranslation)})
+                </p>
+              </div>
+              <button type="button" class="options-close-btn" id="votd-bookmark-close-btn" aria-label="Close bookmarks">✕</button>
+            </div>
+
+            <div class="typing-options-body">
+              <div class="bookmark-input-group">
+                <input
+                  type="text"
+                  id="votd-bookmark-search-input"
+                  class="bookmark-name-input"
+                  placeholder="Search or enter bookmark name..."
+                  autocomplete="off"
+                  maxlength="60"
+                />
+                <button type="button" class="btn btn-primary btn-sm" id="votd-bookmark-save-btn">
+                  Save
+                </button>
+              </div>
+              <div class="bookmark-feedback-msg" id="votd-bookmark-feedback-msg" hidden></div>
+
+              <div class="bookmark-recent-section">
+                <div class="bookmark-section-header">
+                  <span class="bookmark-section-title">Recent Bookmarks</span>
+                  <a href="/bookmarks" class="bookmark-view-all-link">Manage All & History ›</a>
+                </div>
+                <div class="bookmark-recent-list" id="votd-bookmark-recent-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hidden canvas for generating clean uncurved card share image -->
+        <canvas id="votd-share-canvas" width="1200" height="900" style="display:none;"></canvas>
       </div>
     `;
 
@@ -870,6 +1013,380 @@ export function renderLandingScreen(container) {
       startBtn.addEventListener('click', () => {
         trackEvent('home_start_click', { authenticated: Auth.isAuthenticated() });
         navigate('/promises');
+      });
+    }
+
+    // ── Mobile Three-Dots Popover Menu ──
+    const dotsBtn = container.querySelector('#votd-mobile-dots-btn');
+    const dotsMenu = container.querySelector('#votd-dots-menu');
+    if (dotsBtn && dotsMenu) {
+      dotsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !dotsMenu.hidden;
+        dotsMenu.hidden = isOpen;
+        dotsBtn.setAttribute('aria-expanded', String(!isOpen));
+      });
+
+      const onDocClick = (e) => {
+        if (!dotsBtn.contains(e.target) && !dotsMenu.contains(e.target)) {
+          dotsMenu.hidden = true;
+          dotsBtn.setAttribute('aria-expanded', 'false');
+        }
+      };
+      document.addEventListener('click', onDocClick);
+    }
+
+    // Mobile Mark Read in Popover
+    const mobileMarkBtn = container.querySelector('#votd-mobile-mark-btn');
+    if (mobileMarkBtn) {
+      mobileMarkBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (dotsMenu) dotsMenu.hidden = true;
+        markVerseAsRead(currentVerse.bookId, currentVerse.chapter, currentVerse.verse, activeTranslation);
+        trackEvent('votd_mark_verse_read', { verse: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`, source: 'mobile_dots' });
+
+        mobileMarkBtn.disabled = true;
+        mobileMarkBtn.innerHTML = `<span class="dots-item-icon">✓</span><span>Marked Read!</span>`;
+
+        setTimeout(async () => {
+          const fresh = await resolveDailyVerse(activeTranslation, true);
+          currentVerse = fresh;
+          renderCard();
+        }, 320);
+      });
+    }
+
+    // Mobile Open Whole Chapter in Popover
+    const mobileChBtn = container.querySelector('#votd-mobile-chapter-btn');
+    if (mobileChBtn) {
+      mobileChBtn.addEventListener('click', () => {
+        if (dotsMenu) dotsMenu.hidden = true;
+        trackEvent('votd_type_chapter_click', { bookId: currentVerse.bookId, chapter: currentVerse.chapter, source: 'mobile_dots' });
+      });
+    }
+
+    // ── Mobile Favourite Action ──
+    const mobileFavBtn = container.querySelector('#votd-mobile-fav-btn');
+    if (mobileFavBtn) {
+      mobileFavBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nowFav = toggleVerseFavorite({
+          bookId: currentVerse.bookId,
+          chapter: currentVerse.chapter,
+          verse: currentVerse.verse,
+          verseRef: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`,
+          verseText: currentVerse.text,
+          translation: activeTranslation
+        });
+        mobileFavBtn.classList.toggle('is-favorited', nowFav);
+        mobileFavBtn.innerHTML = `<span>${nowFav ? '❤️' : '🤍'}</span>`;
+        mobileFavBtn.title = nowFav ? 'Remove from favorites' : 'Save to favorites';
+        mobileFavBtn.setAttribute('aria-label', mobileFavBtn.title);
+        trackEvent('toggle_verse_favorite', {
+          bookId: currentVerse.bookId,
+          chapter: currentVerse.chapter,
+          verse: currentVerse.verse,
+          isFavorited: nowFav,
+          mode: 'home_votd'
+        });
+      });
+    }
+
+    // ── Mobile Bookmark Action & Modal ──
+    const mobileBookmarkBtn = container.querySelector('#votd-mobile-bookmark-btn');
+    const bookmarkBackdrop = container.querySelector('#votd-bookmark-backdrop');
+    const bookmarkCloseBtn = container.querySelector('#votd-bookmark-close-btn');
+    const bookmarkSearchInput = container.querySelector('#votd-bookmark-search-input');
+    const bookmarkSaveBtn = container.querySelector('#votd-bookmark-save-btn');
+    const bookmarkFeedbackMsg = container.querySelector('#votd-bookmark-feedback-msg');
+    const bookmarkRecentList = container.querySelector('#votd-bookmark-recent-list');
+
+    function renderRecentBookmarks(filterText = '') {
+      if (!bookmarkRecentList) return;
+      const all = getAllBookmarks();
+      const cleanFilter = filterText.trim().toLowerCase();
+      let items = cleanFilter ? all.filter(b => (b.name || '').toLowerCase().includes(cleanFilter)).slice(0, 5) : all.slice(0, 5);
+
+      if (items.length === 0) {
+        bookmarkRecentList.innerHTML = `
+          <div class="bookmark-empty-hint">
+            ${cleanFilter ? `No match for "<strong>${escapeHtml(filterText)}</strong>". Click Save to create it!` : 'No bookmarks yet. Enter a name above to create one!'}
+          </div>
+        `;
+        return;
+      }
+
+      bookmarkRecentList.innerHTML = items.map(bm => `
+        <div class="bookmark-recent-item" data-id="${escapeHtml(bm.id)}" style="cursor:pointer;">
+          <div class="bookmark-item-main">
+            <span class="bookmark-item-name">${escapeHtml(bm.name)}</span>
+            <span class="bookmark-item-ref">${escapeHtml(bm.verseRef || `${bm.bookId}:${bm.chapter}:${bm.verse || 1}`)}</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-xs bookmark-update-here-btn" data-update-id="${escapeHtml(bm.id)}" title="Update to this verse">Update</button>
+        </div>
+      `).join('');
+
+      bookmarkRecentList.querySelectorAll('.bookmark-update-here-btn').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const id = btn.getAttribute('data-update-id');
+          updateBookmarkLocation(id, {
+            bookId: currentVerse.bookId,
+            chapter: currentVerse.chapter,
+            verse: currentVerse.verse,
+            verseRef: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`,
+            verseText: currentVerse.text,
+            translation: activeTranslation
+          });
+          if (bookmarkFeedbackMsg) {
+            bookmarkFeedbackMsg.textContent = '✓ Updated bookmark location to today\'s verse!';
+            bookmarkFeedbackMsg.hidden = false;
+          }
+          if (mobileBookmarkBtn) {
+            mobileBookmarkBtn.classList.add('is-bookmarked');
+            const svgEl = mobileBookmarkBtn.querySelector('svg');
+            if (svgEl) svgEl.setAttribute('fill', 'currentColor');
+          }
+          renderRecentBookmarks(bookmarkSearchInput ? bookmarkSearchInput.value : '');
+        });
+      });
+    }
+
+    function showBookmarkFeedback(msg, isError = false) {
+      if (!bookmarkFeedbackMsg) return;
+      bookmarkFeedbackMsg.textContent = msg;
+      bookmarkFeedbackMsg.classList.toggle('is-error', isError);
+      bookmarkFeedbackMsg.hidden = false;
+      setTimeout(() => {
+        if (bookmarkFeedbackMsg) bookmarkFeedbackMsg.hidden = true;
+      }, 4000);
+    }
+
+    function handleSaveBookmark() {
+      if (!bookmarkSearchInput) return;
+      const name = bookmarkSearchInput.value.trim();
+      if (!name) {
+        showBookmarkFeedback('Please enter a bookmark name.', true);
+        bookmarkSearchInput.focus();
+        return;
+      }
+      const vRef = `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`;
+      const existing = findBookmarkByName(name);
+      if (existing) {
+        updateBookmarkLocation(existing.id, {
+          bookId: currentVerse.bookId,
+          chapter: currentVerse.chapter,
+          verse: currentVerse.verse,
+          verseRef: vRef,
+          verseText: currentVerse.text,
+          translation: activeTranslation
+        });
+        showBookmarkFeedback(`✓ Updated existing bookmark "${existing.name}" to ${vRef}`);
+      } else {
+        createBookmark({
+          name,
+          bookId: currentVerse.bookId,
+          chapter: currentVerse.chapter,
+          verse: currentVerse.verse,
+          verseRef: vRef,
+          verseText: currentVerse.text,
+          translation: activeTranslation
+        });
+        showBookmarkFeedback(`✓ Created new bookmark "${name}" at ${vRef}`);
+      }
+      if (mobileBookmarkBtn) {
+        mobileBookmarkBtn.classList.add('is-bookmarked');
+        const svgEl = mobileBookmarkBtn.querySelector('svg');
+        if (svgEl) svgEl.setAttribute('fill', 'currentColor');
+      }
+      renderRecentBookmarks(bookmarkSearchInput.value);
+    }
+
+    if (mobileBookmarkBtn) {
+      mobileBookmarkBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (bookmarkBackdrop) {
+          if (bookmarkSearchInput) bookmarkSearchInput.value = '';
+          if (bookmarkFeedbackMsg) bookmarkFeedbackMsg.hidden = true;
+          renderRecentBookmarks('');
+          bookmarkBackdrop.hidden = false;
+          setTimeout(() => {
+            if (bookmarkSearchInput) bookmarkSearchInput.focus();
+          }, 60);
+        }
+      });
+    }
+
+    if (bookmarkCloseBtn) {
+      bookmarkCloseBtn.addEventListener('click', () => {
+        if (bookmarkBackdrop) bookmarkBackdrop.hidden = true;
+      });
+    }
+    if (bookmarkBackdrop) {
+      bookmarkBackdrop.addEventListener('click', (e) => {
+        if (e.target === bookmarkBackdrop) bookmarkBackdrop.hidden = true;
+      });
+    }
+    if (bookmarkSaveBtn) {
+      bookmarkSaveBtn.addEventListener('click', handleSaveBookmark);
+    }
+    if (bookmarkSearchInput) {
+      bookmarkSearchInput.addEventListener('input', (e) => {
+        renderRecentBookmarks(e.target.value);
+      });
+      bookmarkSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSaveBookmark();
+        } else if (e.key === 'Escape') {
+          if (bookmarkBackdrop) bookmarkBackdrop.hidden = true;
+        }
+      });
+    }
+
+    // ── Mobile Share Action (iOS Share Tray + Clean Image Card Generation) ──
+    const mobileShareBtn = container.querySelector('#votd-mobile-share-btn');
+    if (mobileShareBtn) {
+      mobileShareBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const shareTitle = `Promises — ${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`;
+        const shareText = `“${currentVerse.text}” — ${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse} (${activeTranslation})`;
+        const shareUrl = `${window.location.origin}/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`;
+
+        // Attempt generating clean uncurved card image poster
+        let imageFile = null;
+        try {
+          const canvas = container.querySelector('#votd-share-canvas');
+          if (canvas) {
+            const ctx = canvas.getContext('2d');
+            const W = 1200;
+            const H = 900;
+            canvas.width = W;
+            canvas.height = H;
+
+            // 1. Draw Clean Flat Background
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(0, 0, W, H);
+
+            // 2. Render SVG background artwork to canvas
+            const blobSvg = new Blob([bgSvg], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(blobSvg);
+            const img = new Image();
+            await new Promise((resolve) => {
+              img.onload = () => {
+                ctx.globalAlpha = 0.55;
+                ctx.drawImage(img, 0, 0, W, H);
+                ctx.globalAlpha = 1.0;
+                URL.revokeObjectURL(svgUrl);
+                resolve();
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(svgUrl);
+                resolve();
+              };
+              img.src = svgUrl;
+            });
+
+            // 3. Draw Clean Center Plaque with soft shadow (no rounded card outer edges)
+            const pad = 80;
+            const boxW = W - pad * 2;
+            const boxH = H - pad * 2;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+            ctx.fillRect(pad, pad, boxW, boxH);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(pad, pad, boxW, boxH);
+
+            // 4. Header: Reference & Translation
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const refTitle = `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}  ·  ${activeTranslation}`;
+            ctx.fillText(refTitle, W / 2, pad + 60);
+
+            // 5. Verse Quote Text (Word Wrapped)
+            ctx.font = 'italic 38px Georgia, serif';
+            ctx.fillStyle = '#0f172a';
+            const maxTextWidth = boxW - 120;
+            const lineHeight = 58;
+            const words = (currentVerse.text || '').split(' ');
+            const lines = [];
+            let currentLine = '“';
+            for (let i = 0; i < words.length; i++) {
+              const testLine = currentLine + (currentLine === '“' ? '' : ' ') + words[i];
+              if (ctx.measureText(testLine + '”').width > maxTextWidth && currentLine !== '“') {
+                lines.push(currentLine);
+                currentLine = words[i];
+              } else {
+                currentLine = testLine;
+              }
+            }
+            lines.push(currentLine + '”');
+
+            const totalTextHeight = lines.length * lineHeight;
+            let startY = (H / 2) - (totalTextHeight / 2) + 20;
+            for (let l = 0; l < lines.length; l++) {
+              ctx.fillText(lines[l], W / 2, startY + l * lineHeight);
+            }
+
+            // 6. Footer: App branding and domain
+            ctx.font = '600 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillStyle = '#64748b';
+            ctx.fillText('Promises to Creation  ·  promisestocreation.org', W / 2, pad + boxH - 65);
+
+            // Convert canvas to File blob
+            const imageBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+            if (imageBlob) {
+              imageFile = new File([imageBlob], `promises-${currentVerse.bookName}-${currentVerse.chapter}-${currentVerse.verse}.png`, { type: 'image/png' });
+            }
+          }
+        } catch (err) {
+          // Graceful fallback to text/link share if canvas export fails
+        }
+
+        // Invoke native navigator.share (iOS Safari share tray)
+        if (navigator.share) {
+          try {
+            if (imageFile && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+              await navigator.share({
+                title: shareTitle,
+                text: shareText,
+                url: shareUrl,
+                files: [imageFile]
+              });
+            } else {
+              await navigator.share({
+                title: shareTitle,
+                text: shareText,
+                url: shareUrl
+              });
+            }
+            trackEvent('votd_share_success', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
+          } catch (shareErr) {
+            // User cancelled or share aborted
+          }
+        } else {
+          // Desktop or non-supporting browser fallback: copy link to clipboard
+          try {
+            await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+            const btnSpan = mobileShareBtn.querySelector('svg');
+            mobileShareBtn.innerHTML = `<span>✓</span>`;
+            setTimeout(() => {
+              if (mobileShareBtn) {
+                mobileShareBtn.innerHTML = `
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                    <polyline points="16 6 12 2 8 6"/>
+                    <line x1="12" y1="2" x2="12" y2="15"/>
+                  </svg>
+                `;
+              }
+            }, 2000);
+          } catch (clipErr) {
+            // Copy failed
+          }
+        }
       });
     }
   }

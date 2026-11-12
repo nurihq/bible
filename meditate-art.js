@@ -157,6 +157,59 @@ export function renderMeditateArtworkSvg(templateIndex, verseText, verseRef, tra
   `;
 }
 
+/**
+ * Returns filled SVG background artwork markup for cards and sharing posters.
+ * Uses soft, elegant tints derived from the theme and palette for a gorgeous aesthetic.
+ */
+export function generateArtBackgroundSvg(templateIndex) {
+  const tIdx = Math.abs(Number(templateIndex) || 0) % TOTAL_MEDITATE_ART_TEMPLATES;
+  const themeIdx = tIdx % 10;
+  const rng = createRng(tIdx * 17 + 31);
+
+  // Soft harmonious palette per segment number (1..10)
+  const palette = [
+    '#e0f2fe', '#bae6fd', '#7dd3fc', '#fef08a', '#fed7aa',
+    '#fbcfe8', '#e9d5ff', '#d6d3d1', '#cbd5e1', '#f1f5f9'
+  ];
+  const autoFills = new Proxy({}, {
+    get(target, prop) {
+      if (typeof prop === 'string') {
+        let hash = 0;
+        for (let i = 0; i < prop.length; i++) {
+          hash = (hash * 31 + prop.charCodeAt(i)) & 0xffffffff;
+        }
+        return palette[Math.abs(hash) % palette.length];
+      }
+      return '#f1f5f9';
+    }
+  });
+
+  let segmentsSvg = '';
+  switch (themeIdx) {
+    case 0: segmentsSvg = generateStainedGlassTemplate(tIdx, rng, autoFills); break;
+    case 1: segmentsSvg = generateMandalaTemplate(tIdx, rng, autoFills); break;
+    case 2: segmentsSvg = generateMountainSunriseTemplate(tIdx, rng, autoFills); break;
+    case 3: segmentsSvg = generateLighthouseOceanTemplate(tIdx, rng, autoFills); break;
+    case 4: segmentsSvg = generateCelestialHeavensTemplate(tIdx, rng, autoFills); break;
+    case 5: segmentsSvg = generateCelticCrossTemplate(tIdx, rng, autoFills); break;
+    case 6: segmentsSvg = generateEdenFloralTemplate(tIdx, rng, autoFills); break;
+    case 7: segmentsSvg = generateDoveOfPeaceTemplate(tIdx, rng, autoFills); break;
+    case 8: segmentsSvg = generateDesertDunesTemplate(tIdx, rng, autoFills); break;
+    case 9:
+    default:
+      segmentsSvg = generateRiverOfLifeTemplate(tIdx, rng, autoFills); break;
+  }
+
+  return `
+    <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block;">
+      <rect x="0" y="0" width="1000" height="700" fill="#f8fafc" />
+      <g opacity="0.92">
+        ${segmentsSvg}
+      </g>
+    </svg>
+  `;
+}
+
 // ── Theme 0: Stained Glass Cathedral Windows & Gothic Tracery ───
 function generateStainedGlassTemplate(tIdx, rng, savedFills) {
   const parts = [];
