@@ -3094,6 +3094,57 @@ sup.verse-num.is-both {
     justify-content: center;
     width: 18px;
   }
+  /* Mobile Swipe Gesture Animation & Touch Affordance */
+  .votd-card {
+    touch-action: pan-y pinch-zoom;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .votd-card-content {
+    transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.22s ease;
+  }
+
+  .votd-card-content.swipe-exit-left {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+
+  .votd-card-content.swipe-exit-right {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+
+  .votd-card-content.swipe-enter-left {
+    animation: votd-slide-in-left 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .votd-card-content.swipe-enter-right {
+    animation: votd-slide-in-right 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes votd-slide-in-left {
+    0% {
+      transform: translateX(40px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes votd-slide-in-right {
+    0% {
+      transform: translateX(-40px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

@@ -30,3 +30,12 @@ Applies to paths matching:
      - Falls back gracefully to sharing verse text/link or clipboard copy.
 5. **Procedural Background Image**:
    - Each verse renders an elegant, soft procedural background SVG artwork behind the card text on mobile (`generateArtBackgroundSvg(templateIdx)` in `meditate-art.js`), keyed deterministically to the verse reference.
+6. **Pure Random Verses (No Curated Pool)**:
+   - Daily and home verses must strictly be chosen purely at random across the entire Bible canon (all 66 books and 31,102 verses) via `getRandomVerseRef()` in `bible-data.js`.
+   - Never reintroduce curated verse pools, hardcoded highlight lists, or artificial theme filters for the verse of the day.
+7. **Mobile-Only Swipe Gesture Navigation**:
+   - On mobile screens (`@media (max-width: 720px)` and touch screens), the verse card supports horizontal swipe gestures:
+     - **Swipe Left**: Navigates forward to a fresh random verse across the Bible and adds it to the session history stack.
+     - **Swipe Right**: Navigates back to the previous verse in the session history stack (if any).
+     - Swipes include smooth horizontal slide/fade animations (`.swipe-exit-left`, `.swipe-enter-left`, etc.) and preserve regular page vertical scrolling and button clicks without gesture conflict.
+
