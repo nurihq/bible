@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261112_v8';
+} from '../api.js?v=20261112_v9';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v8';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v8';
-import { trackEvent } from '../analytics.js?v=20261112_v8';
-import { navigate } from '../router.js?v=20261112_v8';
+} from '../bible-data.js?v=20261112_v9';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v9';
+import { trackEvent } from '../analytics.js?v=20261112_v9';
+import { navigate } from '../router.js?v=20261112_v9';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -43,7 +43,8 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-const HOME_DAILY_VERSE_KEY = 'bible_home_daily_verse_v4';
+const HOME_DAILY_VERSE_KEY = 'bible_home_daily_verse_v5';
+const HOME_DAILY_HISTORY_KEY = 'bible_home_daily_history_v1';
 
 function getDayNumber(date = new Date()) {
   return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86400000);
@@ -72,6 +73,31 @@ function getStoredDailyVerse() {
 function saveStoredDailyVerse(verseObj) {
   try {
     localStorage.setItem(HOME_DAILY_VERSE_KEY, JSON.stringify(verseObj));
+  } catch {}
+}
+
+function getStoredDailyHistory() {
+  try {
+    const raw = localStorage.getItem(HOME_DAILY_HISTORY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const todayKey = getTodayDateKey();
+      if (parsed && parsed.dateKey === todayKey && Array.isArray(parsed.history) && parsed.history.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function saveStoredDailyHistory(history, currentIndex = 0) {
+  try {
+    const payload = {
+      dateKey: getTodayDateKey(),
+      currentIndex: Math.max(0, Math.min(currentIndex, history.length - 1)),
+      history: history.slice(0, 50) // keep reasonable bound
+    };
+    localStorage.setItem(HOME_DAILY_HISTORY_KEY, JSON.stringify(payload));
   } catch {}
 }
 
@@ -199,13 +225,30 @@ export async function populateVerseText(verseObj, activeTranslation = 'ESV') {
 export function renderLandingScreen(container) {
   const activeTranslation = getPreferredTranslation() || 'ESV';
 
-  // Synchronously resolve initial random daily verse and initialize history stack
+  // Synchronously resolve initial random daily verse and restore today's history stack if present
   let initialVerse = getSyncDailyVerse(activeTranslation);
-  const verseHistory = [initialVerse];
-  let historyIndex = 0;
-  let isTransitioning = false;
+  const storedHistoryData = getStoredDailyHistory();
 
+  let verseHistory = [initialVerse];
+  let historyIndex = 0;
+
+  if (storedHistoryData && storedHistoryData.history.length > 0) {
+    verseHistory = storedHistoryData.history;
+    historyIndex = Math.min(storedHistoryData.currentIndex || 0, verseHistory.length - 1);
+  } else {
+    saveStoredDailyHistory(verseHistory, historyIndex);
+  }
+
+  let isTransitioning = false;
   const getActiveVerse = () => verseHistory[historyIndex];
+
+  function persistCurrentState() {
+    const cur = verseHistory[historyIndex];
+    if (cur) {
+      saveStoredDailyVerse(cur);
+      saveStoredDailyHistory(verseHistory, historyIndex);
+    }
+  }
 
   // Ensure a queue of upcoming random verses is always preloaded and ready instantly
   function ensurePreloadedVerses() {
@@ -225,18 +268,31 @@ export function renderLandingScreen(container) {
             quoteEl.textContent = `“${newVerse.text}”`;
           }
         }
+        persistCurrentState();
       });
     }
   }
   ensurePreloadedVerses();
 
-  // Background check to verify translation text & prefetch
-  resolveDailyVerse(activeTranslation).then(verified => {
-    if (verified && (verified.text !== initialVerse.text || verified.verse !== initialVerse.verse || verified.bookId !== initialVerse.bookId)) {
-      verseHistory[0] = verified;
-      if (historyIndex === 0) {
-        renderCard();
+  // Background check to verify translation text & prefetch for current verse
+  const curAtInit = getActiveVerse();
+  if (curAtInit && !curAtInit.text) {
+    populateVerseText(curAtInit, activeTranslation).then(() => {
+      if (getActiveVerse() === curAtInit) {
+        const quoteEl = container.querySelector('.votd-quote');
+        if (quoteEl && curAtInit.text) {
+          quoteEl.textContent = `“${curAtInit.text}”`;
+        }
       }
+      persistCurrentState();
+    });
+  }
+
+  resolveDailyVerse(activeTranslation).then(verified => {
+    if (verified && historyIndex === 0 && (!verseHistory[0] || verseHistory[0].verse !== verified.verse || verseHistory[0].bookId !== verified.bookId)) {
+      verseHistory[0] = verified;
+      renderCard();
+      persistCurrentState();
     }
     ensurePreloadedVerses();
   }).catch(() => {});
@@ -255,6 +311,7 @@ export function renderLandingScreen(container) {
       const delay = animated ? 90 : 0;
       setTimeout(() => {
         historyIndex--;
+        persistCurrentState();
         const cur = verseHistory[historyIndex];
         renderCard('swipe-incoming-right');
         isTransitioning = false;
@@ -265,6 +322,7 @@ export function renderLandingScreen(container) {
               if (quoteEl && cur.text) {
                 quoteEl.textContent = `“${cur.text}”`;
               }
+              persistCurrentState();
             }
           });
         }
@@ -288,6 +346,7 @@ export function renderLandingScreen(container) {
           verseHistory.push(newRandom);
         }
 
+        persistCurrentState();
         const cur = verseHistory[historyIndex];
         renderCard('swipe-incoming-left');
         isTransitioning = false;
@@ -300,6 +359,7 @@ export function renderLandingScreen(container) {
               if (quoteEl && cur.text) {
                 quoteEl.textContent = `“${cur.text}”`;
               }
+              persistCurrentState();
             }
           });
         }
@@ -682,7 +742,8 @@ export function renderLandingScreen(container) {
           await populateVerseText(fresh, activeTranslation);
           verseHistory.push(fresh);
           historyIndex = verseHistory.length - 1;
-          renderCard('swipe-enter-left');
+          persistCurrentState();
+          renderCard('swipe-incoming-left');
         }, 320);
       });
     }
@@ -739,7 +800,8 @@ export function renderLandingScreen(container) {
           await populateVerseText(fresh, activeTranslation);
           verseHistory.push(fresh);
           historyIndex = verseHistory.length - 1;
-          renderCard('swipe-enter-left');
+          persistCurrentState();
+          renderCard('swipe-incoming-left');
         }, 320);
       });
     }

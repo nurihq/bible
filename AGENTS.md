@@ -39,6 +39,8 @@ Applies to paths matching:
      - **Swipe Left**: Flinging or dragging past the threshold dismisses the card offscreen to the left and smoothly slides in a fresh random Bible verse from the right.
      - **Swipe Right**: Flinging or dragging right dismisses the card offscreen to the right and smoothly slides back to the previous verse in the history stack.
      - **Snap-Back Physics**: Releasing below the threshold smoothly springs the card back into its centered home position with cubic-bezier easing.
+     - **Daily Index & History Persistence**: Whenever the user swipes away to a new verse, that new verse becomes the active daily verse and the entire history stack is saved in local storage for the remainder of the day. Refreshing or reopening the app stays on the current verse, while still allowing the user to swipe back through all previous verses seen earlier that day.
      - Preserves vertical page scrolling, button clicks, and card taps without touch conflicts.
+
 
 
