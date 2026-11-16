@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261112_v6';
+} from '../api.js?v=20261112_v7';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v6';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v6';
-import { trackEvent } from '../analytics.js?v=20261112_v6';
-import { navigate } from '../router.js?v=20261112_v6';
+} from '../bible-data.js?v=20261112_v7';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v7';
+import { trackEvent } from '../analytics.js?v=20261112_v7';
+import { navigate } from '../router.js?v=20261112_v7';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -217,31 +217,35 @@ export function renderLandingScreen(container) {
     }
   }).catch(() => {});
 
-  async function navigateVerse(direction) {
+  async function navigateVerse(direction, animated = true) {
     if (isTransitioning) return;
 
     if (direction === 'prev') {
       if (historyIndex <= 0) return;
       isTransitioning = true;
-      const contentEl = container.querySelector('.votd-card-content');
-      if (contentEl) {
-        contentEl.classList.add('swipe-exit-right');
+      const cardEl = container.querySelector('#votd-card');
+      if (cardEl && animated) {
+        cardEl.classList.remove('is-dragging', 'is-snapping-back');
+        cardEl.classList.add('swipe-dismiss-right');
       }
+      const delay = animated ? 220 : 0;
       setTimeout(async () => {
         historyIndex--;
         const cur = verseHistory[historyIndex];
         if (!cur.text) {
           await populateVerseText(cur, activeTranslation);
         }
-        renderCard('swipe-enter-right');
+        renderCard('swipe-incoming-right');
         isTransitioning = false;
-      }, 160);
+      }, delay);
     } else if (direction === 'next') {
       isTransitioning = true;
-      const contentEl = container.querySelector('.votd-card-content');
-      if (contentEl) {
-        contentEl.classList.add('swipe-exit-left');
+      const cardEl = container.querySelector('#votd-card');
+      if (cardEl && animated) {
+        cardEl.classList.remove('is-dragging', 'is-snapping-back');
+        cardEl.classList.add('swipe-dismiss-left');
       }
+      const delay = animated ? 220 : 0;
       setTimeout(async () => {
         historyIndex++;
         if (historyIndex >= verseHistory.length) {
@@ -258,9 +262,9 @@ export function renderLandingScreen(container) {
             await populateVerseText(cur, activeTranslation);
           }
         }
-        renderCard('swipe-enter-left');
+        renderCard('swipe-incoming-left');
         isTransitioning = false;
-      }, 160);
+      }, delay);
     }
   }
 
@@ -296,10 +300,10 @@ export function renderLandingScreen(container) {
 
         <!-- Daily Random Verse Card with Direct Read & Type Controls -->
         <div class="votd-card-wrapper">
-          <div class="votd-card" id="votd-card" role="button" tabindex="0" title="Click to open ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
+          <div class="votd-card ${animClass}" id="votd-card" role="button" tabindex="0" title="Click to open ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
             <!-- Background Artwork (Mobile-Only Art Layer) -->
             <div class="votd-bg-art" aria-hidden="true">${bgSvg}</div>
-            <div class="votd-card-content ${animClass}">
+            <div class="votd-card-content">
               <div class="votd-top-row">
                 <div class="votd-ref-header">
                   <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
@@ -481,62 +485,131 @@ export function renderLandingScreen(container) {
 
     const votdCard = container.querySelector('#votd-card');
     if (votdCard) {
-      let isCardSwipe = false;
+      let isCardDragging = false;
+      let dragDetermined = false;
+      let isHorizontalDrag = false;
+      let hasSwiped = false;
+      let startX = 0;
+      let startY = 0;
+      let currentDeltaX = 0;
+      let startTime = 0;
 
-      // Mobile Touch Swipe Gesture Handling (Mobile-only: <= 720px)
-      let touchStartX = 0;
-      let touchStartY = 0;
-      let touchStartTime = 0;
+      function resetCardPosition(animate = true) {
+        if (animate) {
+          votdCard.classList.remove('is-dragging');
+          votdCard.classList.add('is-snapping-back');
+          votdCard.style.transform = '';
+          votdCard.style.opacity = '';
+          setTimeout(() => {
+            if (votdCard) {
+              votdCard.classList.remove('is-snapping-back');
+            }
+          }, 280);
+        } else {
+          votdCard.classList.remove('is-dragging', 'is-snapping-back');
+          votdCard.style.transform = '';
+          votdCard.style.opacity = '';
+        }
+      }
 
       votdCard.addEventListener('touchstart', (e) => {
-        if (window.innerWidth > 720 || e.touches.length !== 1) return;
+        if (window.innerWidth > 720 || e.touches.length !== 1 || isTransitioning) return;
         const touch = e.touches[0];
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        touchStartTime = Date.now();
-        isCardSwipe = false;
+        startX = touch.clientX;
+        startY = touch.clientY;
+        currentDeltaX = 0;
+        startTime = Date.now();
+        isCardDragging = true;
+        dragDetermined = false;
+        isHorizontalDrag = false;
+        hasSwiped = false;
+        votdCard.classList.remove('swipe-incoming-left', 'swipe-incoming-right', 'is-snapping-back');
       }, { passive: true });
 
       votdCard.addEventListener('touchmove', (e) => {
-        if (window.innerWidth > 720 || e.touches.length !== 1) return;
+        if (!isCardDragging || window.innerWidth > 720 || e.touches.length !== 1 || isTransitioning) return;
         const touch = e.touches[0];
-        const diffX = touch.clientX - touchStartX;
-        const diffY = touch.clientY - touchStartY;
-        // If horizontal swipe dominates vertical movement, mark as swipe
-        if (Math.abs(diffX) > 20 && Math.abs(diffX) > Math.abs(diffY) * 1.25) {
-          isCardSwipe = true;
+        const diffX = touch.clientX - startX;
+        const diffY = touch.clientY - startY;
+
+        // Determine axis intent once finger moves beyond 8px threshold
+        if (!dragDetermined) {
+          if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+            dragDetermined = true;
+            isHorizontalDrag = Math.abs(diffX) >= Math.abs(diffY) * 1.15;
+            if (isHorizontalDrag) {
+              votdCard.classList.add('is-dragging');
+            }
+          }
         }
-      }, { passive: true });
 
-      votdCard.addEventListener('touchend', (e) => {
-        if (window.innerWidth > 720 || !e.changedTouches || e.changedTouches.length !== 1) return;
-        const touch = e.changedTouches[0];
-        const diffX = touch.clientX - touchStartX;
-        const diffY = touch.clientY - touchStartY;
-        const elapsed = Date.now() - touchStartTime;
+        if (isHorizontalDrag) {
+          // If dragging to the right at the beginning of history, apply elastic rubber-band resistance
+          let effectiveDeltaX = diffX;
+          if (diffX > 0 && historyIndex === 0) {
+            effectiveDeltaX = Math.sign(diffX) * Math.pow(Math.abs(diffX), 0.72) * 2.2;
+          }
 
-        // Valid swipe: horizontal distance >= 45px, horizontal dominance over vertical, under 700ms
-        if (Math.abs(diffX) >= 45 && Math.abs(diffX) > Math.abs(diffY) * 1.25 && elapsed < 700) {
-          isCardSwipe = true;
-          if (diffX < 0) {
-            // Swipe left -> Next random verse
-            trackEvent('votd_swipe_next', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-            navigateVerse('next');
-          } else {
-            // Swipe right -> Previous verse in history
-            trackEvent('votd_swipe_prev', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-            navigateVerse('prev');
+          currentDeltaX = effectiveDeltaX;
+          const rotationDeg = (effectiveDeltaX / window.innerWidth) * 12; // Natural tilt while moving
+          const opacityVal = Math.max(0.35, 1 - (Math.abs(effectiveDeltaX) / (window.innerWidth * 1.15)));
+
+          votdCard.style.transform = `translate3d(${effectiveDeltaX}px, 0, 0) rotate(${rotationDeg}deg)`;
+          votdCard.style.opacity = opacityVal;
+
+          if (Math.abs(effectiveDeltaX) > 15) {
+            hasSwiped = true;
           }
         }
       }, { passive: true });
 
+      const finishDrag = (e) => {
+        if (!isCardDragging) return;
+        isCardDragging = false;
+
+        if (!isHorizontalDrag) {
+          resetCardPosition(false);
+          return;
+        }
+
+        const elapsed = Math.max(1, Date.now() - startTime);
+        const velocity = Math.abs(currentDeltaX) / elapsed; // px per ms
+        const cardWidth = votdCard.offsetWidth || 340;
+        const threshold = cardWidth * 0.28; // Displace by ~28% of width or flick fast
+
+        const isFlick = velocity > 0.48 && Math.abs(currentDeltaX) > 35;
+        const isPastThreshold = Math.abs(currentDeltaX) >= threshold;
+
+        if (isFlick || isPastThreshold) {
+          if (currentDeltaX < 0) {
+            // Dragged / flicked Left -> Advance to Next Verse
+            trackEvent('votd_swipe_next', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
+            navigateVerse('next', true);
+          } else {
+            // Dragged / flicked Right -> Go to Previous Verse (or snap back if at start)
+            if (historyIndex > 0) {
+              trackEvent('votd_swipe_prev', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
+              navigateVerse('prev', true);
+            } else {
+              // Elastic bounce back when no previous verse exists
+              resetCardPosition(true);
+            }
+          }
+        } else {
+          // Did not reach swipe threshold -> spring back into original place
+          resetCardPosition(true);
+        }
+      };
+
+      votdCard.addEventListener('touchend', finishDrag, { passive: true });
       votdCard.addEventListener('touchcancel', () => {
-        isCardSwipe = false;
+        isCardDragging = false;
+        resetCardPosition(true);
       }, { passive: true });
 
       votdCard.addEventListener('click', (e) => {
-        if (isCardSwipe) {
-          isCardSwipe = false;
+        if (hasSwiped) {
+          hasSwiped = false;
           return;
         }
         if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;

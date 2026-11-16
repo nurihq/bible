@@ -33,9 +33,12 @@ Applies to paths matching:
 6. **Pure Random Verses (No Curated Pool)**:
    - Daily and home verses must strictly be chosen purely at random across the entire Bible canon (all 66 books and 31,102 verses) via `getRandomVerseRef()` in `bible-data.js`.
    - Never reintroduce curated verse pools, hardcoded highlight lists, or artificial theme filters for the verse of the day.
-7. **Mobile-Only Swipe Gesture Navigation**:
-   - On mobile screens (`@media (max-width: 720px)` and touch screens), the verse card supports horizontal swipe gestures:
-     - **Swipe Left**: Navigates forward to a fresh random verse across the Bible and adds it to the session history stack.
-     - **Swipe Right**: Navigates back to the previous verse in the session history stack (if any).
-     - Swipes include smooth horizontal slide/fade animations (`.swipe-exit-left`, `.swipe-enter-left`, etc.) and preserve regular page vertical scrolling and button clicks without gesture conflict.
+7. **Mobile-Only Interactive Card Drag & Swipe Physics**:
+   - On mobile screens (`@media (max-width: 720px)` and touch screens), the verse card provides a tactile 1:1 finger-following drag experience:
+     - **Interactive 1:1 Drag**: The entire `#votd-card` moves with the user's finger with dynamic rotation tilt, subtle opacity fade, and elastic rubber-band resistance when at the start of history.
+     - **Swipe Left**: Flinging or dragging past the threshold dismisses the card offscreen to the left and smoothly slides in a fresh random Bible verse from the right.
+     - **Swipe Right**: Flinging or dragging right dismisses the card offscreen to the right and smoothly slides back to the previous verse in the history stack.
+     - **Snap-Back Physics**: Releasing below the threshold smoothly springs the card back into its centered home position with cubic-bezier easing.
+     - Preserves vertical page scrolling, button clicks, and card taps without touch conflicts.
+
 
