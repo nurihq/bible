@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261112_v7';
+} from '../api.js?v=20261112_v8';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261112_v7';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v7';
-import { trackEvent } from '../analytics.js?v=20261112_v7';
-import { navigate } from '../router.js?v=20261112_v7';
+} from '../bible-data.js?v=20261112_v8';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261112_v8';
+import { trackEvent } from '../analytics.js?v=20261112_v8';
+import { navigate } from '../router.js?v=20261112_v8';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -207,6 +207,29 @@ export function renderLandingScreen(container) {
 
   const getActiveVerse = () => verseHistory[historyIndex];
 
+  // Ensure a queue of upcoming random verses is always preloaded and ready instantly
+  function ensurePreloadedVerses() {
+    const needed = Math.max(0, (historyIndex + 3) - verseHistory.length);
+    for (let i = 0; i < needed; i++) {
+      const prevRef = verseHistory[verseHistory.length - 1];
+      const newVerse = pickRandomBibleVerse(prevRef ? { bookId: prevRef.bookId, chapter: prevRef.chapter, verse: prevRef.verse } : null);
+      newVerse.dayNum = getDayNumber();
+      newVerse.dateKey = getTodayDateKey();
+      newVerse.translation = activeTranslation;
+      verseHistory.push(newVerse);
+      populateVerseText(newVerse, activeTranslation).then(() => {
+        // If current card is viewing this verse, update text
+        if (verseHistory[historyIndex] === newVerse) {
+          const quoteEl = container.querySelector('.votd-quote');
+          if (quoteEl && newVerse.text) {
+            quoteEl.textContent = `“${newVerse.text}”`;
+          }
+        }
+      });
+    }
+  }
+  ensurePreloadedVerses();
+
   // Background check to verify translation text & prefetch
   resolveDailyVerse(activeTranslation).then(verified => {
     if (verified && (verified.text !== initialVerse.text || verified.verse !== initialVerse.verse || verified.bookId !== initialVerse.bookId)) {
@@ -215,6 +238,7 @@ export function renderLandingScreen(container) {
         renderCard();
       }
     }
+    ensurePreloadedVerses();
   }).catch(() => {});
 
   async function navigateVerse(direction, animated = true) {
@@ -228,15 +252,22 @@ export function renderLandingScreen(container) {
         cardEl.classList.remove('is-dragging', 'is-snapping-back');
         cardEl.classList.add('swipe-dismiss-right');
       }
-      const delay = animated ? 220 : 0;
-      setTimeout(async () => {
+      const delay = animated ? 90 : 0;
+      setTimeout(() => {
         historyIndex--;
         const cur = verseHistory[historyIndex];
-        if (!cur.text) {
-          await populateVerseText(cur, activeTranslation);
-        }
         renderCard('swipe-incoming-right');
         isTransitioning = false;
+        if (!cur.text) {
+          populateVerseText(cur, activeTranslation).then(() => {
+            if (historyIndex < verseHistory.length && verseHistory[historyIndex] === cur) {
+              const quoteEl = container.querySelector('.votd-quote');
+              if (quoteEl && cur.text) {
+                quoteEl.textContent = `“${cur.text}”`;
+              }
+            }
+          });
+        }
       }, delay);
     } else if (direction === 'next') {
       isTransitioning = true;
@@ -245,8 +276,8 @@ export function renderLandingScreen(container) {
         cardEl.classList.remove('is-dragging', 'is-snapping-back');
         cardEl.classList.add('swipe-dismiss-left');
       }
-      const delay = animated ? 220 : 0;
-      setTimeout(async () => {
+      const delay = animated ? 90 : 0;
+      setTimeout(() => {
         historyIndex++;
         if (historyIndex >= verseHistory.length) {
           const prevRef = verseHistory[historyIndex - 1];
@@ -254,16 +285,24 @@ export function renderLandingScreen(container) {
           newRandom.dayNum = getDayNumber();
           newRandom.dateKey = getTodayDateKey();
           newRandom.translation = activeTranslation;
-          await populateVerseText(newRandom, activeTranslation);
           verseHistory.push(newRandom);
-        } else {
-          const cur = verseHistory[historyIndex];
-          if (!cur.text) {
-            await populateVerseText(cur, activeTranslation);
-          }
         }
+
+        const cur = verseHistory[historyIndex];
         renderCard('swipe-incoming-left');
         isTransitioning = false;
+        ensurePreloadedVerses();
+
+        if (!cur.text) {
+          populateVerseText(cur, activeTranslation).then(() => {
+            if (historyIndex < verseHistory.length && verseHistory[historyIndex] === cur) {
+              const quoteEl = container.querySelector('.votd-quote');
+              if (quoteEl && cur.text) {
+                quoteEl.textContent = `“${cur.text}”`;
+              }
+            }
+          });
+        }
       }, delay);
     }
   }

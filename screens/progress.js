@@ -1,10 +1,10 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261112_v7';
-import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261112_v7';
-import { getCadenceDescriptor } from './typing.js?v=20261112_v7';
-import { trackEvent } from '../analytics.js?v=20261112_v7';
+} from '../bible-data.js?v=20261112_v8';
+import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261112_v8';
+import { getCadenceDescriptor } from './typing.js?v=20261112_v8';
+import { trackEvent } from '../analytics.js?v=20261112_v8';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
