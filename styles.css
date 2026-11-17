@@ -2635,9 +2635,9 @@ sup.verse-num.is-both {
     padding-bottom: 0.5rem;
   }
 
-  /* Full-height card tile on mobile for typing, speaking & reading */
+  /* Full-height card tile on mobile for typing, speaking & reading with comfortable bottom breathing room */
   body.typing-active-view .main-content {
-    padding: 0.25rem 0.65rem 0.65rem;
+    padding: 0.25rem 0.75rem max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
   }
 
   .typing-viewport-wrapper {
