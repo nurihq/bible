@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261112_v9';
+import { CONFIG } from './config.js?v=20261112_v10';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261112_v9';
+} from './bible-data.js?v=20261112_v10';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -447,12 +447,19 @@ export const DEFAULT_MEDITATE_PALETTE = [
   '#FFFFFF'  // Eraser / White
 ];
 
+export function isMobileDevice() {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth <= 720 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
+
 export function getActiveModePref() {
   const store = getLocalStore();
   if (['type', 'speak', 'draw'].includes(store.activeMode)) {
     return store.activeMode;
   }
-  return store.meditateMode ? 'draw' : 'type';
+  if (store.meditateMode) return 'draw';
+  // On mobile devices, default to read-only mode (draw/coloring verse mode) per user preference
+  return isMobileDevice() ? 'draw' : 'type';
 }
 
 export function setActiveModePref(mode) {

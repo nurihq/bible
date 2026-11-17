@@ -41,6 +41,10 @@ Applies to paths matching:
      - **Snap-Back Physics**: Releasing below the threshold smoothly springs the card back into its centered home position with cubic-bezier easing.
      - **Daily Index & History Persistence**: Whenever the user swipes away to a new verse, that new verse becomes the active daily verse and the entire history stack is saved in local storage for the remainder of the day. Refreshing or reopening the app stays on the current verse, while still allowing the user to swipe back through all previous verses seen earlier that day.
      - Preserves vertical page scrolling, button clicks, and card taps without touch conflicts.
-
-
-
+8. **Mobile Read-Only Mode Default**:
+   - On mobile devices, the app defaults to read-only mode (`draw` mode / verse coloring view) instead of type mode when no preference has been explicitly set.
+9. **Speak Mode On-Demand Microphone Prompt**:
+   - In Speak Mode, the microphone must default to OFF (`micEnabled = false`).
+   - The browser must only request/prompt for microphone access after the user explicitly clicks the "Start" button (`#speak-mic-toggle-btn`).
+10. **Full-Height Mobile Tile**:
+   - On mobile screens (`@media (max-width: 720px)`), the main practice viewport card tile (`.typing-viewport-wrapper` and `.typing-passage-scroll`) expands to fill the entire remaining vertical viewport height in all modes (Type, Speak, Draw).

@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261112_v9';
+} from '../bible-data.js?v=20261112_v10';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -88,13 +88,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261112_v9';
+} from '../api.js?v=20261112_v10';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261112_v9';
-import { trackEvent } from '../analytics.js?v=20261112_v9';
-import { navigate } from '../router.js?v=20261112_v9';
+} from '../meditate-art.js?v=20261112_v10';
+import { trackEvent } from '../analytics.js?v=20261112_v10';
+import { navigate } from '../router.js?v=20261112_v10';
 
 function escapeHtml(str) {
   return String(str)
@@ -335,7 +335,7 @@ export function renderTypingScreen(container, params = {}) {
   let currentArtworkTemplateIdx = Math.abs((book.id * 31 + initialChapter * 7 + (targetSingleVerseNum || 1))) % TOTAL_MEDITATE_ART_TEMPLATES;
 
   // Speak mode state
-  let micEnabled = true; // Enabled by default when in Speak mode
+  let micEnabled = false; // Default to mic off — only prompt for mic after user clicks Start button
   let speechRecognition = null;
   let speechSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
   let wordsList = []; // [{ wordIdx, verse, vIdx, rawWord, cleanWord, startCharIdx, endCharIdx, nextCursorCharIdx, isLastWordOfVerse, wordEl }]
