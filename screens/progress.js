@@ -1,10 +1,10 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261118_v15';
-import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261118_v15';
-import { getCadenceDescriptor } from './typing.js?v=20261118_v15';
-import { trackEvent } from '../analytics.js?v=20261118_v15';
+} from '../bible-data.js?v=20261118_v16';
+import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261118_v16';
+import { getCadenceDescriptor } from './typing.js?v=20261118_v16';
+import { trackEvent } from '../analytics.js?v=20261118_v16';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -582,7 +582,7 @@ export function renderProgressScreen(container) {
                     if (sum.isBoth) {
                       cellClass = 'is-both';
                       cellTitle = `${b.name} ${c} — Completed in multiple modes (${sum.completedVersesCount}/${sum.totalVerses}v)`;
-                    } else if (sum.isTypedOnly || (sum.isFullyTyped && !sum.isFullyRead && !sum.isFullySpoken)) {
+                    } else if (sum.isTypedOnly || (sum.isFullyTyped && !sum.isFullyRead && !sum.isFullySpoken && !sum.isFullyListened)) {
                       cellClass = 'is-done';
                       cellTitle = `${b.name} ${c} — Typed (${sum.typedVersesCount}/${sum.totalVerses}v${trs ? ` in ${trs}` : ''}) · Best: ${sum.bestWpm} WPM`;
                     } else if (sum.isSpokenOnly || (sum.isFullySpoken && !sum.isFullyRead && !sum.isFullyTyped && !sum.isFullyListened)) {

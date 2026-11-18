@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261118_v15';
+} from '../bible-data.js?v=20261118_v16';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -97,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261118_v15';
+} from '../api.js?v=20261118_v16';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261118_v15';
-import { trackEvent } from '../analytics.js?v=20261118_v15';
-import { navigate } from '../router.js?v=20261118_v15';
+} from '../meditate-art.js?v=20261118_v16';
+import { trackEvent } from '../analytics.js?v=20261118_v16';
+import { navigate } from '../router.js?v=20261118_v16';
 
 function escapeHtml(str) {
   return String(str)
@@ -670,19 +670,25 @@ export function renderTypingScreen(container, params = {}) {
 
     if (singleVerseMode && targetSingleVerseNum) {
       const vRec = summary.record?.completedVerses?.[String(targetSingleVerseNum)];
-      const vIsRead = Boolean(summary.isFullyRead || vRec?.isRead);
-      const vIsSpoken = Boolean(summary.isFullySpoken || vRec?.isSpoken);
-      const vIsListened = Boolean(summary.isFullyListened || vRec?.isListened);
-      const vIsTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && !vIsListened && vRec?.count && vRec.count > 0));
+      const vIsRead = Boolean(vRec?.isRead);
+      const vIsSpoken = Boolean(vRec?.isSpoken);
+      const vIsListened = Boolean(vRec?.isListened);
+      const vIsTyped = Boolean(
+        (vRec?.isTyped && (vRec.count > 0 || vRec.bestWpm > 0 || vRec.typedAt || (vRec.translations && Object.keys(vRec.translations).length > 0))) ||
+        (!vIsSpoken && !vIsRead && !vIsListened && vRec?.count && vRec.count > 0)
+      );
       const modesDone = [];
       if (vIsRead) modesDone.push('Read');
       if (vIsTyped) modesDone.push('Typed');
       if (vIsSpoken) modesDone.push('Spoken');
       if (vIsListened) modesDone.push('Listened');
       if (modesDone.length >= 2) {
+        const activeName = activeMode === 'listen' ? 'Listened' : (activeMode === 'speak' ? 'Spoken' : (activeMode === 'draw' ? 'Read' : 'Typed'));
+        const sortedModes = [...modesDone].sort((a, b) => (a === activeName ? -1 : b === activeName ? 1 : 0));
+        const icon = activeMode === 'listen' ? '🎧' : (activeMode === 'speak' ? '🗣️' : (activeMode === 'draw' ? '📖' : '✓'));
         return `
-          <span class="chapter-completed-pill is-both" title="Verse ${targetSingleVerseNum} completed (${modesDone.join(' & ')})!">
-            ✓ Verse ${targetSingleVerseNum} ${modesDone.join(' &amp;')}${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
+          <span class="chapter-completed-pill is-both" title="Verse ${targetSingleVerseNum} completed (${sortedModes.join(' & ')})!">
+            ${icon} Verse ${targetSingleVerseNum} ${sortedModes.join(' &amp; ')}${vRec?.bestWpm ? ` · Best ${vRec.bestWpm} WPM` : ''}
           </span>
         `;
       }
@@ -730,7 +736,7 @@ export function renderTypingScreen(container, params = {}) {
       `;
     }
 
-    if (summary.isTypedOnly || (summary.isFullyTyped && !summary.isFullyRead && !summary.isFullySpoken)) {
+    if (summary.isTypedOnly || (summary.isFullyTyped && !summary.isFullyRead && !summary.isFullySpoken && !summary.isFullyListened)) {
       return `
         <span class="chapter-completed-pill is-done" title="All ${totalV} verses typed!">
           ✓ Typed (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
@@ -754,7 +760,7 @@ export function renderTypingScreen(container, params = {}) {
       `;
     }
 
-    if (summary.isReadOnly || (summary.isFullyRead && !summary.isFullyTyped && !summary.isFullySpoken)) {
+    if (summary.isReadOnly || (summary.isFullyRead && !summary.isFullyTyped && !summary.isFullySpoken && !summary.isFullyListened)) {
       return `
         <span class="chapter-completed-pill is-read" title="All ${totalV} verses marked as read!">
           📖 Read (${totalV}/${totalV}v)

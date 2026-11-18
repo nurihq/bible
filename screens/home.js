@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261118_v15';
+} from '../api.js?v=20261118_v16';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261118_v15';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261118_v15';
-import { trackEvent } from '../analytics.js?v=20261118_v15';
-import { navigate } from '../router.js?v=20261118_v15';
+} from '../bible-data.js?v=20261118_v16';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261118_v16';
+import { trackEvent } from '../analytics.js?v=20261118_v16';
+import { navigate } from '../router.js?v=20261118_v16';
 
 export { renderLandingScreen as renderHomeScreen };
 
