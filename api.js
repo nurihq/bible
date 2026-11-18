@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261112_v12';
+import { CONFIG } from './config.js?v=20261112_v13';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261112_v12';
+} from './bible-data.js?v=20261112_v13';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -178,7 +178,7 @@ function createDefaultStore() {
     activeMode: 'type', // 'type' | 'speak' | 'draw' | 'listen'
     listenVoice: '',
     listenRate: 1.0,
-    listenAutoAdvance: true
+    listenAutoAdvance: true,
     meditateMode: false,
     meditateFont: DEFAULT_MEDITATE_FONT,
     meditateFontSize: DEFAULT_MEDITATE_FONT_SIZE,
