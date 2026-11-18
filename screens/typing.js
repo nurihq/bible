@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261118_v17';
+} from '../bible-data.js?v=20261118_v18';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -97,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261118_v17';
+} from '../api.js?v=20261118_v18';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261118_v17';
-import { trackEvent } from '../analytics.js?v=20261118_v17';
-import { navigate } from '../router.js?v=20261118_v17';
+} from '../meditate-art.js?v=20261118_v18';
+import { trackEvent } from '../analytics.js?v=20261118_v18';
+import { navigate } from '../router.js?v=20261118_v18';
 
 function escapeHtml(str) {
   return String(str)
@@ -1345,6 +1345,35 @@ export function renderTypingScreen(container, params = {}) {
           </div>
         </div>
       </div>
+
+      <!-- Microphone Permission Helper Modal -->
+      <div class="typing-options-backdrop mic-permission-backdrop" id="mic-permission-backdrop" hidden>
+        <div class="typing-options-card mic-permission-card" role="dialog" aria-modal="true" aria-labelledby="mic-permission-title" style="max-width: 440px;">
+          <div class="typing-options-header">
+            <h2 class="typing-options-title" id="mic-permission-title">🎙️ Microphone Access</h2>
+            <button type="button" class="options-close-btn" id="mic-permission-close-btn" aria-label="Close dialog">✕</button>
+          </div>
+          <div class="typing-options-body" style="padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.9rem;">
+            <p style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+              Speak Mode needs permission to use your microphone. If access was blocked or cancelled, allow it in your browser settings and try again without refreshing.
+            </p>
+            <div class="mic-permission-instructions">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;">How to unblock:</div>
+              <ul>
+                <li><strong>Safari / iOS:</strong> Tap <strong>aA</strong> in the address bar &rarr; <strong>Website Settings</strong> &rarr; set <strong>Microphone</strong> to <strong>Allow</strong>.</li>
+                <li><strong>Chrome / Android:</strong> Tap the <strong>Tune / Lock (🔒)</strong> icon next to the URL &rarr; <strong>Permissions</strong> &rarr; turn on <strong>Microphone</strong>.</li>
+              </ul>
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">
+              After updating permissions, click <strong>Try Again</strong> below!
+            </p>
+          </div>
+          <div class="typing-options-footer">
+            <button type="button" class="btn btn-secondary btn-sm" id="mic-permission-cancel-btn">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" id="mic-permission-retry-btn">Try Again</button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -1360,6 +1389,10 @@ export function renderTypingScreen(container, params = {}) {
   const actionsBtn = container.querySelector('#typing-actions-btn');
   const speakMicToggleBtn = container.querySelector('#speak-mic-toggle-btn');
   const speakMicToggleLabel = container.querySelector('#speak-mic-toggle-label');
+  const micPermissionBackdrop = container.querySelector('#mic-permission-backdrop');
+  const micPermissionCloseBtn = container.querySelector('#mic-permission-close-btn');
+  const micPermissionCancelBtn = container.querySelector('#mic-permission-cancel-btn');
+  const micPermissionRetryBtn = container.querySelector('#mic-permission-retry-btn');
 
   // Mode Modal (Base), Mode Settings Modal (Stacked Level 2) & Scope Settings Modal (Stacked Level 3)
   const modeSelectBackdrop = container.querySelector('#mode-select-backdrop');
@@ -1960,13 +1993,29 @@ export function renderTypingScreen(container, params = {}) {
     });
   }
 
+  if (micPermissionCloseBtn) micPermissionCloseBtn.addEventListener('click', hideMicPermissionModal);
+  if (micPermissionCancelBtn) micPermissionCancelBtn.addEventListener('click', hideMicPermissionModal);
+  if (micPermissionBackdrop) {
+    micPermissionBackdrop.addEventListener('click', (e) => {
+      if (e.target === micPermissionBackdrop) hideMicPermissionModal();
+    });
+  }
+  if (micPermissionRetryBtn) {
+    micPermissionRetryBtn.addEventListener('click', async () => {
+      hideMicPermissionModal();
+      await enableAndStartSpeaking();
+    });
+  }
+
   if (speakMicToggleBtn) {
-    speakMicToggleBtn.addEventListener('click', () => {
-      micEnabled = !micEnabled;
-      updateSpeakMicUI();
-      if (micEnabled && activeMode === 'speak' && !isCompleted) {
-        startSpeechRecognition();
+    speakMicToggleBtn.addEventListener('click', async () => {
+      if (!micEnabled) {
+        if (activeMode === 'speak' && !isCompleted) {
+          await enableAndStartSpeaking();
+        }
       } else {
+        micEnabled = false;
+        updateSpeakMicUI();
         stopSpeechRecognition();
       }
     });
@@ -4643,6 +4692,63 @@ export function renderTypingScreen(container, params = {}) {
     }
   }
 
+  function showMicPermissionModal() {
+    if (micPermissionBackdrop) {
+      micPermissionBackdrop.hidden = false;
+    }
+  }
+
+  function hideMicPermissionModal() {
+    if (micPermissionBackdrop) {
+      micPermissionBackdrop.hidden = true;
+    }
+  }
+
+  async function requestMicrophoneAccess() {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        return { granted: true };
+      } catch (err) {
+        return { granted: false, error: err };
+      }
+    }
+    return { granted: true };
+  }
+
+  async function enableAndStartSpeaking() {
+    if (activeMode !== 'speak' || isCompleted) return;
+    if (!speechSupported) {
+      updateSpeakMicUI();
+      return;
+    }
+
+    if (speakMicToggleBtn) {
+      speakMicToggleBtn.disabled = true;
+      if (speakMicToggleLabel) {
+        speakMicToggleLabel.textContent = 'Connecting...';
+      }
+    }
+
+    const res = await requestMicrophoneAccess();
+    if (speakMicToggleBtn) {
+      speakMicToggleBtn.disabled = false;
+    }
+
+    if (!res.granted) {
+      micEnabled = false;
+      updateSpeakMicUI();
+      showMicPermissionModal();
+      return;
+    }
+
+    hideMicPermissionModal();
+    micEnabled = true;
+    updateSpeakMicUI();
+    startSpeechRecognition();
+  }
+
   function startSpeechRecognition() {
     if (activeMode !== 'speak' || !micEnabled || isCompleted) return;
     if (!speechSupported) {
@@ -4671,6 +4777,7 @@ export function renderTypingScreen(container, params = {}) {
           micEnabled = false;
           stopSpeechRecognition();
           updateSpeakMicUI();
+          showMicPermissionModal();
           if (speakMicToggleBtn) {
             speakMicToggleBtn.title = '⚠️ Microphone access denied — please allow mic permissions';
           }

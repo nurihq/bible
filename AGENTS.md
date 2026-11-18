@@ -33,19 +33,22 @@ Applies to paths matching:
 6. **Pure Random Verses (No Curated Pool)**:
    - Daily and home verses must strictly be chosen purely at random across the entire Bible canon (all 66 books and 31,102 verses) via `getRandomVerseRef()` in `bible-data.js`.
    - Never reintroduce curated verse pools, hardcoded highlight lists, or artificial theme filters for the verse of the day.
-7. **Mobile-Only Interactive Card Drag & Swipe Physics**:
+7. **Mobile-Only Interactive Card Drag, Instant Tap & Prefetching**:
    - On mobile screens (`@media (max-width: 720px)` and touch screens), the verse card provides a tactile 1:1 finger-following drag experience:
      - **Interactive 1:1 Drag**: The entire `#votd-card` moves with the user's finger with dynamic rotation tilt, subtle opacity fade, and elastic rubber-band resistance when at the start of history.
      - **Swipe Left**: Flinging or dragging past the threshold dismisses the card offscreen to the left and smoothly slides in a fresh random Bible verse from the right.
      - **Swipe Right**: Flinging or dragging right dismisses the card offscreen to the right and smoothly slides back to the previous verse in the history stack.
      - **Snap-Back Physics**: Releasing below the threshold smoothly springs the card back into its centered home position with cubic-bezier easing.
      - **Daily Index & History Persistence**: Whenever the user swipes away to a new verse, that new verse becomes the active daily verse and the entire history stack is saved in local storage for the remainder of the day. Refreshing or reopening the app stays on the current verse, while still allowing the user to swipe back through all previous verses seen earlier that day.
+     - **Instant Tap & Zero-Delay Passage Switch**: `touch-action: manipulation` eliminates the 300ms tap delay. Clean taps trigger immediate routing on `touchend` without synthetic click latency, while proactive background prefetching (`prefetchChapterVerses`) guarantees the target chapter is already cached in memory, eliminating loading spinners when opening the verse.
      - Preserves vertical page scrolling, button clicks, and card taps without touch conflicts.
 8. **Mobile Read-Only Mode Default**:
    - On mobile devices, the app defaults to read-only mode (`draw` mode / verse coloring view) instead of type mode when no preference has been explicitly set.
-9. **Speak Mode On-Demand Microphone Prompt**:
+9. **Speak Mode On-Demand Microphone Prompt & Zero-Reload Recovery**:
    - In Speak Mode, the microphone must default to OFF (`micEnabled = false`).
    - The browser must only request/prompt for microphone access after the user explicitly clicks the "Start" button (`#speak-mic-toggle-btn`).
+   - Uses `navigator.mediaDevices.getUserMedia({ audio: true })` so that permission can be re-requested or recovered cleanly if previously dismissed.
+   - If the user blocks or dismisses access, an elegant permission modal guides them to allow microphone access via the address bar (Safari `aA` / Chrome `🔒`) and provides a "Try Again" button that immediately resumes without refreshing the page.
 10. **Full-Height Mobile Tile**:
    - On mobile screens (`@media (max-width: 720px)`), the main practice viewport card tile (`.typing-viewport-wrapper` and `.typing-passage-scroll`) expands to fill the entire remaining vertical viewport height in all modes (Type, Speak, Draw, Listen).
 11. **Listen Mode (Web Speech API Text-to-Speech & Bible Completion Tracking)**:

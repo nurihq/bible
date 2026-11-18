@@ -1597,6 +1597,24 @@ body.typing-active-view .main-content {
   border-top: 1px solid var(--border-color);
 }
 
+.mic-permission-instructions {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.mic-permission-instructions ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .chapter-completed-pill {
   display: inline-flex;
   align-items: center;
@@ -3113,7 +3131,7 @@ sup.verse-num.is-both {
   }
 
   .votd-card {
-    touch-action: pan-y pinch-zoom;
+    touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
     will-change: transform, opacity;

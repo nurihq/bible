@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261118_v17';
+} from '../api.js?v=20261118_v18';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261118_v17';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261118_v17';
-import { trackEvent } from '../analytics.js?v=20261118_v17';
-import { navigate } from '../router.js?v=20261118_v17';
+} from '../bible-data.js?v=20261118_v18';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261118_v18';
+import { trackEvent } from '../analytics.js?v=20261118_v18';
+import { navigate } from '../router.js?v=20261118_v18';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -260,6 +260,9 @@ export function renderLandingScreen(container) {
       newVerse.dateKey = getTodayDateKey();
       newVerse.translation = activeTranslation;
       verseHistory.push(newVerse);
+      if (newVerse.bookId && newVerse.chapter) {
+        prefetchChapterVerses(activeTranslation, newVerse.bookId, newVerse.chapter);
+      }
       populateVerseText(newVerse, activeTranslation).then(() => {
         // If current card is viewing this verse, update text
         if (verseHistory[historyIndex] === newVerse) {
@@ -276,6 +279,9 @@ export function renderLandingScreen(container) {
 
   // Background check to verify translation text & prefetch for current verse
   const curAtInit = getActiveVerse();
+  if (curAtInit && curAtInit.bookId && curAtInit.chapter) {
+    prefetchChapterVerses(activeTranslation, curAtInit.bookId, curAtInit.chapter);
+  }
   if (curAtInit && !curAtInit.text) {
     populateVerseText(curAtInit, activeTranslation).then(() => {
       if (getActiveVerse() === curAtInit) {
@@ -289,6 +295,9 @@ export function renderLandingScreen(container) {
   }
 
   resolveDailyVerse(activeTranslation).then(verified => {
+    if (verified && verified.bookId && verified.chapter) {
+      prefetchChapterVerses(activeTranslation, verified.bookId, verified.chapter);
+    }
     if (verified && historyIndex === 0 && (!verseHistory[0] || verseHistory[0].verse !== verified.verse || verseHistory[0].bookId !== verified.bookId)) {
       verseHistory[0] = verified;
       renderCard();
@@ -313,6 +322,9 @@ export function renderLandingScreen(container) {
         historyIndex--;
         persistCurrentState();
         const cur = verseHistory[historyIndex];
+        if (cur && cur.bookId && cur.chapter) {
+          prefetchChapterVerses(activeTranslation, cur.bookId, cur.chapter);
+        }
         renderCard('swipe-incoming-right');
         isTransitioning = false;
         if (!cur.text) {
@@ -348,6 +360,9 @@ export function renderLandingScreen(container) {
 
         persistCurrentState();
         const cur = verseHistory[historyIndex];
+        if (cur && cur.bookId && cur.chapter) {
+          prefetchChapterVerses(activeTranslation, cur.bookId, cur.chapter);
+        }
         renderCard('swipe-incoming-left');
         isTransitioning = false;
         ensurePreloadedVerses();
@@ -369,6 +384,9 @@ export function renderLandingScreen(container) {
 
   function renderCard(animClass = '') {
     const currentVerse = getActiveVerse();
+    if (currentVerse && currentVerse.bookId && currentVerse.chapter) {
+      prefetchChapterVerses(activeTranslation, currentVerse.bookId, currentVerse.chapter);
+    }
     const isCompleted = isVerseCompletedForUser(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
     const activeMode = getActiveModePref() || 'type';
     const isFav = isVerseFavorited(currentVerse.bookId, currentVerse.chapter, currentVerse.verse);
@@ -588,6 +606,7 @@ export function renderLandingScreen(container) {
       let dragDetermined = false;
       let isHorizontalDrag = false;
       let hasSwiped = false;
+      let justNavigatedOnTouch = false;
       let startX = 0;
       let startY = 0;
       let currentDeltaX = 0;
@@ -668,6 +687,18 @@ export function renderLandingScreen(container) {
 
         if (!isHorizontalDrag) {
           resetCardPosition(false);
+          const elapsed = Date.now() - startTime;
+          const touchEndTarget = e.target;
+          if (!hasSwiped && elapsed < 350 && Math.abs(currentDeltaX) < 10) {
+            if (touchEndTarget && !touchEndTarget.closest('[data-stop-card-nav="true"]') && !touchEndTarget.closest('a') && !touchEndTarget.closest('button')) {
+              justNavigatedOnTouch = true;
+              setTimeout(() => { justNavigatedOnTouch = false; }, 500);
+              trackEvent('votd_card_click', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
+              const mode = getActiveModePref() || 'type';
+              navigate(`/${mode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+              return;
+            }
+          }
           return;
         }
 
@@ -707,6 +738,10 @@ export function renderLandingScreen(container) {
       }, { passive: true });
 
       votdCard.addEventListener('click', (e) => {
+        if (justNavigatedOnTouch) {
+          justNavigatedOnTouch = false;
+          return;
+        }
         if (hasSwiped) {
           hasSwiped = false;
           return;
