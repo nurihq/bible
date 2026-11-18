@@ -9,16 +9,16 @@ import {
   getAllMeditations,
   getAllFavorites,
   getAllBookmarks
-} from '../api.js?v=20261112_v11';
+} from '../api.js?v=20261112_v12';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261112_v11';
-import { trackEvent } from '../analytics.js?v=20261112_v11';
-import { navigate } from '../router.js?v=20261112_v11';
+} from '../bible-data.js?v=20261112_v12';
+import { trackEvent } from '../analytics.js?v=20261112_v12';
+import { navigate } from '../router.js?v=20261112_v12';
 
 function escapeHtml(str) {
   return String(str)
@@ -221,10 +221,12 @@ export class Navbar {
       const vRec = chSum.record?.completedVerses?.[String(v)];
       const vIsRead = Boolean(chSum.isFullyRead || vRec?.isRead);
       const vIsSpoken = Boolean(chSum.isFullySpoken || vRec?.isSpoken);
-      const vIsTyped = Boolean(chSum.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && vRec?.count && vRec.count > 0));
+      const vIsListened = Boolean(chSum.isFullyListened || vRec?.isListened);
+      const vIsTyped = Boolean(chSum.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && !vIsListened && vRec?.count && vRec.count > 0));
+      const modesCount = (vIsRead ? 1 : 0) + (vIsTyped ? 1 : 0) + (vIsSpoken ? 1 : 0) + (vIsListened ? 1 : 0);
       let vCls = '';
       let vBadge = '';
-      if ((vIsRead && vIsTyped) || (vIsRead && vIsSpoken) || (vIsTyped && vIsSpoken)) {
+      if (modesCount >= 2) {
         vCls = 'is-both';
         vBadge = '<span class="drawer-v-check">✓</span>';
       } else if (vIsTyped) {
@@ -233,6 +235,9 @@ export class Navbar {
       } else if (vIsSpoken) {
         vCls = 'is-spoken is-completed';
         vBadge = '<span class="drawer-v-check">🗣️</span>';
+      } else if (vIsListened) {
+        vCls = 'is-listen is-completed';
+        vBadge = '<span class="drawer-v-check">🎧</span>';
       } else if (vIsRead) {
         vCls = 'is-read';
         vBadge = '<span class="drawer-v-check">📖</span>';
@@ -240,7 +245,7 @@ export class Navbar {
 
       verseBtns.push(`
         <button type="button" class="drawer-verse-pill ${vCls}" data-verse="${v}"
-          title="Open ${selBook.name} ${this.drawerChapter}:${v}${vIsTyped ? ' (Typed)' : vIsSpoken ? ' (Spoken)' : vIsRead ? ' (Read)' : ''}">
+          title="Open ${selBook.name} ${this.drawerChapter}:${v}${vIsTyped ? ' (Typed)' : vIsSpoken ? ' (Spoken)' : vIsListened ? ' (Listened)' : vIsRead ? ' (Read)' : ''}">
           ${v}${vBadge}
         </button>`);
     }
@@ -423,8 +428,9 @@ export class Navbar {
       cleanPath === '/typing' ||
       cleanPath === '/type' ||
       cleanPath === '/speak' ||
+      cleanPath === '/listen' ||
       cleanPath === '/draw' ||
-      /^\/(?:typing|type|speak|draw|promises)\//.test(cleanPath);
+      /^\/(?:typing|type|speak|draw|listen|promises)\//.test(cleanPath);
     const isProgressActive = cleanPath === '/progress';
     const isDrawingsActive = cleanPath === '/drawings' || cleanPath === '/meditations';
     const isFavoritesActive = cleanPath === '/favorites';

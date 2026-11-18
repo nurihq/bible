@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261112_v11';
+} from '../bible-data.js?v=20261112_v12';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -58,6 +58,15 @@ import {
   isVerseSpoken,
   toggleChapterRead,
   toggleVerseRead,
+  getListenVoicePref,
+  setListenVoicePref,
+  getListenRatePref,
+  setListenRatePref,
+  getListenAutoAdvancePref,
+  setListenAutoAdvancePref,
+  markVerseAsListened,
+  toggleVerseListened,
+  isVerseListened,
   saveVerseDrawing,
   getVerseDrawing,
   deleteVerseDrawing,
@@ -88,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261112_v11';
+} from '../api.js?v=20261112_v12';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261112_v11';
-import { trackEvent } from '../analytics.js?v=20261112_v11';
-import { navigate } from '../router.js?v=20261112_v11';
+} from '../meditate-art.js?v=20261112_v12';
+import { trackEvent } from '../analytics.js?v=20261112_v12';
+import { navigate } from '../router.js?v=20261112_v12';
 
 function escapeHtml(str) {
   return String(str)
@@ -336,6 +345,10 @@ export function renderTypingScreen(container, params = {}) {
 
   // Speak mode state
   let micEnabled = false; // Default to mic off — only prompt for mic after user clicks Start button
+  let isListeningAudioPlaying = false;
+  let listenUtterance = null;
+  let currentListenWordIdx = -1;
+  let currentListenVerseNum = null;
   let speechRecognition = null;
   let speechSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
   let wordsList = []; // [{ wordIdx, verse, vIdx, rawWord, cleanWord, startCharIdx, endCharIdx, nextCursorCharIdx, isLastWordOfVerse, wordEl }]
@@ -436,9 +449,181 @@ export function renderTypingScreen(container, params = {}) {
   let onFavoritesUpdated = null;
   let onBookmarksUpdated = null;
   let onWindowWheel = null;
+
+  // ── Web Speech API Text-to-Speech Engine for Listen Mode ──
+  function populateVoiceSelect() {
+    if (!listenVoiceSelect || typeof window === 'undefined' || !window.speechSynthesis) return;
+    const voices = window.speechSynthesis.getVoices() || [];
+    const savedVoice = getListenVoicePref();
+    listenVoiceSelect.innerHTML = '<option value="">Default System Voice</option>';
+    const sortedVoices = [...voices].sort((a, b) => {
+      const aEn = a.lang.startsWith('en') ? 0 : 1;
+      const bEn = b.lang.startsWith('en') ? 0 : 1;
+      if (aEn !== bEn) return aEn - bEn;
+      return a.name.localeCompare(b.name);
+    });
+    sortedVoices.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.voiceURI || v.name;
+      opt.textContent = `${v.name} (${v.lang})${v.default ? ' — System Default' : ''}`;
+      if (savedVoice && (savedVoice === opt.value || savedVoice === v.name)) {
+        opt.selected = true;
+      }
+      listenVoiceSelect.appendChild(opt);
+    });
+  }
+
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      populateVoiceSelect();
+    };
+  }
+
+  function stopListenAudio() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    isListeningAudioPlaying = false;
+    listenUtterance = null;
+    currentListenWordIdx = -1;
+    wordsList.forEach(w => {
+      if (w.wordEl) w.wordEl.classList.remove('is-listen-active');
+    });
+    updateListenPlayBtnUI();
+  }
+
+  function updateListenPlayBtnUI() {
+    if (!listenPlayToggleBtn) return;
+    listenPlayToggleBtn.hidden = activeMode !== 'listen';
+    listenPlayToggleBtn.classList.toggle('is-listen-active', isListeningAudioPlaying);
+    const iconEl = container.querySelector('#listen-play-toggle-icon');
+    const labelEl = container.querySelector('#listen-play-toggle-label');
+    if (iconEl) iconEl.textContent = isListeningAudioPlaying ? '⏸' : '▶';
+    if (labelEl) labelEl.textContent = isListeningAudioPlaying ? 'Pause' : 'Play';
+  }
+
+  function playVerseAudio(vRange, onFinished) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      alert('Audio narration is not supported by your browser.');
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const verseWords = wordsList.filter(w => w.verse === vRange.verse);
+    if (verseWords.length === 0) {
+      if (onFinished) onFinished();
+      return;
+    }
+
+    let text = '';
+    const wordOffsets = [];
+    verseWords.forEach(w => {
+      const start = text.length;
+      text += (text.length > 0 ? ' ' : '') + w.rawWord;
+      wordOffsets.push({ word: w, startOffset: start, endOffset: text.length });
+    });
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    listenUtterance = utterance;
+
+    const voices = window.speechSynthesis.getVoices() || [];
+    const prefVoice = getListenVoicePref();
+    if (prefVoice && voices.length > 0) {
+      const found = voices.find(v => v.voiceURI === prefVoice || v.name === prefVoice);
+      if (found) utterance.voice = found;
+    }
+    utterance.rate = getListenRatePref();
+
+    utterance.onboundary = (e) => {
+      if (!isListeningAudioPlaying) return;
+      const charIdx = e.charIndex;
+      const matched = wordOffsets.find(item => charIdx >= item.startOffset && charIdx <= item.endOffset);
+      if (matched) {
+        currentListenWordIdx = matched.word.wordIdx;
+        wordsList.forEach(w => {
+          if (w.wordEl) {
+            w.wordEl.classList.toggle('is-listen-active', w.wordIdx === matched.word.wordIdx);
+          }
+        });
+        if (matched.word.wordEl && passageScroll) {
+          matched.word.wordEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        }
+      }
+    };
+
+    utterance.onend = () => {
+      if (!isListeningAudioPlaying) return;
+      wordsList.forEach(w => {
+        if (w.wordEl) w.wordEl.classList.remove('is-listen-active');
+      });
+
+      // Mark verse as listened!
+      markVerseAsListened(book.id, initialChapter, vRange.verse, activeTranslation);
+
+      // Update superscript checkmark / badge
+      if (vRange.supEl) updateVerseSup(vRange.supEl, vRange.verse);
+      syncSummaryBottomLine();
+
+      if (onFinished) {
+        onFinished();
+      }
+    };
+
+    utterance.onerror = (e) => {
+      console.warn('Speech synthesis utterance error:', e);
+      stopListenAudio();
+    };
+
+    isListeningAudioPlaying = true;
+    currentListenVerseNum = vRange.verse;
+    updateListenPlayBtnUI();
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function toggleListenPlayback() {
+    if (isListeningAudioPlaying) {
+      stopListenAudio();
+      return;
+    }
+
+    if (singleVerseMode && targetSingleVerseNum) {
+      const vRange = verseRanges.find(vr => vr.verse === targetSingleVerseNum) || verseRanges[0];
+      if (!vRange) return;
+      playVerseAudio(vRange, () => {
+        stopListenAudio();
+        isCompleted = true;
+        syncAdvanceStepBtn();
+        if (autoAdvance) {
+          navigateNextStep();
+        }
+      });
+    } else {
+      const curVIdx = charToVerseIdxMap[cursorIdx] ?? 0;
+      playChapterVerseFromIndex(curVIdx);
+    }
+  }
+
+  function playChapterVerseFromIndex(vIdx) {
+    if (vIdx >= verseRanges.length) {
+      stopListenAudio();
+      isCompleted = true;
+      syncAdvanceStepBtn();
+      return;
+    }
+
+    const vRange = verseRanges[vIdx];
+    jumpToVerse(vRange.verse, { manualClick: false });
+
+    playVerseAudio(vRange, () => {
+      playChapterVerseFromIndex(vIdx + 1);
+    });
+  }
+
   function cleanup() {
     clearTimer();
     stopSpeechRecognition();
+    stopListenAudio();
     document.documentElement.classList.remove('typing-active-view');
     document.body.classList.remove('typing-active-view');
     if (onWindowKeydown) {
@@ -487,11 +672,13 @@ export function renderTypingScreen(container, params = {}) {
       const vRec = summary.record?.completedVerses?.[String(targetSingleVerseNum)];
       const vIsRead = Boolean(summary.isFullyRead || vRec?.isRead);
       const vIsSpoken = Boolean(summary.isFullySpoken || vRec?.isSpoken);
-      const vIsTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && vRec?.count && vRec.count > 0));
+      const vIsListened = Boolean(summary.isFullyListened || vRec?.isListened);
+      const vIsTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!vIsSpoken && !vIsRead && !vIsListened && vRec?.count && vRec.count > 0));
       const modesDone = [];
       if (vIsRead) modesDone.push('Read');
       if (vIsTyped) modesDone.push('Typed');
       if (vIsSpoken) modesDone.push('Spoken');
+      if (vIsListened) modesDone.push('Listened');
       if (modesDone.length >= 2) {
         return `
           <span class="chapter-completed-pill is-both" title="Verse ${targetSingleVerseNum} completed (${modesDone.join(' & ')})!">
@@ -513,6 +700,13 @@ export function renderTypingScreen(container, params = {}) {
           </span>
         `;
       }
+      if (vIsListened) {
+        return `
+          <span class="chapter-completed-pill is-listen" title="Verse ${targetSingleVerseNum} completed in listen mode!">
+            🎧 Verse ${targetSingleVerseNum} Listened
+          </span>
+        `;
+      }
       if (vIsRead) {
         return `
           <span class="chapter-completed-pill is-read" title="Verse ${targetSingleVerseNum} marked as read!">
@@ -528,6 +722,7 @@ export function renderTypingScreen(container, params = {}) {
       if (summary.isFullyRead) parts.push('Read');
       if (summary.isFullyTyped) parts.push('Typed');
       if (summary.isFullySpoken) parts.push('Spoken');
+      if (summary.isFullyListened) parts.push('Listened');
       return `
         <span class="chapter-completed-pill is-both" title="All ${totalV} verses completed (${parts.join(' & ')})!">
           ✓ ${parts.join(' &amp; ')} (${totalV}/${totalV}v)${trText}${summary.bestWpm ? ` · Best ${summary.bestWpm} WPM` : ''}
@@ -543,10 +738,18 @@ export function renderTypingScreen(container, params = {}) {
       `;
     }
 
-    if (summary.isSpokenOnly || (summary.isFullySpoken && !summary.isFullyRead && !summary.isFullyTyped)) {
+    if (summary.isSpokenOnly || (summary.isFullySpoken && !summary.isFullyRead && !summary.isFullyTyped && !summary.isFullyListened)) {
       return `
         <span class="chapter-completed-pill is-spoken" title="All ${totalV} verses spoken!">
           🗣️ Spoken (${totalV}/${totalV}v)${trText}
+        </span>
+      `;
+    }
+
+    if (summary.isListenedOnly || (summary.isFullyListened && !summary.isFullyRead && !summary.isFullyTyped && !summary.isFullySpoken)) {
+      return `
+        <span class="chapter-completed-pill is-listen" title="All ${totalV} verses listened!">
+          🎧 Listened (${totalV}/${totalV}v)${trText}
         </span>
       `;
     }
@@ -617,6 +820,16 @@ export function renderTypingScreen(container, params = {}) {
                 <line x1="8" y1="22" x2="16" y2="22"/>
               </svg>
               <span id="speak-mic-toggle-label">${micEnabled ? 'Pause' : 'Start'}</span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm summary-action-btn listen-play-toggle-btn"
+              id="listen-play-toggle-btn"
+              title="Play or pause audio narration"
+              ${activeMode === 'listen' ? '' : 'hidden'}
+            >
+              <span id="listen-play-toggle-icon">▶</span>
+              <span id="listen-play-toggle-label">Play</span>
             </button>
           </div>
 
@@ -849,6 +1062,21 @@ export function renderTypingScreen(container, params = {}) {
                 ⚙️
               </button>
             </div>
+
+            <!-- Mode 4: Listen -->
+            <div class="mode-radio-item ${activeMode === 'listen' ? 'is-selected' : ''}" data-mode-item="listen">
+              <label class="mode-radio-label" for="mode-radio-listen">
+                <input type="radio" name="bible-mode-radio" id="mode-radio-listen" value="listen" class="mode-radio-input" ${activeMode === 'listen' ? 'checked' : ''} />
+                <span class="mode-radio-custom"></span>
+                <span class="mode-radio-info">
+                  <strong class="mode-radio-name">🎧 Listen</strong>
+                  <span class="mode-radio-desc">Listen to scripture read aloud with voice narration (${singleVerseMode ? 'Single Verse' : 'Chapter'})</span>
+                </span>
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm mode-settings-gear-btn" data-open-mode-settings="listen" title="Listen Mode Settings" aria-label="Listen Mode Settings">
+                ⚙️
+              </button>
+            </div>
           </div>
 
           <div class="typing-options-footer">
@@ -919,6 +1147,31 @@ export function renderTypingScreen(container, params = {}) {
                 <option value="realtime" ${speakTrackingMode === 'realtime' ? 'selected' : ''}>Real-Time Word by Word (Live cursor with anti-drift alignment)</option>
                 <option value="phrase" ${speakTrackingMode === 'phrase' ? 'selected' : ''}>Phrase by Phrase (Waits for short pause — highest accuracy)</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Listen Mode Voice & Speed Tuning Section -->
+          <div class="typing-options-body" id="mode-settings-listen-tuning" hidden style="padding-top:0; border-top:1px solid var(--border-subtle, rgba(255,255,255,0.08)); margin-top:4px;">
+            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:10px;">
+              <label class="option-title" for="listen-voice-select" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>🗣️ Narration Voice</span>
+              </label>
+              <select id="listen-voice-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
+                <option value="">Default System Voice</option>
+              </select>
+              <span class="option-desc" style="font-size:0.75rem; color:var(--text-muted, #94a3b8);">Select from available browser/system text-to-speech voices.</span>
+            </div>
+            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:10px;">
+              <label class="option-title" for="listen-speed-select" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>⚡ Playback Speed</span>
+              </label>
+              <select id="listen-speed-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
+                <option value="0.75">0.75x (Gentle)</option>
+                <option value="1">1.0x (Normal)</option>
+                <option value="1.25">1.25x (Brisk)</option>
+                <option value="1.5">1.5x (Fast)</option>
+              </select>
+              <span class="option-desc" style="font-size:0.75rem; color:var(--text-muted, #94a3b8);">Control narration playback speed.</span>
             </div>
           </div>
 
@@ -1117,6 +1370,10 @@ export function renderTypingScreen(container, params = {}) {
   const modeSettingsSpeakTuning = container.querySelector('#mode-settings-speak-tuning');
   const speakStrictnessSelect = container.querySelector('#speak-strictness-select');
   const speakTrackingModeSelect = container.querySelector('#speak-tracking-mode-select');
+  const modeSettingsListenTuning = container.querySelector('#mode-settings-listen-tuning');
+  const listenVoiceSelect = container.querySelector('#listen-voice-select');
+  const listenSpeedSelect = container.querySelector('#listen-speed-select');
+  const listenPlayToggleBtn = container.querySelector('#listen-play-toggle-btn');
   const modeSettingsDrawBody = container.querySelector('#mode-settings-draw-body');
   const scopeSettingsBackdrop = container.querySelector('#scope-settings-backdrop');
   const scopeSettingsTitle = container.querySelector('#scope-settings-title');
@@ -1258,6 +1515,8 @@ export function renderTypingScreen(container, params = {}) {
         desc.textContent = `Type scripture character by character (${singleVerseMode ? 'Single Verse' : 'Chapter'})`;
       } else if (desc && m === 'speak') {
         desc.textContent = `Speak scripture aloud word by word (${singleVerseMode ? 'Single Verse' : 'Chapter'})`;
+      } else if (desc && m === 'listen') {
+        desc.textContent = `Listen to scripture read aloud with voice narration (${singleVerseMode ? 'Single Verse' : 'Chapter'})`;
       }
     });
 
@@ -1267,7 +1526,7 @@ export function renderTypingScreen(container, params = {}) {
     if (window.location.pathname !== cleanTargetUrl) {
       window.history.replaceState(null, '', cleanTargetUrl);
     }
-    const modeTitle = activeMode === 'speak' ? 'Speak' : (activeMode === 'draw' ? 'Draw' : 'Type');
+    const modeTitle = activeMode === 'speak' ? 'Speak' : (activeMode === 'draw' ? 'Draw' : (activeMode === 'listen' ? 'Listen' : 'Type'));
     document.title = `${book.name} ${initialChapter}${singleVerseMode ? `:${targetSingleVerseNum || 1}` : ''} — ${modeTitle} | Promises to Creation`;
 
     setLastSelectedChapter(book.id, initialChapter, singleVerseMode ? (targetSingleVerseNum || 1) : (requestedStartVerse || null));
@@ -1330,8 +1589,10 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   function switchActiveMode(newMode) {
-    if (!['type', 'draw', 'speak'].includes(newMode)) return;
+    if (!['type', 'draw', 'speak', 'listen'].includes(newMode)) return;
     const prevMode = activeMode;
+    if (prevMode === 'speak') stopSpeechRecognition();
+    if (prevMode === 'listen') stopListenAudio();
     activeMode = newMode;
     meditateMode = activeMode === 'draw';
     setActiveModePref(activeMode);
@@ -1400,11 +1661,21 @@ export function renderTypingScreen(container, params = {}) {
       if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
       if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = false;
       if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
+      if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = true;
+    } else if (targetMode === 'listen') {
+      if (modeSettingsTitle) modeSettingsTitle.textContent = '🎧 Listen Mode Settings';
+      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
+      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
+      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
+      if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = false;
+      populateVoiceSelect();
+      if (listenSpeedSelect) listenSpeedSelect.value = String(getListenRatePref());
     } else {
       if (modeSettingsTitle) modeSettingsTitle.textContent = '⌨️ Type Mode Settings';
       if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
       if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
       if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
+      if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = true;
     }
 
     if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = false;
@@ -1522,6 +1793,27 @@ export function renderTypingScreen(container, params = {}) {
       speakTrackingMode = speakTrackingModeSelect.value;
       setSpeakTrackingModePref(speakTrackingMode);
       trackEvent('speak_tracking_mode_change', { trackingMode: speakTrackingMode });
+    });
+  }
+
+  if (listenVoiceSelect) {
+    listenVoiceSelect.addEventListener('change', () => {
+      setListenVoicePref(listenVoiceSelect.value);
+      trackEvent('listen_voice_change', { voice: listenVoiceSelect.value });
+    });
+  }
+
+  if (listenSpeedSelect) {
+    listenSpeedSelect.addEventListener('change', () => {
+      const spd = parseFloat(listenSpeedSelect.value) || 1.0;
+      setListenRatePref(spd);
+      trackEvent('listen_speed_change', { speed: spd });
+    });
+  }
+
+  if (listenPlayToggleBtn) {
+    listenPlayToggleBtn.addEventListener('click', () => {
+      toggleListenPlayback();
     });
   }
 
@@ -2321,8 +2613,9 @@ export function renderTypingScreen(container, params = {}) {
     const vRec = summary.record?.completedVerses?.[String(vNum)];
     const isVRead = Boolean(summary.isFullyRead || vRec?.isRead);
     const isVSpoken = Boolean(summary.isFullySpoken || vRec?.isSpoken);
-    const isVTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!isVSpoken && !isVRead && vRec?.count && vRec.count > 0));
-    const modesCount = (isVRead ? 1 : 0) + (isVTyped ? 1 : 0) + (isVSpoken ? 1 : 0);
+    const isVListened = Boolean(summary.isFullyListened || vRec?.isListened);
+    const isVTyped = Boolean(summary.isFullyTyped || vRec?.isTyped || (!isVSpoken && !isVRead && !isVListened && vRec?.count && vRec.count > 0));
+    const modesCount = (isVRead ? 1 : 0) + (isVTyped ? 1 : 0) + (isVSpoken ? 1 : 0) + (isVListened ? 1 : 0);
     let cls = 'verse-num';
     let txt = String(vNum);
     let tip = `Verse ${vNum}`;
@@ -2338,6 +2631,10 @@ export function renderTypingScreen(container, params = {}) {
       cls += ' is-spoken';
       txt = `🗣️ ${vNum}`;
       tip = `Verse ${vNum} — Spoken aloud. Click to toggle read status.`;
+    } else if (isVListened) {
+      cls += ' is-listen';
+      txt = `🎧 ${vNum}`;
+      tip = `Verse ${vNum} — Listened via audio narration. Click to toggle read status.`;
     } else if (isVRead) {
       cls += ' is-read';
       txt = `📖 ${vNum}`;
@@ -2624,10 +2921,12 @@ export function renderTypingScreen(container, params = {}) {
   function applyMeditateModeState() {
     const isMeditate = Boolean(singleVerseMode && activeMode === 'draw');
     const isSpeak = activeMode === 'speak';
+    const isListen = activeMode === 'listen';
 
     if (viewportWrapper) {
       viewportWrapper.classList.toggle('is-meditate-active', isMeditate);
       viewportWrapper.classList.toggle('is-speak-active', isSpeak);
+      viewportWrapper.classList.toggle('is-listen-active', isListen);
     }
 
     syncAdvanceStepBtn();
@@ -2642,7 +2941,9 @@ export function renderTypingScreen(container, params = {}) {
     if (focusBannerText) {
       focusBannerText.textContent = isSpeak
         ? '🎙️ Speak aloud into your microphone to advance word by word'
-        : '⌨️ Click any verse or press any key to resume typing';
+        : (isListen
+          ? '🎧 Press ▶ Play to listen to verse narration'
+          : '⌨️ Click any verse or press any key to resume typing');
     }
 
     if (focusBanner && (isMeditate || isSpeak)) {
@@ -2654,8 +2955,13 @@ export function renderTypingScreen(container, params = {}) {
     }
 
     updateSpeakMicUI();
+    updateListenPlayBtnUI();
 
-    if (isMeditate) {
+    if (isListen) {
+      stopSpeechRecognition();
+      if (passageScroll) passageScroll.hidden = false;
+      if (meditateCanvasWrapper) meditateCanvasWrapper.hidden = true;
+    } else if (isMeditate) {
       stopSpeechRecognition();
       if (passageScroll) passageScroll.hidden = true;
       if (meditateCanvasWrapper) {
@@ -4655,7 +4961,7 @@ export function renderTypingScreen(container, params = {}) {
 
   // Mobile virtual keyboard fallback via input event
   hiddenInput.addEventListener('input', (e) => {
-    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') {
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak' || activeMode === 'listen') {
       hiddenInput.value = '';
       return;
     }
@@ -4677,7 +4983,7 @@ export function renderTypingScreen(container, params = {}) {
   });
 
   function focusTypingInput() {
-    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak' || activeMode === 'listen') return;
     if (document.body.classList.contains('browse-open') || isAnyModalOpen()) return;
     hiddenInput.focus({ preventScroll: true });
     viewportWrapper.classList.add('is-focused');
@@ -4685,13 +4991,13 @@ export function renderTypingScreen(container, params = {}) {
   }
 
   hiddenInput.addEventListener('focus', () => {
-    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak' || activeMode === 'listen') return;
     viewportWrapper.classList.add('is-focused');
     focusBanner.hidden = true;
   });
 
   hiddenInput.addEventListener('blur', () => {
-    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak' || activeMode === 'listen') return;
     viewportWrapper.classList.remove('is-focused');
     if (!isCompleted && targetChars.length > 0 && !document.body.classList.contains('browse-open') && !isAnyModalOpen()) {
       focusBanner.hidden = false;
@@ -4699,7 +5005,7 @@ export function renderTypingScreen(container, params = {}) {
   });
 
   viewportWrapper.addEventListener('click', () => {
-    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak') return;
+    if ((singleVerseMode && activeMode === 'draw') || activeMode === 'speak' || activeMode === 'listen') return;
     focusTypingInput();
   });
 

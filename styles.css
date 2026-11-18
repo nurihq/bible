@@ -6375,6 +6375,94 @@ sup.verse-num.is-both {
   color: var(--accent-emerald, #10b981);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   LISTEN MODE CONTROLS, WORD AUDIO HIGHLIGHTING & PROGRESS BADGES
+   ══════════════════════════════════════════════════════════════════════════ */
+.listen-play-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  padding: 0.25rem 0.65rem;
+  min-height: 28px;
+  height: 28px;
+  max-height: 28px;
+  line-height: 1;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
 
+.listen-play-toggle-btn span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
 
+.listen-play-toggle-btn:not(.is-listen-active) {
+  color: var(--text-secondary);
+}
 
+.listen-play-toggle-btn.is-listen-active {
+  background: rgba(168, 85, 247, 0.16);
+  border-color: rgba(168, 85, 247, 0.55);
+  color: #9333ea;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .listen-play-toggle-btn.is-listen-active {
+  background: rgba(168, 85, 247, 0.24);
+  border-color: rgba(192, 132, 252, 0.6);
+  color: #c084fc;
+}
+
+/* Word-level active audio narration highlight in Listen Mode */
+.t-word.is-listen-active {
+  background: rgba(168, 85, 247, 0.22);
+  color: var(--text-primary);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.45);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-theme="dark"] .t-word.is-listen-active {
+  background: rgba(168, 85, 247, 0.32);
+  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.6);
+}
+
+.chapter-completed-pill.is-listen,
+.kpi-badge.is-listen {
+  background: rgba(168, 85, 247, 0.14);
+  color: #9333ea;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+[data-theme="dark"] .chapter-completed-pill.is-listen,
+[data-theme="dark"] .kpi-badge.is-listen {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border-color: rgba(192, 132, 252, 0.45);
+}
+
+.legend-swatch.is-listen,
+.reach-ch-cell.is-listen,
+.browse-ch-cell.is-listen {
+  background: #9333ea;
+  color: #ffffff;
+  border-color: #7e22ce;
+}
+
+sup.verse-num.is-listen,
+.verse-num.is-listen {
+  color: #9333ea;
+  font-weight: 700;
+}
+
+[data-theme="dark"] sup.verse-num.is-listen,
+[data-theme="dark"] .verse-num.is-listen {
+  color: #c084fc;
+}

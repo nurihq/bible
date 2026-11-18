@@ -47,4 +47,11 @@ Applies to paths matching:
    - In Speak Mode, the microphone must default to OFF (`micEnabled = false`).
    - The browser must only request/prompt for microphone access after the user explicitly clicks the "Start" button (`#speak-mic-toggle-btn`).
 10. **Full-Height Mobile Tile**:
-   - On mobile screens (`@media (max-width: 720px)`), the main practice viewport card tile (`.typing-viewport-wrapper` and `.typing-passage-scroll`) expands to fill the entire remaining vertical viewport height in all modes (Type, Speak, Draw).
+   - On mobile screens (`@media (max-width: 720px)`), the main practice viewport card tile (`.typing-viewport-wrapper` and `.typing-passage-scroll`) expands to fill the entire remaining vertical viewport height in all modes (Type, Speak, Draw, Listen).
+11. **Listen Mode (Web Speech API Text-to-Speech & Bible Completion Tracking)**:
+   - **Modes**: The app supports 4 core practice modes across all routes: `Type`, `Draw`, `Speak`, and `Listen` (`/type`, `/draw`, `/speak`, `/listen`).
+   - **Zero Cloud Costs**: Uses the standard browser Web Speech API (`window.speechSynthesis` / `SpeechSynthesisUtterance`), requiring zero external API keys and incurring zero hosting/cloud costs.
+   - **Voice Selection**: Users can choose any available system or browser voice in Mode Settings (`#listen-voice-select`), populated dynamically via `speechSynthesis.getVoices()`.
+   - **Playback Speed**: Configurable playback rate (0.75x, 1.0x, 1.25x, 1.5x) in Mode Settings.
+   - **Live Word Highlighting**: Audio words are highlighted in real-time (`.t-word.is-listen-active`) using utterance boundary tracking.
+   - **Bible Completion Tracking**: Once audio narration for a verse finishes, it is automatically recorded via `markVerseAsListened`. Listened verses are factored into `isVerseCovered`, counting toward overall chapter and Bible completion in the Progress section alongside Read, Typed, and Spoken.

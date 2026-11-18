@@ -1,10 +1,10 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261112_v11';
-import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261112_v11';
-import { getCadenceDescriptor } from './typing.js?v=20261112_v11';
-import { trackEvent } from '../analytics.js?v=20261112_v11';
+} from '../bible-data.js?v=20261112_v12';
+import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261112_v12';
+import { getCadenceDescriptor } from './typing.js?v=20261112_v12';
+import { trackEvent } from '../analytics.js?v=20261112_v12';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -130,7 +130,7 @@ function buildSpeedChartSVG(sessions, metric = 'wpm') {
 
 export function renderProgressScreen(container) {
   let activeChartMetric = 'wpm'; // 'wpm' | 'cpm' | 'cadence'
-  let activeCoverageFilter = 'ALL'; // 'ALL' | 'TYPED' | 'SPEAK' | 'READ'
+  let activeCoverageFilter = 'ALL'; // 'ALL' | 'TYPED' | 'SPEAK' | 'LISTEN' | 'READ'
   let activeTranslationFilter = 'ALL';
   let showTranslationDrawer = false;
   let activeTestamentTab = 'ALL';
@@ -226,6 +226,7 @@ export function renderProgressScreen(container) {
               <span class="kpi-badge is-read">📖 ${stats.overallReadChapters} read</span>
               <span class="kpi-badge is-done">⌨️ ${stats.overallTypedChapters} typed</span>
               <span class="kpi-badge is-spoken">🗣️ ${stats.overallSpokenChapters} spoken</span>
+              <span class="kpi-badge is-listen">🎧 ${stats.overallListenedChapters} listened</span>
               ${stats.overallBothChapters > 0 ? `<span class="kpi-badge is-both">✨ ${stats.overallBothChapters} multi</span>` : ''}
             </div>
             <div class="kpi-mini-bar">
@@ -275,6 +276,21 @@ export function renderProgressScreen(container) {
             </div>
             <div class="kpi-note-text">
               ${stats.totalWordsSpoken.toLocaleString()} words spoken across ${stats.spokenSessionsCount} sessions
+            </div>
+          </div>
+
+          <!-- Card 5: Scripture Listened -->
+          <div class="kpi-card">
+            <div class="kpi-card-top">
+              <span class="kpi-label">Scripture Listened</span>
+              <span class="kpi-icon">🎧</span>
+            </div>
+            <div class="kpi-value">${stats.overallListenedChapters} <small>/ ${stats.totalBibleChapters} ch</small></div>
+            <div class="kpi-sub">
+              <strong>${stats.overallListenedPercentage}%</strong> chapters · <strong>${stats.overallListenedVerses.toLocaleString()}</strong> verses listened (${stats.overallListenedVersesPercentage}%)
+            </div>
+            <div class="kpi-note-text">
+              Listened through audio voice narration
             </div>
           </div>
         </div>
@@ -394,6 +410,7 @@ export function renderProgressScreen(container) {
                 <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'ALL' ? 'active' : ''}" data-coverage-filter="ALL">All Covered (${stats.overallCoveredChapters})</button>
                 <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'TYPED' ? 'active' : ''}" data-coverage-filter="TYPED">Typed (${stats.overallTypedChapters})</button>
                 <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'SPEAK' ? 'active' : ''}" data-coverage-filter="SPEAK">Spoken (${stats.overallSpokenChapters})</button>
+                <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'LISTEN' ? 'active' : ''}" data-coverage-filter="LISTEN">Listened (${stats.overallListenedChapters})</button>
                 <button type="button" class="pill-toggle-btn ${activeCoverageFilter === 'READ' ? 'active' : ''}" data-coverage-filter="READ">Read (${stats.overallReadChapters})</button>
               </div>
 
@@ -419,6 +436,7 @@ export function renderProgressScreen(container) {
           <div class="completeness-legend-bar">
             <span class="legend-item"><i class="legend-swatch is-done"></i> <strong>Typed</strong></span>
             <span class="legend-item"><i class="legend-swatch is-spoken"></i> <strong>Spoken</strong></span>
+            <span class="legend-item"><i class="legend-swatch is-listen"></i> <strong>Listened</strong></span>
             <span class="legend-item"><i class="legend-swatch is-read"></i> <strong>Read</strong></span>
             <span class="legend-item"><i class="legend-swatch is-both"></i> <strong>Multiple Modes</strong></span>
             <span class="legend-item"><i class="legend-swatch is-partial"></i> <strong>In Progress</strong></span>
@@ -483,6 +501,14 @@ export function renderProgressScreen(container) {
                     partialInBook++;
                     versesInBook += sum.spokenVersesCount;
                   }
+                } else if (activeCoverageFilter === 'LISTEN') {
+                  if (sum.isFullyListened) {
+                    doneInBook++;
+                    versesInBook += sum.totalVerses;
+                  } else if (sum.listenedVersesCount > 0) {
+                    partialInBook++;
+                    versesInBook += sum.listenedVersesCount;
+                  }
                 } else if (activeCoverageFilter === 'READ') {
                   if (sum.isFullyRead) {
                     doneInBook++;
@@ -534,6 +560,15 @@ export function renderProgressScreen(container) {
                       cellTitle = `${b.name} ${c} — Partially Spoken (${sum.spokenVersesCount}/${sum.totalVerses}v)`;
                       cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.spokenVersesCount}v</sup>`;
                     }
+                  } else if (activeCoverageFilter === 'LISTEN') {
+                    if (sum.isFullyListened) {
+                      cellClass = 'is-listen';
+                      cellTitle = `${b.name} ${c} — Fully Listened (${sum.listenedVersesCount}/${sum.totalVerses}v)`;
+                    } else if (sum.listenedVersesCount > 0) {
+                      cellClass = 'is-partial';
+                      cellTitle = `${b.name} ${c} — Partially Listened (${sum.listenedVersesCount}/${sum.totalVerses}v)`;
+                      cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.listenedVersesCount}v</sup>`;
+                    }
                   } else if (activeCoverageFilter === 'READ') {
                     if (sum.isFullyRead) {
                       cellClass = 'is-read';
@@ -550,10 +585,13 @@ export function renderProgressScreen(container) {
                     } else if (sum.isTypedOnly || (sum.isFullyTyped && !sum.isFullyRead && !sum.isFullySpoken)) {
                       cellClass = 'is-done';
                       cellTitle = `${b.name} ${c} — Typed (${sum.typedVersesCount}/${sum.totalVerses}v${trs ? ` in ${trs}` : ''}) · Best: ${sum.bestWpm} WPM`;
-                    } else if (sum.isSpokenOnly || (sum.isFullySpoken && !sum.isFullyRead && !sum.isFullyTyped)) {
+                    } else if (sum.isSpokenOnly || (sum.isFullySpoken && !sum.isFullyRead && !sum.isFullyTyped && !sum.isFullyListened)) {
                       cellClass = 'is-spoken';
                       cellTitle = `${b.name} ${c} — Spoken (${sum.spokenVersesCount}/${sum.totalVerses}v)`;
-                    } else if (sum.isReadOnly || (sum.isFullyRead && !sum.isFullyTyped && !sum.isFullySpoken)) {
+                    } else if (sum.isListenedOnly || (sum.isFullyListened && !sum.isFullyRead && !sum.isFullyTyped && !sum.isFullySpoken)) {
+                      cellClass = 'is-listen';
+                      cellTitle = `${b.name} ${c} — Listened (${sum.listenedVersesCount}/${sum.totalVerses}v)`;
+                    } else if (sum.isReadOnly || (sum.isFullyRead && !sum.isFullyTyped && !sum.isFullySpoken && !sum.isFullyListened)) {
                       cellClass = 'is-read';
                       cellTitle = `${b.name} ${c} — Marked as Read (${sum.readVersesCount}/${sum.totalVerses}v)`;
                     } else if (sum.isPartial) {
@@ -562,6 +600,7 @@ export function renderProgressScreen(container) {
                       if (sum.readVersesCount > 0) parts.push(`${sum.readVersesCount} read`);
                       if (sum.typedVersesCount > 0) parts.push(`${sum.typedVersesCount} typed`);
                       if (sum.spokenVersesCount > 0) parts.push(`${sum.spokenVersesCount} spoken`);
+                      if (sum.listenedVersesCount > 0) parts.push(`${sum.listenedVersesCount} listened`);
                       cellTitle = `${b.name} ${c} — In Progress (${sum.completedVersesCount}/${sum.totalVerses || '?'}v: ${parts.join(', ')})`;
                       cellContent = `${c}<sup style="font-size:0.55rem; margin-left:1px;">${sum.completedVersesCount}v</sup>`;
                     }
@@ -569,7 +608,7 @@ export function renderProgressScreen(container) {
 
                   chapterCells.push(`
                     <a
-                      href="/${activeCoverageFilter === 'SPEAK' ? 'speak' : (activeMode === 'draw' ? 'type' : activeMode)}/${b.id}/${c}"
+                      href="/${activeCoverageFilter === 'SPEAK' ? 'speak' : (activeCoverageFilter === 'LISTEN' ? 'listen' : (activeMode === 'draw' ? 'type' : activeMode))}/${b.id}/${c}"
                       class="reach-ch-cell ${cellClass}"
                       title="${cellTitle}"
                     >
@@ -645,7 +684,8 @@ export function renderProgressScreen(container) {
                   ${stats.sessions.map(s => {
                     const isSpoken = s.activityType === 'spoken';
                     const isRead = s.activityType === 'read';
-                    const modeRoute = isSpoken ? 'speak' : 'type';
+                    const isListen = s.activityType === 'listen' || s.activityType === 'listened';
+                    const modeRoute = isSpoken ? 'speak' : (isListen ? 'listen' : 'type');
                     const singleV = s.verseNumber || (s.versesTyped === 1 && /^\d+$/.test(String(s.verseRange || '')) ? Number(s.verseRange) : null);
                     const sCadence = isSpoken ? getCadenceDescriptor(s.wpm) : null;
                     return `
@@ -657,8 +697,8 @@ export function renderProgressScreen(container) {
                           </div>
                         </td>
                         <td>
-                          <span class="kpi-badge ${isSpoken ? 'is-spoken' : (isRead ? 'is-read' : 'is-done')}">
-                            ${isSpoken ? '🗣️ Spoken' : (isRead ? '📖 Read' : '⌨️ Typed')}
+                          <span class="kpi-badge ${isSpoken ? 'is-spoken' : (isRead ? 'is-read' : (isListen ? 'is-listen' : 'is-done'))}">
+                            ${isSpoken ? '🗣️ Spoken' : (isRead ? '📖 Read' : (isListen ? '🎧 Listened' : '⌨️ Typed'))}
                           </span>
                         </td>
                         <td><span class="hist-tr-badge">${s.translation || 'ESV'}</span></td>

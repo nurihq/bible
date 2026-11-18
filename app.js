@@ -1,5 +1,5 @@
-import { Navbar } from './components/navbar.js?v=20261112_v11';
-import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261112_v11';
+import { Navbar } from './components/navbar.js?v=20261112_v12';
+import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261112_v12';
 import {
   Auth,
   syncLocalToCloud,
@@ -10,19 +10,19 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261112_v11';
-import { initGA, trackPageView } from './analytics.js?v=20261112_v11';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261112_v11';
-import { navigate, parseActiveRoute } from './router.js?v=20261112_v11';
-export { navigate, parseActiveRoute } from './router.js?v=20261112_v11';
+} from './api.js?v=20261112_v12';
+import { initGA, trackPageView } from './analytics.js?v=20261112_v12';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261112_v12';
+import { navigate, parseActiveRoute } from './router.js?v=20261112_v12';
+export { navigate, parseActiveRoute } from './router.js?v=20261112_v12';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261112_v11';
-import { renderLandingScreen } from './screens/home.js?v=20261112_v11';
-import { renderTypingScreen } from './screens/typing.js?v=20261112_v11';
-import { renderProgressScreen } from './screens/progress.js?v=20261112_v11';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261112_v11';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261112_v11';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261112_v11';
+import { renderSignInScreen } from './screens/signin.js?v=20261112_v12';
+import { renderLandingScreen } from './screens/home.js?v=20261112_v12';
+import { renderTypingScreen } from './screens/typing.js?v=20261112_v12';
+import { renderProgressScreen } from './screens/progress.js?v=20261112_v12';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261112_v12';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261112_v12';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261112_v12';
 
 class App {
   constructor() {
@@ -86,7 +86,7 @@ class App {
       if (document.visibilityState === 'visible' && Auth.isAuthenticated()) {
         syncLocalToCloud().then(() => {
           const { path } = parseActiveRoute();
-          if (/^\/(?:typing|type|speak|draw|promises)/.test(path)) return;
+          if (/^\/(?:typing|type|speak|draw|listen|promises)/.test(path)) return;
           this.handleRoute();
         });
       }
@@ -130,7 +130,7 @@ class App {
   handleRoute() {
     const { path, query } = parseActiveRoute();
 
-    const isPracticeRoute = /^\/(?:typing|type|speak|draw|promises)(?:\/|$)/.test(path);
+    const isPracticeRoute = /^\/(?:typing|type|speak|draw|listen|promises)(?:\/|$)/.test(path);
 
     // Clean up active typing/speech intervals when leaving the practice screen
     if (!isPracticeRoute && window.__bibleTypingCleanup) {
@@ -167,7 +167,7 @@ class App {
     }
 
     // Bare mode entry points: /typing, /type, /speak, /draw
-    const bareModeMatch = path.match(/^\/(typing|type|speak|draw)$/);
+    const bareModeMatch = path.match(/^\/(typing|type|speak|draw|listen)$/);
     if (bareModeMatch) {
       const rawMode = bareModeMatch[1];
       const targetMode = rawMode === 'typing' ? getActiveModePref() : rawMode;
@@ -196,7 +196,7 @@ class App {
     }
 
     // Single-Verse Granularity Route: /:mode/:bookId/:chapter/:verse
-    const verseMatch = path.match(/^\/(typing|type|speak|draw)\/(\d+)\/(\d+)\/(\d+)$/);
+    const verseMatch = path.match(/^\/(typing|type|speak|draw|listen)\/(\d+)\/(\d+)\/(\d+)$/);
     if (verseMatch) {
       const rawMode = verseMatch[1];
       const bookId = Number(verseMatch[2]);
@@ -211,7 +211,7 @@ class App {
         return;
       }
       const book = getBookById(bookId);
-      const modeTitle = mode === 'speak' ? 'Speak' : (mode === 'draw' ? 'Draw' : 'Type');
+      const modeTitle = mode === 'speak' ? 'Speak' : (mode === 'draw' ? 'Draw' : (mode === 'listen' ? 'Listen' : 'Type'));
       document.title = `${book.name} ${chapter}:${verse} — ${modeTitle} | Promises to Creation`;
       trackPageView(path, document.title);
       renderTypingScreen(this.mainContainer, {
@@ -225,7 +225,7 @@ class App {
     }
 
     // Full-Chapter Route (with optional ?verse=X starting verse): /:mode/:bookId/:chapter
-    const chapterMatch = path.match(/^\/(typing|type|speak|draw)\/(\d+)\/(\d+)$/);
+    const chapterMatch = path.match(/^\/(typing|type|speak|draw|listen)\/(\d+)\/(\d+)$/);
     if (chapterMatch) {
       const rawMode = chapterMatch[1];
       const bookId = Number(chapterMatch[2]);
@@ -245,7 +245,7 @@ class App {
         return;
       }
       const book = getBookById(bookId);
-      const modeTitle = mode === 'speak' ? 'Speak' : 'Type';
+      const modeTitle = mode === 'speak' ? 'Speak' : (mode === 'listen' ? 'Listen' : 'Type');
       document.title = `${book.name} ${chapter}${startVerse ? ` (v. ${startVerse})` : ''} — ${modeTitle} | Promises to Creation`;
       trackPageView(path, document.title);
       renderTypingScreen(this.mainContainer, {
