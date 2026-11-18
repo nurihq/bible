@@ -1133,51 +1133,40 @@ export function renderTypingScreen(container, params = {}) {
           </div>
 
           <!-- Speak Mode Speech Recognition Tuning Section -->
-          <div class="typing-options-body" id="mode-settings-speak-tuning" hidden style="padding-top:0; border-top:1px solid var(--border-subtle, rgba(255,255,255,0.08)); margin-top:4px;">
-            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:10px;">
-              <label class="option-title" for="speak-strictness-select" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>🎙️ Pronunciation Strictness</span>
-              </label>
-              <select id="speak-strictness-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
-                <option value="lenient" ${speakStrictness === 'lenient' ? 'selected' : ''}>Lenient / Natural (Forgives mic-dropped "the/to/who" &amp; homophones)</option>
-                <option value="standard" ${speakStrictness === 'standard' ? 'selected' : ''}>Standard (Balanced phonetic &amp; stem matching)</option>
-                <option value="strict" ${speakStrictness === 'strict' ? 'selected' : ''}>Strict (Exact pronunciation match)</option>
+          <div class="typing-options-body mode-tuning-panel" id="mode-settings-speak-tuning" hidden>
+            <div class="typing-option-row option-action-row">
+              <span class="option-title">Pronunciation strictness</span>
+              <select id="speak-strictness-select" class="option-select-inline" aria-label="Pronunciation strictness">
+                <option value="lenient" ${speakStrictness === 'lenient' ? 'selected' : ''}>Lenient</option>
+                <option value="standard" ${speakStrictness === 'standard' ? 'selected' : ''}>Standard</option>
+                <option value="strict" ${speakStrictness === 'strict' ? 'selected' : ''}>Strict</option>
               </select>
             </div>
-
-            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:8px;">
-              <label class="option-title" for="speak-tracking-mode-select" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>⏱️ Recognition Timing</span>
-              </label>
-              <select id="speak-tracking-mode-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
-                <option value="realtime" ${speakTrackingMode === 'realtime' ? 'selected' : ''}>Real-Time Word by Word (Live cursor with anti-drift alignment)</option>
-                <option value="phrase" ${speakTrackingMode === 'phrase' ? 'selected' : ''}>Phrase by Phrase (Waits for short pause — highest accuracy)</option>
+            <div class="typing-option-row option-action-row">
+              <span class="option-title">Recognition timing</span>
+              <select id="speak-tracking-mode-select" class="option-select-inline" aria-label="Recognition timing">
+                <option value="realtime" ${speakTrackingMode === 'realtime' ? 'selected' : ''}>Word by word</option>
+                <option value="phrase" ${speakTrackingMode === 'phrase' ? 'selected' : ''}>After each phrase</option>
               </select>
             </div>
           </div>
 
           <!-- Listen Mode Voice & Speed Tuning Section -->
-          <div class="typing-options-body" id="mode-settings-listen-tuning" hidden style="padding-top:0; border-top:1px solid var(--border-subtle, rgba(255,255,255,0.08)); margin-top:4px;">
-            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:10px;">
-              <label class="option-title" for="listen-voice-select" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>🗣️ Narration Voice</span>
-              </label>
-              <select id="listen-voice-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
-                <option value="">Default System Voice</option>
+          <div class="typing-options-body mode-tuning-panel" id="mode-settings-listen-tuning" hidden>
+            <div class="typing-option-row option-action-row">
+              <span class="option-title">Narration voice</span>
+              <select id="listen-voice-select" class="option-select-inline" aria-label="Narration voice">
+                <option value="">System default</option>
               </select>
-              <span class="option-desc" style="font-size:0.75rem; color:var(--text-muted, #94a3b8);">Select from available browser/system text-to-speech voices.</span>
             </div>
-            <div class="typing-option-row" style="flex-direction:column; align-items:stretch; gap:6px; padding-top:10px;">
-              <label class="option-title" for="listen-speed-select" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>⚡ Playback Speed</span>
-              </label>
-              <select id="listen-speed-select" class="btn btn-secondary btn-sm" style="width:100%; text-align:left; padding:8px 10px;">
-                <option value="0.75">0.75x (Gentle)</option>
-                <option value="1">1.0x (Normal)</option>
-                <option value="1.25">1.25x (Brisk)</option>
-                <option value="1.5">1.5x (Fast)</option>
+            <div class="typing-option-row option-action-row">
+              <span class="option-title">Playback speed</span>
+              <select id="listen-speed-select" class="option-select-inline" aria-label="Playback speed">
+                <option value="0.75">0.75×</option>
+                <option value="1">1×</option>
+                <option value="1.25">1.25×</option>
+                <option value="1.5">1.5×</option>
               </select>
-              <span class="option-desc" style="font-size:0.75rem; color:var(--text-muted, #94a3b8);">Control narration playback speed.</span>
             </div>
           </div>
 
