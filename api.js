@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261118_v16';
+import { CONFIG } from './config.js?v=20261118_v17';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261118_v16';
+} from './bible-data.js?v=20261118_v17';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -2481,11 +2481,21 @@ export function getGlobalTypingStats() {
     if (listenedInBook === book.chapters) listenedBooksCount++;
   }
 
-  // Speed & volume metrics across TYPED sessions only (do not include read or spoken sessions in typing WPM/CPM)
-  const typedSessions = sessions.filter(s => s.activityType !== 'read' && s.activityType !== 'spoken');
+  // Speed & volume metrics across TYPED sessions only (do not include read, spoken, listened, or draw sessions in typing WPM/CPM)
+  const typedSessions = sessions.filter(s =>
+    (!s.activityType || s.activityType === 'typed') &&
+    s.activityType !== 'read' &&
+    s.activityType !== 'spoken' &&
+    s.activityType !== 'listen' &&
+    s.activityType !== 'listened' &&
+    s.activityType !== 'draw' &&
+    ((Number(s.wpm) || 0) > 0 || (Number(s.cpm) || 0) > 0 || (Number(s.charsTyped) || 0) > 0)
+  );
   let totalWpmSum = 0;
   let totalCpmSum = 0;
   let totalAccSum = 0;
+  let wpmCount = 0;
+  let cpmCount = 0;
   let bestWpm = 0;
   let bestCpm = 0;
   let totalVersesTyped = 0;
@@ -2497,8 +2507,14 @@ export function getGlobalTypingStats() {
     const wpm = Number(s.wpm) || 0;
     const cpm = Number(s.cpm) || 0;
     const acc = Number(s.accuracy) ?? 100;
-    totalWpmSum += wpm;
-    totalCpmSum += cpm;
+    if (wpm > 0) {
+      totalWpmSum += wpm;
+      wpmCount++;
+    }
+    if (cpm > 0) {
+      totalCpmSum += cpm;
+      cpmCount++;
+    }
     totalAccSum += acc;
     if (wpm > bestWpm) bestWpm = wpm;
     if (cpm > bestCpm) bestCpm = cpm;
@@ -2509,21 +2525,29 @@ export function getGlobalTypingStats() {
   }
 
   const typedChapterRecords = allChapterRecords.filter(c => (c.bestWpm || 0) > 0 || c.isTyped);
-  if (typedSessions.length === 0 && typedChapterRecords.length > 0) {
+  if (wpmCount === 0 && typedChapterRecords.length > 0) {
     for (const c of typedChapterRecords) {
-      totalWpmSum += Number(c.bestWpm) || 0;
-      totalCpmSum += Number(c.bestCpm) || 0;
+      const bwpm = Number(c.bestWpm) || 0;
+      const bcpm = Number(c.bestCpm) || 0;
+      if (bwpm > 0) {
+        totalWpmSum += bwpm;
+        wpmCount++;
+      }
+      if (bcpm > 0) {
+        totalCpmSum += bcpm;
+        cpmCount++;
+      }
       totalAccSum += Number(c.bestAccuracy) || 100;
-      if ((c.bestWpm || 0) > bestWpm) bestWpm = c.bestWpm;
-      if ((c.bestCpm || 0) > bestCpm) bestCpm = c.bestCpm;
+      if (bwpm > bestWpm) bestWpm = bwpm;
+      if (bcpm > bestCpm) bestCpm = bcpm;
       totalVersesTyped += Object.keys(c.completedVerses || {}).length || Number(c.versesCount) || 0;
     }
   }
 
-  const denom = typedSessions.length || typedChapterRecords.length || 0;
-  const avgWpm = denom > 0 ? Math.round((totalWpmSum / denom) * 10) / 10 : 0;
-  const avgCpm = denom > 0 ? Math.round(totalCpmSum / denom) : 0;
-  const avgAccuracy = denom > 0 ? Math.round((totalAccSum / denom) * 10) / 10 : 100;
+  const avgWpm = wpmCount > 0 ? Math.round((totalWpmSum / wpmCount) * 10) / 10 : 0;
+  const avgCpm = cpmCount > 0 ? Math.round(totalCpmSum / cpmCount) : 0;
+  const denomAcc = typedSessions.length || typedChapterRecords.length || 0;
+  const avgAccuracy = denomAcc > 0 ? Math.round((totalAccSum / denomAcc) * 10) / 10 : 100;
 
   // Speaking Cadence (WPM), Pronunciation Accuracy & Enunciation across SPOKEN sessions
   const spokenSessions = sessions.filter(s => s.activityType === 'spoken');

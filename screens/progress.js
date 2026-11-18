@@ -1,10 +1,10 @@
 import {
   BIBLE_BOOKS,
   getTranslationByCode
-} from '../bible-data.js?v=20261118_v16';
-import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261118_v16';
-import { getCadenceDescriptor } from './typing.js?v=20261118_v16';
-import { trackEvent } from '../analytics.js?v=20261118_v16';
+} from '../bible-data.js?v=20261118_v17';
+import { getGlobalTypingStats, getChapterProgressSummary, getActiveModePref } from '../api.js?v=20261118_v17';
+import { getCadenceDescriptor } from './typing.js?v=20261118_v17';
+import { trackEvent } from '../analytics.js?v=20261118_v17';
 
 function formatTotalDuration(ms) {
   const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -34,9 +34,31 @@ function formatDateShort(isoStr) {
 }
 
 function buildSpeedChartSVG(sessions, metric = 'wpm') {
-  const filtered = metric === 'cadence'
-    ? sessions.filter(s => s.activityType === 'spoken' && (Number(s.wpm) || 0) > 0)
-    : sessions.filter(s => s.activityType !== 'read' && s.activityType !== 'spoken');
+  let filtered;
+  if (metric === 'cadence') {
+    filtered = sessions.filter(s => s.activityType === 'spoken' && (Number(s.wpm) || 0) > 0);
+  } else if (metric === 'cpm') {
+    filtered = sessions.filter(s =>
+      (!s.activityType || s.activityType === 'typed') &&
+      s.activityType !== 'read' &&
+      s.activityType !== 'spoken' &&
+      s.activityType !== 'listen' &&
+      s.activityType !== 'listened' &&
+      s.activityType !== 'draw' &&
+      (Number(s.cpm) || 0) > 0
+    );
+  } else {
+    // metric === 'wpm'
+    filtered = sessions.filter(s =>
+      (!s.activityType || s.activityType === 'typed') &&
+      s.activityType !== 'read' &&
+      s.activityType !== 'spoken' &&
+      s.activityType !== 'listen' &&
+      s.activityType !== 'listened' &&
+      s.activityType !== 'draw' &&
+      (Number(s.wpm) || 0) > 0
+    );
+  }
   const chronological = [...filtered].reverse().slice(-30);
   if (chronological.length === 0) {
     if (metric === 'cadence') {
@@ -703,19 +725,23 @@ export function renderProgressScreen(container) {
                         </td>
                         <td><span class="hist-tr-badge">${s.translation || 'ESV'}</span></td>
                         <td>
-                          ${isSpoken
-                            ? `<strong>${s.wpm || 0} WPM</strong>`
-                            : `<strong>${s.wpm} WPM</strong>`}
+                          ${(isListen || isRead)
+                            ? '<span style="color:var(--text-muted);">—</span>'
+                            : `<strong>${s.wpm || 0} WPM</strong>`}
                         </td>
                         <td>
-                          ${isSpoken
-                            ? `<span class="hist-cadence-note">${sCadence?.shortLabel || 'Cadence'}</span>`
-                            : `${s.cpm} CPM`}
+                          ${(isListen || isRead)
+                            ? '<span style="color:var(--text-muted);">—</span>'
+                            : (isSpoken
+                              ? `<span class="hist-cadence-note">${sCadence?.shortLabel || 'Cadence'}</span>`
+                              : `${s.cpm || 0} CPM`)}
                         </td>
                         <td>
-                          ${isSpoken
-                            ? `${s.accuracy ?? 100}% pron · ${s.enunciation ?? s.accuracy ?? 100}% enun`
-                            : `${s.accuracy ?? 100}%`}
+                          ${(isListen || isRead)
+                            ? '<span style="color:var(--text-muted);">—</span>'
+                            : (isSpoken
+                              ? `${s.accuracy ?? 100}% pron · ${s.enunciation ?? s.accuracy ?? 100}% enun`
+                              : `${s.accuracy ?? 100}%`)}
                         </td>
                         <td>${formatTotalDuration(s.durationMs)}</td>
                         <td class="hist-date-cell">${formatDateShort(s.completedAt)}</td>
