@@ -1,1 +1,1 @@
-export { renderDrawingsScreen, renderDrawingsScreen as renderMeditationsScreen } from './drawings.js?v=20261112_v14';
+export { renderDrawingsScreen, renderDrawingsScreen as renderMeditationsScreen } from './drawings.js?v=20261118_v15';

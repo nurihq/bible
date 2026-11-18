@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261112_v14';
+} from '../bible-data.js?v=20261118_v15';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -97,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261112_v14';
+} from '../api.js?v=20261118_v15';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261112_v14';
-import { trackEvent } from '../analytics.js?v=20261112_v14';
-import { navigate } from '../router.js?v=20261112_v14';
+} from '../meditate-art.js?v=20261118_v15';
+import { trackEvent } from '../analytics.js?v=20261118_v15';
+import { navigate } from '../router.js?v=20261118_v15';
 
 function escapeHtml(str) {
   return String(str)
@@ -1266,6 +1266,14 @@ export function renderTypingScreen(container, params = {}) {
               </div>
             </div>
 
+            <!-- Active mode's settings (panels are moved here while the Actions modal is open) -->
+            <div id="actions-mode-settings-section">
+              <div class="typing-options-section-divider">
+                <span id="actions-mode-settings-title">Mode Settings</span>
+              </div>
+              <div id="actions-mode-settings-host"></div>
+            </div>
+
             <div class="typing-options-section-divider">
               <span>General Options</span>
             </div>
@@ -1390,6 +1398,8 @@ export function renderTypingScreen(container, params = {}) {
   const actionsStatsRow = container.querySelector('#actions-stats-row');
   const actionsTagsRow = container.querySelector('#actions-tags-row');
   const actionsRestartRow = container.querySelector('#actions-restart-row');
+  const actionsModeSettingsHost = container.querySelector('#actions-mode-settings-host');
+  const actionsModeSettingsTitle = container.querySelector('#actions-mode-settings-title');
 
   const toggleShuffleCheckbox = container.querySelector('#toggle-shuffle-checkbox');
   const toggleAutoAdvanceCheckbox = container.querySelector('#toggle-auto-advance-checkbox');
@@ -1641,7 +1651,15 @@ export function renderTypingScreen(container, params = {}) {
     focusTypingInput();
   }
 
-  function openModeSettingsModal(targetMode) {
+  const MODE_SETTINGS_TITLES = {
+    type: '⌨️ Type Mode Settings',
+    draw: '🎨 Draw Mode Settings',
+    speak: '🗣️ Speak Mode Settings',
+    listen: '🎧 Listen Mode Settings'
+  };
+
+  // Show only the settings panels that belong to `targetMode` and refresh their control values.
+  function applyModeSettingsPanels(targetMode) {
     syncScopeRadioUI(singleVerseMode);
     if (toggleShuffleCheckbox) toggleShuffleCheckbox.checked = shuffleVerses;
     if (toggleAutoAdvanceCheckbox) toggleAutoAdvanceCheckbox.checked = autoAdvance;
@@ -1651,33 +1669,32 @@ export function renderTypingScreen(container, params = {}) {
     if (speakStrictnessSelect) speakStrictnessSelect.value = speakStrictness;
     if (speakTrackingModeSelect) speakTrackingModeSelect.value = speakTrackingMode;
 
-    if (targetMode === 'draw') {
-      if (modeSettingsTitle) modeSettingsTitle.textContent = '🎨 Draw Mode Settings';
-      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = true;
-      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
-      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = false;
-    } else if (targetMode === 'speak') {
-      if (modeSettingsTitle) modeSettingsTitle.textContent = '🗣️ Speak Mode Settings';
-      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
-      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = false;
-      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
-      if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = true;
-    } else if (targetMode === 'listen') {
-      if (modeSettingsTitle) modeSettingsTitle.textContent = '🎧 Listen Mode Settings';
-      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
-      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
-      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
-      if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = false;
+    const isDraw = targetMode === 'draw';
+    if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = isDraw;
+    if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = targetMode !== 'speak';
+    if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = targetMode !== 'listen';
+    if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = !isDraw;
+
+    if (targetMode === 'listen') {
       populateVoiceSelect();
       if (listenSpeedSelect) listenSpeedSelect.value = String(getListenRatePref());
-    } else {
-      if (modeSettingsTitle) modeSettingsTitle.textContent = '⌨️ Type Mode Settings';
-      if (modeSettingsTypeSpeakBody) modeSettingsTypeSpeakBody.hidden = false;
-      if (modeSettingsSpeakTuning) modeSettingsSpeakTuning.hidden = true;
-      if (modeSettingsDrawBody) modeSettingsDrawBody.hidden = true;
-      if (modeSettingsListenTuning) modeSettingsListenTuning.hidden = true;
     }
+  }
 
+  // Move the mode settings panels back into the Mode Settings modal card (before its footer).
+  function restoreModeSettingsPanels() {
+    const card = modeSettingsBackdrop ? modeSettingsBackdrop.querySelector('.mode-settings-card') : null;
+    const footer = card ? card.querySelector('.typing-options-footer') : null;
+    if (!card || !footer) return;
+    [modeSettingsTypeSpeakBody, modeSettingsSpeakTuning, modeSettingsListenTuning, modeSettingsDrawBody].forEach(panel => {
+      if (panel && panel.parentElement !== card) card.insertBefore(panel, footer);
+    });
+  }
+
+  function openModeSettingsModal(targetMode) {
+    restoreModeSettingsPanels();
+    applyModeSettingsPanels(targetMode);
+    if (modeSettingsTitle) modeSettingsTitle.textContent = MODE_SETTINGS_TITLES[targetMode] || MODE_SETTINGS_TITLES.type;
     if (modeSettingsBackdrop) modeSettingsBackdrop.hidden = false;
   }
 
@@ -1720,12 +1737,26 @@ export function renderTypingScreen(container, params = {}) {
     if (actionsRestartRow) {
       actionsRestartRow.hidden = activeMode === 'draw';
     }
+
+    // Show the current mode's settings inline in the Actions modal
+    if (actionsModeSettingsHost) {
+      applyModeSettingsPanels(activeMode);
+      [modeSettingsTypeSpeakBody, modeSettingsSpeakTuning, modeSettingsListenTuning, modeSettingsDrawBody].forEach(panel => {
+        if (panel) actionsModeSettingsHost.appendChild(panel);
+      });
+      if (actionsModeSettingsTitle) {
+        actionsModeSettingsTitle.textContent = MODE_SETTINGS_TITLES[activeMode] || MODE_SETTINGS_TITLES.type;
+      }
+    }
+
     updateReadButtons();
     if (actionsBackdrop) actionsBackdrop.hidden = false;
   }
 
   function closeActionsModal() {
+    if (scopeSettingsBackdrop) scopeSettingsBackdrop.hidden = true;
     if (actionsBackdrop) actionsBackdrop.hidden = true;
+    restoreModeSettingsPanels();
     focusTypingInput();
   }
 
