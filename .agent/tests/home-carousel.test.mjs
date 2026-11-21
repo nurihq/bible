@@ -393,3 +393,56 @@ test('7. Actions modal strictly isolates mode settings to the current activeMode
   );
   assert.match(cssSrc, /\.typing-actions-card \[hidden\]/);
 });
+
+test('8. Swiping a verse or calling markVerseAsRead marks ONLY that single verse, not the whole chapter', () => {
+  globalThis.localStorage.clear();
+
+  // Pick Isaiah 48:18 (book 23, chapter 48, verse 18). Total verses in Isaiah 48 is 22.
+  const bookId = 23;
+  const chapter = 48;
+  const verse = 18;
+
+  // Initially unread
+  let chSum = api.getChapterProgressSummary(bookId, chapter, 'ALL');
+  assert.equal(chSum.isFullyRead, false);
+  assert.equal(chSum.isFullyCompleted, false);
+  assert.equal(chSum.hasAnyProgress, false);
+
+  // Mark single verse as read (what swipe does)
+  api.markVerseAsRead(bookId, chapter, verse, 'ESV');
+
+  // Verify chapter summary: only verse 18 is read
+  chSum = api.getChapterProgressSummary(bookId, chapter, 'ALL');
+  assert.equal(chSum.isFullyRead, false, 'Chapter must NOT be fully read');
+  assert.equal(chSum.isFullyCompleted, false, 'Chapter must NOT be fully completed');
+  assert.equal(chSum.isPartial, true, 'Chapter should be partial');
+  assert.equal(chSum.completedVersesCount, 1, 'Only 1 verse covered in chapter');
+  assert.deepEqual(chSum.readVerseNums, [18], 'readVerseNums must only contain [18]');
+
+  // Verify isVerseRead for all verses in chapter
+  assert.equal(api.isVerseRead(chSum.record, 18), true, 'Verse 18 must be read');
+  for (let v = 1; v <= 22; v++) {
+    if (v !== 18) {
+      assert.equal(api.isVerseRead(chSum.record, v), false, `Verse ${v} must NOT be read`);
+      assert.equal(api.isVerseCovered(chSum.record, v), false, `Verse ${v} must NOT be covered`);
+    }
+  }
+
+  // Verify self-healing if a corrupted chapter record exists in store
+  const store = api.getLocalStore();
+  store.chapters[`${bookId}:${chapter}`] = {
+    ...store.chapters[`${bookId}:${chapter}`],
+    isFullyRead: true, // corrupted flag from older bug
+    isRead: true
+  };
+  api.saveLocalStore(store);
+
+  // getLocalStore should self-heal
+  const healedStore = api.getLocalStore();
+  const healedRec = healedStore.chapters[`${bookId}:${chapter}`];
+  assert.equal(healedRec.isFullyRead, false, 'Self-heal must clear corrupted isFullyRead');
+  assert.equal(healedRec.isRead, true, 'isRead remains true because 1 verse was read');
+
+  // isChapterRecordFullyRead must also refuse corrupted isFullyRead
+  assert.equal(api.isChapterRecordFullyRead(healedRec), false, 'isChapterRecordFullyRead must return false for partial chapter');
+});

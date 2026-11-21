@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261121_v19';
+import { CONFIG } from './config.js?v=20261121_v20';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261121_v19';
+} from './bible-data.js?v=20261121_v20';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -249,17 +249,33 @@ export function getLocalStore() {
           store.meditateFont = DEFAULT_MEDITATE_FONT;
         }
 
-        // Self-heal: clean up any corrupted isTyped flags on verses that were only listened/read/spoken
+        // Self-heal: clean up corrupted isTyped flags and chapter-level read flags from single-verse swipe bug
         if (store.chapters && typeof store.chapters === 'object') {
           for (const chKey in store.chapters) {
             const ch = store.chapters[chKey];
-            if (ch && ch.completedVerses && typeof ch.completedVerses === 'object') {
-              for (const vKey in ch.completedVerses) {
-                const v = ch.completedVerses[vKey];
-                if (v) {
-                  const hasTrueTypedData = (v.count > 0 || v.bestWpm > 0 || v.typedAt || (v.translations && Object.keys(v.translations).length > 0));
-                  if (!hasTrueTypedData && (v.isListened || v.isRead || v.isSpoken)) {
-                    v.isTyped = false;
+            if (ch && typeof ch === 'object') {
+              const totalVerses = Math.max(
+                Number(ch.totalVerses) || 0,
+                Number(ch.versesCount) || 0,
+                getChapterVerseCount(ch.bookId, ch.chapter)
+              );
+              if (ch.completedVerses && typeof ch.completedVerses === 'object') {
+                for (const vKey in ch.completedVerses) {
+                  const v = ch.completedVerses[vKey];
+                  if (v) {
+                    const hasTrueTypedData = (v.count > 0 || v.bestWpm > 0 || v.typedAt || (v.translations && Object.keys(v.translations).length > 0));
+                    if (!hasTrueTypedData && (v.isListened || v.isRead || v.isSpoken)) {
+                      v.isTyped = false;
+                    }
+                  }
+                }
+                const numRecorded = Object.keys(ch.completedVerses).length;
+                const readCount = Object.values(ch.completedVerses).filter(v => v && v.isRead).length;
+                if (numRecorded > 0 && totalVerses > 0 && readCount < totalVerses) {
+                  ch.isFullyRead = false;
+                  ch.isRead = readCount > 0;
+                  if (!ch.isFullyTyped && !ch.isFullySpoken && !ch.isFullyListened) {
+                    ch.isFullyCompleted = numRecorded >= totalVerses;
                   }
                 }
               }
@@ -1090,11 +1106,23 @@ export function setLastSelectedChapter(bookId, chapter, verse = null) {
 // ── Chapter & Verse Completion Helpers ──────────────────────────
 export function isChapterRecordFullyRead(rec) {
   if (!rec) return false;
-  if (rec.isFullyRead === true || rec.isRead === true) return true;
-  const total = Math.max(Number(rec.totalVerses) || 0, Number(rec.versesCount) || 0);
-  if (total <= 0) return false;
+  const total = Math.max(
+    Number(rec.totalVerses) || 0,
+    Number(rec.versesCount) || 0,
+    getChapterVerseCount(rec.bookId, rec.chapter)
+  );
   const readCount = Object.values(rec.completedVerses || {}).filter(v => v && v.isRead).length;
-  return readCount >= total;
+  if (total > 0 && readCount >= total) return true;
+  if (rec.isFullyRead === true) {
+    const numVerses = Object.keys(rec.completedVerses || {}).length;
+    // Self-healing: if completedVerses has partial verses recorded and readCount < total,
+    // this chapter was marked isFullyRead by the single-verse swipe bug and is NOT actually fully read
+    if (numVerses > 0 && total > 0 && readCount < total) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 export function isChapterRecordFullySpoken(rec) {
@@ -1153,7 +1181,7 @@ export function isChapterRecordFullyCompleted(rec) {
 
 export function isVerseRead(rec, verseNum) {
   if (!rec) return false;
-  if (rec.isFullyRead === true || rec.isRead === true) return true;
+  if (isChapterRecordFullyRead(rec)) return true;
   const vKey = String(verseNum);
   const vRec = rec.completedVerses?.[vKey];
   return Boolean(vRec?.isRead);
@@ -1381,7 +1409,9 @@ export function markVerseAsRead(bookId, chapter, verse, translation = 'ESV') {
   const isFullyTyped = Boolean(prevChapter.isFullyTyped || (totalVerses > 0 && typedVersesCount >= totalVerses));
   const spokenVersesCount = Object.values(prevVerses).filter(v => v.isSpoken).length;
   const isFullySpoken = Boolean(prevChapter.isFullySpoken || (totalVerses > 0 && spokenVersesCount >= totalVerses));
-  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || isFullySpoken || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
+  const listenedVersesCount = Object.values(prevVerses).filter(v => v.isListened).length;
+  const isFullyListened = Boolean(prevChapter.isFullyListened || (totalVerses > 0 && listenedVersesCount >= totalVerses));
+  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || isFullySpoken || isFullyListened || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
 
   store.chapters[key] = {
     ...prevChapter,
@@ -1394,12 +1424,14 @@ export function markVerseAsRead(bookId, chapter, verse, translation = 'ESV') {
     completedVersesCount: Object.keys(prevVerses).length,
     isFullyCompleted,
     isFullyRead,
-    isRead: Boolean(prevChapter.isRead || isFullyRead),
+    isRead: Boolean(isFullyRead || readVersesCount > 0),
     readAt: isFullyRead ? now : prevChapter.readAt,
     isFullyTyped,
     isTyped: Boolean(prevChapter.isTyped || typedVersesCount > 0),
     isFullySpoken,
     isSpoken: Boolean(prevChapter.isSpoken || spokenVersesCount > 0),
+    isFullyListened,
+    isListened: Boolean(prevChapter.isListened || listenedVersesCount > 0),
     completedVerses: prevVerses,
     firstCompletedAt: prevChapter.firstCompletedAt || now,
     lastCompletedAt: now
@@ -1454,7 +1486,7 @@ export function unmarkVerseAsRead(bookId, chapter, verse) {
   const prevV = prevVerses[vKey];
   if (!prevV) return rec;
 
-  if (prevV.isTyped || prevV.isSpoken) {
+  if (prevV.isTyped || prevV.isSpoken || prevV.isListened) {
     prevVerses[vKey] = { ...prevV, isRead: false, readAt: null };
   } else {
     delete prevVerses[vKey];
@@ -1467,13 +1499,21 @@ export function unmarkVerseAsRead(bookId, chapter, verse) {
   const isFullyTyped = Boolean(rec.isFullyTyped || (totalVerses > 0 && typedVersesCount >= totalVerses));
   const spokenVersesCount = Object.values(prevVerses).filter(v => v.isSpoken).length;
   const isFullySpoken = Boolean(rec.isFullySpoken || (totalVerses > 0 && spokenVersesCount >= totalVerses));
-  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || isFullySpoken || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
+  const listenedVersesCount = Object.values(prevVerses).filter(v => v.isListened).length;
+  const isFullyListened = Boolean(rec.isFullyListened || (totalVerses > 0 && listenedVersesCount >= totalVerses));
+  const isFullyCompleted = Boolean(isFullyRead || isFullyTyped || isFullySpoken || isFullyListened || (totalVerses > 0 && Object.keys(prevVerses).length >= totalVerses));
 
   store.chapters[key] = {
     ...rec,
     isFullyRead,
-    isRead: isFullyRead,
+    isRead: Boolean(isFullyRead || readVersesCount > 0),
     isFullyCompleted,
+    isFullyTyped,
+    isTyped: Boolean(rec.isTyped || typedVersesCount > 0),
+    isFullySpoken,
+    isSpoken: Boolean(rec.isSpoken || spokenVersesCount > 0),
+    isFullyListened,
+    isListened: Boolean(rec.isListened || listenedVersesCount > 0),
     completedVerses: prevVerses,
     completedVersesCount: Object.keys(prevVerses).length
   };
@@ -1965,10 +2005,11 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
     (session.isFullChapter && isSpokenActivity) ||
     (resolvedTotalVerses > 0 && spokenVersesCount >= resolvedTotalVerses)
   );
+  const readVersesCount = Object.values(prevCompletedVerses).filter(v => v && v.isRead).length;
   const isNowFullyRead = Boolean(
-    prevChapter?.isFullyRead ||
     (session.isFullChapter && isReadActivity) ||
-    (resolvedTotalVerses > 0 && Object.values(prevCompletedVerses).filter(v => v && v.isRead).length >= resolvedTotalVerses)
+    (resolvedTotalVerses > 0 && readVersesCount >= resolvedTotalVerses) ||
+    (prevChapter?.isFullyRead && (completedVersesCount === 0 || readVersesCount >= resolvedTotalVerses))
   );
   const isNowFullyCompleted = Boolean(
     wasFullyCompleted ||
@@ -2011,7 +2052,7 @@ function applySessionToChapterRecord(prevChapter, session, totalChapterVerses = 
     isFullySpoken: isNowFullySpoken,
     isFullyRead: isNowFullyRead,
     isFullyListened: isNowFullyListened,
-    isRead: Boolean(prevChapter?.isRead || isNowFullyRead),
+    isRead: Boolean(isNowFullyRead || readVersesCount > 0),
     isSpoken: Boolean(prevChapter?.isSpoken || isSpokenActivity || isNowFullySpoken),
     isListened: Boolean(prevChapter?.isListened || isListenedActivity || isNowFullyListened),
     isTyped: Boolean(prevChapter?.isTyped || isTypedActivity || isNowFullyTyped),
@@ -2793,29 +2834,32 @@ function mergeChapterRecords(localCh, cloudCh) {
     }
   }
 
-  const totalVerses = Math.max(localCh.totalVerses || 0, cloudCh.totalVerses || 0, localCh.versesCount || 0, cloudCh.versesCount || 0);
+  const totalVerses = Math.max(localCh.totalVerses || 0, cloudCh.totalVerses || 0, localCh.versesCount || 0, cloudCh.versesCount || 0, getChapterVerseCount(localCh.bookId || cloudCh.bookId, localCh.chapter || cloudCh.chapter));
   const completedVersesCount = Object.keys(mergedVerses).length;
+  const readVersesCount = Object.values(mergedVerses).filter(v => v.isRead).length;
+  const typedVersesCount = Object.values(mergedVerses).filter(v => v.isTyped).length;
+  const spokenVersesCount = Object.values(mergedVerses).filter(v => v.isSpoken).length;
+  const listenedVersesCount = Object.values(mergedVerses).filter(v => v.isListened).length;
+
   const isFullyRead = Boolean(
-    localCh.isFullyRead ||
-    cloudCh.isFullyRead ||
-    localCh.isRead ||
-    cloudCh.isRead ||
-    (totalVerses > 0 && Object.values(mergedVerses).filter(v => v.isRead).length >= totalVerses)
+    (totalVerses > 0 && readVersesCount >= totalVerses) ||
+    (localCh.isFullyRead && (completedVersesCount === 0 || readVersesCount >= totalVerses)) ||
+    (cloudCh.isFullyRead && (completedVersesCount === 0 || readVersesCount >= totalVerses))
   );
   const isFullyTyped = Boolean(
-    localCh.isFullyTyped ||
-    cloudCh.isFullyTyped ||
-    (totalVerses > 0 && Object.values(mergedVerses).filter(v => v.isTyped).length >= totalVerses)
+    (totalVerses > 0 && typedVersesCount >= totalVerses) ||
+    (localCh.isFullyTyped && (completedVersesCount === 0 || typedVersesCount >= totalVerses)) ||
+    (cloudCh.isFullyTyped && (completedVersesCount === 0 || typedVersesCount >= totalVerses))
   );
   const isFullySpoken = Boolean(
-    localCh.isFullySpoken ||
-    cloudCh.isFullySpoken ||
-    (totalVerses > 0 && Object.values(mergedVerses).filter(v => v.isSpoken).length >= totalVerses)
+    (totalVerses > 0 && spokenVersesCount >= totalVerses) ||
+    (localCh.isFullySpoken && (completedVersesCount === 0 || spokenVersesCount >= totalVerses)) ||
+    (cloudCh.isFullySpoken && (completedVersesCount === 0 || spokenVersesCount >= totalVerses))
   );
   const isFullyListened = Boolean(
-    localCh.isFullyListened ||
-    cloudCh.isFullyListened ||
-    (totalVerses > 0 && Object.values(mergedVerses).filter(v => v.isListened).length >= totalVerses)
+    (totalVerses > 0 && listenedVersesCount >= totalVerses) ||
+    (localCh.isFullyListened && (completedVersesCount === 0 || listenedVersesCount >= totalVerses)) ||
+    (cloudCh.isFullyListened && (completedVersesCount === 0 || listenedVersesCount >= totalVerses))
   );
   const isFullyCompleted = Boolean(
     isFullyRead ||
@@ -2838,10 +2882,10 @@ function mergeChapterRecords(localCh, cloudCh) {
     isFullyTyped,
     isFullySpoken,
     isFullyListened,
-    isRead: isFullyRead,
-    isSpoken: Boolean(localCh.isSpoken || cloudCh.isSpoken || isFullySpoken),
-    isListened: Boolean(localCh.isListened || cloudCh.isListened || isFullyListened),
-    isTyped: Boolean(localCh.isTyped || cloudCh.isTyped || isFullyTyped),
+    isRead: Boolean(isFullyRead || readVersesCount > 0),
+    isSpoken: Boolean(localCh.isSpoken || cloudCh.isSpoken || isFullySpoken || spokenVersesCount > 0),
+    isListened: Boolean(localCh.isListened || cloudCh.isListened || isFullyListened || listenedVersesCount > 0),
+    isTyped: Boolean(localCh.isTyped || cloudCh.isTyped || isFullyTyped || typedVersesCount > 0),
     completedVerses: mergedVerses,
     completedCount: Math.max(localCh.completedCount || 0, cloudCh.completedCount || 0),
     bestWpm: Math.max(localCh.bestWpm || 0, cloudCh.bestWpm || 0),
