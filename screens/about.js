@@ -1,23 +1,52 @@
-import { trackEvent } from '../analytics.js?v=20261121_v5';
+import { trackEvent } from '../analytics.js?v=20261121_v6';
+import { CONFIG } from '../config.js?v=20261121_v6';
 
 /**
  * About + Charities screens.
- * - /about     : project story, support section, understated charities teaser, contact
+ * - /about     : project story, PayPal support modal (SSM-backed via Lambda), charities link, contact modal
  * - /charities : the two charities this project hopes to support (both still in development)
  */
-
-// Set this to the PayPal donation page URL once it exists. While empty, the support
-// section shows a gentle "coming soon" note instead of a button.
-const SUPPORT_DONATION_URL = '';
 
 const CONTACT_ENDPOINT = 'https://5osdsd7re7htcmddembdmucjv40ikqlo.lambda-url.us-east-1.on.aws/';
 const CONTACT_DOMAIN = 'promisestocreation.org';
 
-export function renderAboutScreen(container) {
-  const supportAction = SUPPORT_DONATION_URL
-    ? `<a class="about-btn about-btn-primary" href="${SUPPORT_DONATION_URL}" target="_blank" rel="noopener noreferrer" id="about-support-btn">Support this project</a>`
-    : `<span class="about-soon-note">Donations will open here soon. Thank you for the thought.</span>`;
+let paypalSdkPromise = null;
 
+function loadPayPalSdk() {
+  if (window.paypal && window.paypal.Buttons) {
+    return Promise.resolve(window.paypal);
+  }
+  if (paypalSdkPromise) return paypalSdkPromise;
+
+  paypalSdkPromise = (async () => {
+    const res = await fetch(`${CONFIG.API_ENDPOINTS.profile}?action=paypal-config`);
+    if (!res.ok) throw new Error('Could not load payment configuration');
+    const { clientId } = await res.json();
+    if (!clientId) throw new Error('Missing PayPal client ID');
+
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
+      script.async = true;
+      script.onload = () => {
+        if (window.paypal && window.paypal.Buttons) {
+          resolve(window.paypal);
+        } else {
+          reject(new Error('PayPal SDK failed to initialize'));
+        }
+      };
+      script.onerror = () => reject(new Error('Failed to load PayPal SDK'));
+      document.head.appendChild(script);
+    });
+  })().catch((err) => {
+    paypalSdkPromise = null;
+    throw err;
+  });
+
+  return paypalSdkPromise;
+}
+
+export function renderAboutScreen(container) {
   document.documentElement.classList.add('about-active-view');
   document.body.classList.add('about-active-view');
 
@@ -42,7 +71,9 @@ export function renderAboutScreen(container) {
             Promises to Creation is free to use. If it has been a blessing and you would like to help keep it
             running and growing, you are welcome to contribute.
           </p>
-          <div class="about-actions">${supportAction}</div>
+          <div class="about-actions">
+            <button type="button" class="about-btn about-btn-primary" id="about-support-btn">Support this project</button>
+          </div>
         </section>
 
         <section class="about-section about-contact">
@@ -59,7 +90,43 @@ export function renderAboutScreen(container) {
         </footer>
       </article>
 
-      <!-- Contact modal (same Lambda-backed form setup used on the other sites) -->
+      <!-- Support / Donate modal (PayPal order created & captured server-side via AWS SSM Parameter Store) -->
+      <div class="about-modal-backdrop" id="about-donate-backdrop" hidden>
+        <div class="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-donate-title">
+          <div class="about-modal-header">
+            <h2 id="about-donate-title">Support Promises to Creation</h2>
+            <button type="button" class="about-modal-close" id="about-donate-close" aria-label="Close">✕</button>
+          </div>
+
+          <p class="about-donate-subtitle">Choose an amount (USD)</p>
+
+          <div class="about-donate-amounts" id="about-donate-amounts">
+            <button type="button" class="about-amount-pill" data-amount="5">$5</button>
+            <button type="button" class="about-amount-pill is-selected" data-amount="10">$10</button>
+            <button type="button" class="about-amount-pill" data-amount="25">$25</button>
+            <button type="button" class="about-amount-pill" data-amount="50">$50</button>
+          </div>
+
+          <label class="about-field about-custom-amount-field">
+            <span>Or enter a custom amount (USD)</span>
+            <input type="number" id="about-donate-custom-input" min="1" max="10000" step="1" placeholder="Custom amount ($)" />
+          </label>
+
+          <div class="about-paypal-status" id="about-paypal-status">Loading secure checkout…</div>
+          <div class="about-paypal-buttons" id="about-paypal-buttons"></div>
+        </div>
+      </div>
+
+      <!-- Donation Thank You modal -->
+      <div class="about-modal-backdrop" id="about-donate-success-backdrop" hidden>
+        <div class="about-modal about-modal-small" role="dialog" aria-modal="true" aria-labelledby="about-donate-success-title">
+          <h2 id="about-donate-success-title">Thank you</h2>
+          <p>Your generous support helps keep Promises to Creation free and growing.</p>
+          <button type="button" class="about-btn about-btn-primary" id="about-donate-success-close">Close</button>
+        </div>
+      </div>
+
+      <!-- Contact modal (same Lambda-backed form setup used on nuri.software) -->
       <div class="about-modal-backdrop" id="about-contact-backdrop" hidden>
         <div class="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-contact-title">
           <div class="about-modal-header">
@@ -104,7 +171,7 @@ export function renderAboutScreen(container) {
         </div>
       </div>
 
-      <!-- Success modal -->
+      <!-- Contact Success modal -->
       <div class="about-modal-backdrop" id="about-success-backdrop" hidden>
         <div class="about-modal about-modal-small" role="dialog" aria-modal="true" aria-labelledby="about-success-title">
           <h2 id="about-success-title">Thank you</h2>
@@ -115,6 +182,115 @@ export function renderAboutScreen(container) {
     </div>
   `;
 
+  // ── Support / Donate Modal Logic ──
+  const donateBackdrop = container.querySelector('#about-donate-backdrop');
+  const donateSuccessBackdrop = container.querySelector('#about-donate-success-backdrop');
+  const amountPills = container.querySelectorAll('.about-amount-pill');
+  const customAmountInput = container.querySelector('#about-donate-custom-input');
+  const paypalStatusEl = container.querySelector('#about-paypal-status');
+  const paypalButtonsEl = container.querySelector('#about-paypal-buttons');
+
+  let selectedPresetAmount = 10;
+  let paypalButtonsRendered = false;
+
+  function getSelectedDonationAmount() {
+    const customVal = parseFloat(customAmountInput.value);
+    if (Number.isFinite(customVal) && customVal >= 1) {
+      return Math.min(10000, Math.round(customVal * 100) / 100);
+    }
+    return selectedPresetAmount;
+  }
+
+  amountPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      selectedPresetAmount = Number(pill.getAttribute('data-amount')) || 10;
+      customAmountInput.value = '';
+      amountPills.forEach((p) => p.classList.toggle('is-selected', p === pill));
+    });
+  });
+
+  customAmountInput.addEventListener('input', () => {
+    const hasCustom = customAmountInput.value.trim().length > 0;
+    amountPills.forEach((p) => p.classList.toggle('is-selected', !hasCustom && Number(p.getAttribute('data-amount')) === selectedPresetAmount));
+  });
+
+  async function ensurePayPalButtonsRendered() {
+    if (paypalButtonsRendered) return;
+    paypalStatusEl.hidden = false;
+    paypalStatusEl.textContent = 'Loading secure checkout…';
+    try {
+      const paypal = await loadPayPalSdk();
+      if (!document.body.contains(paypalButtonsEl)) return;
+      paypalButtonsEl.innerHTML = '';
+      paypalStatusEl.hidden = true;
+      paypalButtonsRendered = true;
+
+      paypal.Buttons({
+        style: {
+          layout: 'vertical',
+          color: 'gold',
+          shape: 'rect',
+          label: 'donate'
+        },
+        createOrder: async () => {
+          const amount = getSelectedDonationAmount();
+          trackEvent('about_donate_Order_start', { amount });
+          const res = await fetch(CONFIG.API_ENDPOINTS.profile, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'paypal-create-order', amount })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.orderId) {
+            throw new Error(data.error || 'Could not initiate donation');
+          }
+          return data.orderId;
+        },
+        onApprove: async (data) => {
+          paypalStatusEl.hidden = false;
+          paypalStatusEl.textContent = 'Completing contribution…';
+          const res = await fetch(CONFIG.API_ENDPOINTS.profile, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'paypal-capture-order', orderId: data.orderID })
+          });
+          const capData = await res.json();
+          paypalStatusEl.hidden = true;
+          if (!res.ok) {
+            throw new Error(capData.error || 'Could not complete contribution');
+          }
+          trackEvent('about_donate_complete', { amount: getSelectedDonationAmount() });
+          donateBackdrop.hidden = true;
+          donateSuccessBackdrop.hidden = false;
+        },
+        onError: (err) => {
+          console.error('PayPal checkout error:', err);
+          paypalStatusEl.hidden = false;
+          paypalStatusEl.textContent = 'Checkout encountered an issue. Please try again.';
+        }
+      }).render(paypalButtonsEl);
+    } catch (err) {
+      console.error('Failed to load PayPal checkout:', err);
+      paypalStatusEl.hidden = false;
+      paypalStatusEl.textContent = 'Could not load PayPal checkout right now. Please try again shortly.';
+    }
+  }
+
+  const openDonateModal = () => {
+    donateBackdrop.hidden = false;
+    trackEvent('about_support_click');
+    ensurePayPalButtonsRendered();
+  };
+  const closeDonateModal = () => { donateBackdrop.hidden = true; };
+  const closeDonateSuccess = () => { donateSuccessBackdrop.hidden = true; };
+
+  container.querySelector('#about-support-btn').addEventListener('click', openDonateModal);
+  container.querySelector('#about-donate-close').addEventListener('click', closeDonateModal);
+  donateBackdrop.addEventListener('click', (e) => { if (e.target === donateBackdrop) closeDonateModal(); });
+  container.querySelector('#about-donate-success-close').addEventListener('click', closeDonateSuccess);
+  donateSuccessBackdrop.addEventListener('click', (e) => { if (e.target === donateSuccessBackdrop) closeDonateSuccess(); });
+
+  // ── Contact Modal Logic ──
   const contactBackdrop = container.querySelector('#about-contact-backdrop');
   const successBackdrop = container.querySelector('#about-success-backdrop');
   const contactForm = container.querySelector('#contactForm');
@@ -145,10 +321,6 @@ export function renderAboutScreen(container) {
   const charitiesLink = container.querySelector('#about-charities-link');
   if (charitiesLink) {
     charitiesLink.addEventListener('click', () => trackEvent('about_charities_click'));
-  }
-  const supportBtn = container.querySelector('#about-support-btn');
-  if (supportBtn) {
-    supportBtn.addEventListener('click', () => trackEvent('about_support_click'));
   }
 
   if (window.location.hash === '#success') {

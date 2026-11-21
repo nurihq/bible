@@ -7122,3 +7122,56 @@ body.about-active-view .main-content {
 
 .about-story { margin-top: 0; }
 .about-card > .about-lede { margin-bottom: 1.5rem; }
+
+/* PayPal Support / Donate modal controls */
+.about-donate-subtitle {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.about-donate-amounts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.about-amount-pill {
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 0.55rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.about-amount-pill:hover {
+  border-color: var(--primary);
+}
+
+.about-amount-pill.is-selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.about-custom-amount-field {
+  margin-bottom: 1.1rem;
+}
+
+.about-paypal-status {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.75rem 0;
+}
+
+.about-paypal-buttons {
+  min-height: 44px;
+}
+
