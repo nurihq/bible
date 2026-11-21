@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v8';
-import { CONFIG } from '../config.js?v=20261121_v8';
+import { trackEvent } from '../analytics.js?v=20261121_v9';
+import { CONFIG } from '../config.js?v=20261121_v9';
 
 /**
  * About + Charities screens.
