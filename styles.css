@@ -6978,31 +6978,51 @@ body.about-active-view .main-content {
 .about-charities-link:hover,
 .about-back-link:hover { color: var(--primary); }
 
-.about-back-link { display: inline-block; margin-bottom: 1rem; }
+.about-back-link {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 0.9rem;
+}
 
-/* Charity cards */
+/* Charity cards (standalone on the canvas, 880px wide total) */
+.charities-stage {
+  width: 100%;
+  max-width: 880px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.charities-stage::-webkit-scrollbar { display: none; }
+
 .charity-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.25rem;
+  width: 100%;
 }
 
 .charity-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.6rem;
-  padding: 1.5rem 1.35rem;
+  gap: 0.75rem;
+  padding: 2rem 1.85rem;
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  background: var(--bg-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .charity-mark { font-size: 1.5rem; line-height: 1; }
 
 .charity-name {
   font-family: var(--font-serif);
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 600;
   margin: 0;
 }
@@ -7010,8 +7030,8 @@ body.about-active-view .main-content {
 .charity-desc {
   margin: 0;
   flex: 1;
-  font-size: 0.9rem;
-  line-height: 1.65;
+  font-size: 0.95rem;
+  line-height: 1.7;
   color: var(--text-secondary);
 }
 
@@ -7023,15 +7043,7 @@ body.about-active-view .main-content {
   color: var(--text-muted);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
-  padding: 0.2rem 0.65rem;
-}
-
-.charity-note {
-  margin: 1.5rem 0 0;
-  font-size: 0.88rem;
-  line-height: 1.65;
-  color: var(--text-muted);
-  text-align: center;
+  padding: 0.22rem 0.7rem;
 }
 
 /* About modals & contact form */

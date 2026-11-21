@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v9';
-import { CONFIG } from '../config.js?v=20261121_v9';
+import { trackEvent } from '../analytics.js?v=20261121_v10';
+import { CONFIG } from '../config.js?v=20261121_v10';
 
 /**
  * About + Charities screens.
@@ -316,9 +316,8 @@ export function renderCharitiesScreen(container) {
 
   container.innerHTML = `
     <div class="about-screen-container">
-      <article class="about-card">
+      <div class="charities-stage">
         <a class="about-back-link" href="/about">← About</a>
-        <p class="about-lede">Two causes this project hopes to support one day.</p>
 
         <div class="charity-grid">
           <section class="charity-card">
@@ -340,11 +339,8 @@ export function renderCharitiesScreen(container) {
             <span class="charity-status">In development</span>
           </section>
         </div>
-
-        <p class="charity-note">
-          Both charities are still in development, so there are no links yet. Thank you for your patience and kindness.
-        </p>
-      </article>
+      </div>
     </div>
   `;
 }
+
