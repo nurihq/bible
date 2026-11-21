@@ -6808,3 +6808,276 @@ sup.verse-num.is-listen,
   align-items: center;
   justify-content: center;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NAV ABOUT BUTTON, ABOUT & CHARITIES PAGES
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Desktop: text only. Mobile: info icon only. */
+.nav-info-btn .nav-info-icon { display: none; }
+.nav-info-btn .nav-info-text { display: inline; }
+
+@media (max-width: 720px) {
+  .nav-info-btn {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .nav-info-btn .nav-info-icon { display: block; }
+  .nav-info-btn .nav-info-text { display: none; }
+}
+
+.about-screen-container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.about-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2.25rem;
+  color: var(--text-primary);
+}
+
+.about-header { margin-bottom: 1.75rem; }
+
+.about-title {
+  font-family: var(--font-serif);
+  font-size: 1.9rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+}
+
+.about-lede {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.about-section { margin-top: 1.75rem; }
+
+.about-section p {
+  margin: 0 0 0.9rem;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  font-size: 0.97rem;
+}
+
+.about-section strong { color: var(--text-primary); font-weight: 600; }
+
+.about-heading {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 0.7rem;
+}
+
+.about-support,
+.about-contact {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.about-actions { margin-top: 0.4rem; }
+
+.about-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.about-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.about-btn-primary:hover { opacity: 0.9; }
+.about-btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+.about-btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.about-btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.about-soon-note {
+  font-size: 0.88rem;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.about-footer {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.about-charities-link,
+.about-back-link {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.about-charities-link:hover,
+.about-back-link:hover { color: var(--primary); }
+
+.about-back-link { display: inline-block; margin-bottom: 1rem; }
+
+/* Charity cards */
+.charity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.charity-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 1.5rem 1.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--bg-subtle);
+}
+
+.charity-mark { font-size: 1.5rem; line-height: 1; }
+
+.charity-name {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.charity-desc {
+  margin: 0;
+  flex: 1;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.charity-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.65rem;
+}
+
+.charity-note {
+  margin: 1.5rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* About modals & contact form */
+.about-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.about-modal-backdrop[hidden] { display: none; }
+
+.about-modal {
+  width: 100%;
+  max-width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  color: var(--text-primary);
+}
+
+.about-modal-small { text-align: center; max-width: 360px; }
+.about-modal-small p { color: var(--text-secondary); line-height: 1.6; margin: 0.5rem 0 1.25rem; }
+
+.about-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.about-modal h2 {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.about-modal-close {
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.about-form { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.about-field { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.about-field span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.about-field input,
+.about-field select,
+.about-field textarea {
+  font: inherit;
+  font-size: 0.92rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.about-field input:focus,
+.about-field select:focus,
+.about-field textarea:focus { border-color: var(--primary); }
+
+.about-field textarea { resize: vertical; }
+.about-submit { width: 100%; margin-top: 0.25rem; }
+
+@media (max-width: 600px) {
+  .about-card { padding: 1.75rem 1.25rem; }
+  .charity-grid { grid-template-columns: 1fr; }
+}

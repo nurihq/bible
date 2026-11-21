@@ -9,16 +9,16 @@ import {
   getAllMeditations,
   getAllFavorites,
   getAllBookmarks
-} from '../api.js?v=20261121_v3';
+} from '../api.js?v=20261121_v4';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261121_v3';
-import { trackEvent } from '../analytics.js?v=20261121_v3';
-import { navigate } from '../router.js?v=20261121_v3';
+} from '../bible-data.js?v=20261121_v4';
+import { trackEvent } from '../analytics.js?v=20261121_v4';
+import { navigate } from '../router.js?v=20261121_v4';
 
 function escapeHtml(str) {
   return String(str)
@@ -510,6 +510,13 @@ export class Navbar {
             <a href="/progress" class="nav-about-btn ${isProgressActive ? 'active' : ''}" title="Progress &amp; Bible Reach">
               <span>📊</span>
               <span class="nav-about-text">Progress</span>
+            </a>
+          ` : ''}
+
+          ${isHomeScreen || cleanPath === '/about' || cleanPath === '/charities' ? `
+            <a href="/about" class="nav-about-btn nav-info-btn ${cleanPath === '/about' || cleanPath === '/charities' ? 'active' : ''}" id="nav-about-btn" title="About" aria-label="About">
+              <svg class="nav-info-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <span class="nav-info-text">About</span>
             </a>
           ` : ''}
 
