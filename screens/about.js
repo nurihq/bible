@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v16';
-import { CONFIG } from '../config.js?v=20261121_v16';
+import { trackEvent } from '../analytics.js?v=20261121_v17';
+import { CONFIG } from '../config.js?v=20261121_v17';
 
 /**
  * About + Charities screens.
@@ -64,7 +64,7 @@ export function renderAboutScreen(container) {
           <div class="about-highlight-item">
             <span class="about-highlight-title">Total Bible progress</span>
             <p class="about-highlight-desc">
-              Keep track of every verse and chapter completed across all 66 books and 1,189 chapters.
+              Track your exposure to God's promises across every verse and chapter of all 66 books and 1,189 chapters.
             </p>
           </div>
 
