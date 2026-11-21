@@ -7138,21 +7138,75 @@ body.about-active-view .main-content {
 .about-story p:last-child { margin-bottom: 0; }
 .about-card > .about-lede { margin-bottom: 1.5rem; }
 
-.about-action-bar {
+.about-highlights {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1.75rem;
-  padding-top: 1.5rem;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.about-highlight-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.about-highlight-title {
+  font-family: var(--font-serif);
+  font-size: 1.12rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.about-highlight-desc {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.about-link-stack {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1.85rem;
+  padding-top: 1.15rem;
   border-top: 1px solid var(--border-color);
 }
 
-@media (max-width: 520px) {
-  .about-action-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
+.about-stack-link {
+  font: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.65rem;
+  margin: 0 -0.65rem;
+  width: calc(100% + 1.3rem);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.96rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.about-stack-link:hover {
+  background: var(--bg-subtle);
+  color: var(--primary);
+}
+
+.about-stack-link-arrow {
+  color: var(--text-muted);
+  font-weight: 400;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.about-stack-link:hover .about-stack-link-arrow {
+  color: var(--primary);
+  transform: translateX(4px);
 }
 
 /* PayPal Support / Donate modal controls */

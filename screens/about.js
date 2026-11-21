@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v12';
-import { CONFIG } from '../config.js?v=20261121_v12';
+import { trackEvent } from '../analytics.js?v=20261121_v13';
+import { CONFIG } from '../config.js?v=20261121_v13';
 
 /**
  * About + Charities screens.
@@ -53,23 +53,43 @@ export function renderAboutScreen(container) {
   container.innerHTML = `
     <div class="about-screen-container">
       <article class="about-card">
-        <section class="about-section about-story">
-          <p>
-            Promises to Creation is a simple tool for walking through the Bible, verse by verse and chapter by
-            chapter, and quietly keeping track of your journey through Scripture.
-          </p>
-          <p>
-            Whether by <strong>typing</strong> passages to slow down and focus, <strong>speaking</strong> verses aloud,
-            reflecting through <strong>drawing</strong>, or <strong>listening</strong> along during everyday chores,
-            the hope is simply to make time in the Word a natural part of each day.
-          </p>
-        </section>
+        <div class="about-highlights">
+          <div class="about-highlight-item">
+            <span class="about-highlight-title">Daily random verse carousel</span>
+            <p class="about-highlight-desc">
+              Swipe through random verses from across the entire Bible to keep discovering Scripture and let God speak to you.
+            </p>
+          </div>
 
-        <div class="about-action-bar">
-          <button type="button" class="about-btn about-btn-primary" id="about-support-btn">Support this project</button>
-          <button type="button" class="about-btn about-btn-secondary" id="about-contact-btn">Contact</button>
-          <a href="/charities" class="about-btn about-btn-secondary" id="about-charities-link">Charities</a>
+          <div class="about-highlight-item">
+            <span class="about-highlight-title">Total Bible progress</span>
+            <p class="about-highlight-desc">
+              Keep track of every verse and chapter completed across all 66 books and 1,189 chapters.
+            </p>
+          </div>
+
+          <div class="about-highlight-item">
+            <span class="about-highlight-title">Productive time in the Word</span>
+            <p class="about-highlight-desc">
+              Practice typing, speak verses aloud, reflect through drawing, or listen along hands-free during everyday chores.
+            </p>
+          </div>
         </div>
+
+        <nav class="about-link-stack" aria-label="About actions">
+          <button type="button" class="about-stack-link" id="about-contact-btn">
+            <span class="about-stack-link-label">Contact Us</span>
+            <span class="about-stack-link-arrow" aria-hidden="true">→</span>
+          </button>
+          <a href="/charities" class="about-stack-link" id="about-charities-link">
+            <span class="about-stack-link-label">View our Causes</span>
+            <span class="about-stack-link-arrow" aria-hidden="true">→</span>
+          </a>
+          <button type="button" class="about-stack-link" id="about-support-btn">
+            <span class="about-stack-link-label">Support this Project</span>
+            <span class="about-stack-link-arrow" aria-hidden="true">→</span>
+          </button>
+        </nav>
       </article>
 
       <!-- Support / Donate modal (PayPal order created & captured server-side via AWS SSM Parameter Store) -->
