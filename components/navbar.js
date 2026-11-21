@@ -9,16 +9,16 @@ import {
   getAllMeditations,
   getAllFavorites,
   getAllBookmarks
-} from '../api.js?v=20261121_v15';
+} from '../api.js?v=20261121_v16';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
   getBookById,
   getChapterVerseCount,
   searchBibleChapters
-} from '../bible-data.js?v=20261121_v15';
-import { trackEvent } from '../analytics.js?v=20261121_v15';
-import { navigate } from '../router.js?v=20261121_v15';
+} from '../bible-data.js?v=20261121_v16';
+import { trackEvent } from '../analytics.js?v=20261121_v16';
+import { navigate } from '../router.js?v=20261121_v16';
 
 function escapeHtml(str) {
   return String(str)
@@ -426,6 +426,7 @@ export class Navbar {
     const cleanPath = (currentRoute || '').replace(/^#/, '') || '/';
     const isHomeScreen = cleanPath === '/' || cleanPath === '';
     const isSignInScreen = cleanPath === '/signin';
+    const isAboutOrCharities = cleanPath === '/about' || cleanPath === '/charities';
     const isPromisesActive =
       cleanPath === '/promises' ||
       cleanPath === '/typing' ||
@@ -444,8 +445,8 @@ export class Navbar {
     const favoritesCount = allFavs.length;
     const allBookmarks = getAllBookmarks();
     const bookmarksCount = allBookmarks.length;
-    const showUnauthBanner = !isAuthed && !isHomeScreen && !isSignInScreen;
-    const showTools = !isHomeScreen && !isSignInScreen;
+    const showUnauthBanner = !isAuthed && !isHomeScreen && !isSignInScreen && !isAboutOrCharities;
+    const showTools = !isHomeScreen && !isSignInScreen && !isAboutOrCharities;
 
     const passage = this.getCurrentPassage(cleanPath);
     const passageBook = getBookById(passage.bookId);
@@ -501,7 +502,7 @@ export class Navbar {
         ` : ''}
 
         <div class="nav-right">
-          ${!isHomeScreen && !isSignInScreen ? `
+          ${!isHomeScreen && !isSignInScreen && !isAboutOrCharities ? `
             <a href="/${activeMode}" class="nav-about-btn ${isPromisesActive ? 'active' : ''}" id="nav-promises-btn" title="Scripture Promises">
               <span>⌨️</span>
               <span class="nav-about-text">Promises</span>
@@ -513,8 +514,8 @@ export class Navbar {
             </a>
           ` : ''}
 
-          ${isHomeScreen || cleanPath === '/about' || cleanPath === '/charities' ? `
-            <a href="/about" class="nav-about-btn nav-info-btn ${cleanPath === '/about' || cleanPath === '/charities' ? 'active' : ''}" id="nav-about-btn" title="About" aria-label="About">
+          ${isHomeScreen ? `
+            <a href="/about" class="nav-about-btn nav-info-btn" id="nav-about-btn" title="About" aria-label="About">
               <svg class="nav-info-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
               <span class="nav-info-text">About</span>
             </a>
