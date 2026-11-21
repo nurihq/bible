@@ -3,16 +3,16 @@ import {
   deleteVerseDrawing,
   setActiveModePref,
   getPreferredTranslation
-} from '../api.js?v=20261121_v7';
+} from '../api.js?v=20261121_v8';
 import {
   renderMeditateArtworkSvg,
   getArtworkTemplateName,
   MEDITATE_ART_THEME_NAMES,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261121_v7';
-import { getBookById, getRandomVerseRef } from '../bible-data.js?v=20261121_v7';
-import { trackEvent } from '../analytics.js?v=20261121_v7';
-import { navigate } from '../router.js?v=20261121_v7';
+} from '../meditate-art.js?v=20261121_v8';
+import { getBookById, getRandomVerseRef } from '../bible-data.js?v=20261121_v8';
+import { trackEvent } from '../analytics.js?v=20261121_v8';
+import { navigate } from '../router.js?v=20261121_v8';
 
 function escapeHtml(str) {
   return String(str || '')

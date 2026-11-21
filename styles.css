@@ -7121,7 +7121,25 @@ body.about-active-view .main-content {
 }
 
 .about-story { margin-top: 0; }
+.about-story p:last-child { margin-bottom: 0; }
 .about-card > .about-lede { margin-bottom: 1.5rem; }
+
+.about-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 520px) {
+  .about-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 
 /* PayPal Support / Donate modal controls */
 .about-donate-subtitle {

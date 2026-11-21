@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v7';
-import { CONFIG } from '../config.js?v=20261121_v7';
+import { trackEvent } from '../analytics.js?v=20261121_v8';
+import { CONFIG } from '../config.js?v=20261121_v8';
 
 /**
  * About + Charities screens.
@@ -55,39 +55,21 @@ export function renderAboutScreen(container) {
       <article class="about-card">
         <section class="about-section about-story">
           <p>
-            Promises to Creation makes it simple to track progress through the Bible, verse by verse and chapter by
-            chapter, with a clear view of how far you have come.
+            Promises to Creation is a simple tool for walking through the Bible, verse by verse and chapter by
+            chapter, and quietly keeping track of your journey through Scripture.
           </p>
           <p>
-            Time is precious, so it is worth making the most of it. While you are in the Word, you may as well
-            practice <strong>typing</strong> it, <strong>speaking</strong> it aloud, or <strong>drawing</strong> it,
-            and when your hands are busy with chores, you can simply <strong>listen</strong>.
+            Whether by <strong>typing</strong> passages to slow down and focus, <strong>speaking</strong> verses aloud,
+            reflecting through <strong>drawing</strong>, or <strong>listening</strong> along during everyday chores,
+            the hope is simply to make time in the Word a natural part of each day.
           </p>
-          <p>One small tool, built to make daily time in scripture easier to keep.</p>
         </section>
 
-        <section class="about-section about-support">
-          <p>
-            Promises to Creation is free to use. If it has been a blessing and you would like to help keep it
-            running and growing, you are welcome to contribute.
-          </p>
-          <div class="about-actions">
-            <button type="button" class="about-btn about-btn-primary" id="about-support-btn">Support this project</button>
-          </div>
-        </section>
-
-        <section class="about-section about-contact">
-          <p>Questions, ideas, or something not working? Get in touch.</p>
-          <div class="about-actions">
-            <button type="button" class="about-btn about-btn-secondary" id="about-contact-btn">Contact</button>
-          </div>
-        </section>
-
-        <footer class="about-footer">
-          <a class="about-charities-link" href="/charities" id="about-charities-link">
-            Charities we hope to support <span aria-hidden="true">→</span>
-          </a>
-        </footer>
+        <div class="about-action-bar">
+          <button type="button" class="about-btn about-btn-primary" id="about-support-btn">Support this project</button>
+          <button type="button" class="about-btn about-btn-secondary" id="about-contact-btn">Contact</button>
+          <a href="/charities" class="about-btn about-btn-secondary" id="about-charities-link">Charities</a>
+        </div>
       </article>
 
       <!-- Support / Donate modal (PayPal order created & captured server-side via AWS SSM Parameter Store) -->
