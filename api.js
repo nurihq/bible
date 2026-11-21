@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=20261121_v18';
+import { CONFIG } from './config.js?v=20261121_v19';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -8,7 +8,7 @@ import {
   TOTAL_BIBLE_VERSES,
   getChapterVerseCount,
   getBookById
-} from './bible-data.js?v=20261121_v18';
+} from './bible-data.js?v=20261121_v19';
 
 const STORAGE_PREFIX = 'bible_app_';
 const AUTH_TOKEN_KEY = `${STORAGE_PREFIX}auth_token`;
@@ -103,6 +103,9 @@ export async function attemptSilentGoogleRefresh() {
       const apps = getApps();
       const app = apps.length > 0 ? apps[0] : initializeApp(CONFIG.FIREBASE_CONFIG);
       const auth = getAuth(app);
+      if (typeof auth.authStateReady === 'function') {
+        await auth.authStateReady();
+      }
       if (auth.currentUser) {
         const freshToken = await auth.currentUser.getIdToken(true);
         if (freshToken) {
@@ -111,6 +114,9 @@ export async function attemptSilentGoogleRefresh() {
           isRefreshingToken = false;
           return true;
         }
+      } else {
+        // Firebase auth state is ready and no user session exists
+        Auth.signOut();
       }
     }
   } catch (e) {}
@@ -2744,10 +2750,8 @@ async function fetchWithAuth(url, options = {}) {
       });
       if (retryRes.ok) return retryRes.json();
     }
-    if (!Auth.isAuthenticated()) {
-      Auth.signOut();
-      throw new Error('Authentication expired. Please sign in again.');
-    }
+    Auth.signOut();
+    throw new Error('Authentication expired. Please sign in again.');
   }
 
   if (!res.ok) {
