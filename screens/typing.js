@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261121_v1';
+} from '../bible-data.js?v=20261121_v2';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -97,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261121_v1';
+} from '../api.js?v=20261121_v2';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261121_v1';
-import { trackEvent } from '../analytics.js?v=20261121_v1';
-import { navigate } from '../router.js?v=20261121_v1';
+} from '../meditate-art.js?v=20261121_v2';
+import { trackEvent } from '../analytics.js?v=20261121_v2';
+import { navigate } from '../router.js?v=20261121_v2';
 
 function escapeHtml(str) {
   return String(str)
@@ -1237,58 +1237,62 @@ export function renderTypingScreen(container, params = {}) {
             <button type="button" class="options-close-btn" id="actions-close-btn" aria-label="Close actions">✕</button>
           </div>
 
-          <div class="typing-options-body">
+          <div class="typing-options-body actions-modal-body">
             <!-- Mark as Read section (shown when not already on the main summary bar for that mode) -->
-            <div id="actions-mark-read-section" ${singleVerseMode && activeMode === 'draw' ? 'hidden' : ''}>
-              <div class="typing-options-section-divider" style="margin-top: 0;">
+            <div id="actions-mark-read-section" class="typing-options-section" ${singleVerseMode && activeMode === 'draw' ? 'hidden' : ''}>
+              <div class="typing-options-section-label">
                 <span>Mark as Read</span>
               </div>
+              <div class="typing-options-group">
+                <!-- Mark Current Verse Read -->
+                <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
+                  <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
+                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
+                    <span id="modal-mark-verse-read-label">📖 Mark Read</span>
+                  </button>
+                </div>
 
-              <!-- Mark Current Verse Read -->
-              <div class="typing-option-row option-action-row" id="modal-mark-verse-row">
-                <span class="option-title" id="modal-mark-verse-title">Verse ${targetSingleVerseNum || 1}</span>
-                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-verse-read-btn">
-                  <span id="modal-mark-verse-read-label">📖 Mark Read</span>
-                </button>
-              </div>
-
-              <!-- Mark Entire Chapter Read (shown in Chapter Mode) -->
-              <div class="typing-option-row option-action-row" id="modal-mark-ch-row" ${singleVerseMode ? 'hidden' : ''}>
-                <span class="option-title">${book.name} ${initialChapter} (Full Chapter)</span>
-                <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
-                  <span id="modal-mark-ch-read-label">📖 Mark Read</span>
-                </button>
+                <!-- Mark Entire Chapter Read (shown in Chapter Mode) -->
+                <div class="typing-option-row option-action-row" id="modal-mark-ch-row" ${singleVerseMode ? 'hidden' : ''}>
+                  <span class="option-title">${book.name} ${initialChapter} (Full Chapter)</span>
+                  <button type="button" class="btn btn-secondary btn-sm mark-read-btn" id="modal-mark-ch-read-btn">
+                    <span id="modal-mark-ch-read-label">📖 Mark Read</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             <!-- Active mode's settings (panels are moved here while the Actions modal is open) -->
-            <div id="actions-mode-settings-section">
-              <div class="typing-options-section-divider">
+            <div id="actions-mode-settings-section" class="typing-options-section">
+              <div class="typing-options-section-label">
                 <span id="actions-mode-settings-title">Mode Settings</span>
               </div>
-              <div id="actions-mode-settings-host"></div>
+              <div class="typing-options-group" id="actions-mode-settings-host"></div>
             </div>
 
-            <div class="typing-options-section-divider">
-              <span>General Options</span>
-            </div>
+            <div id="actions-general-options-section" class="typing-options-section">
+              <div class="typing-options-section-label">
+                <span>General Options</span>
+              </div>
+              <div class="typing-options-group">
+                <!-- Toggle: Live Stats Bar -->
+                <label class="typing-option-row" id="actions-stats-row" for="toggle-stats-checkbox" ${activeMode === 'draw' ? 'hidden' : ''}>
+                  <span class="option-title">Show Live Stats Bar</span>
+                  <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
+                </label>
 
-            <!-- Toggle: Live Stats Bar -->
-            <label class="typing-option-row" id="actions-stats-row" for="toggle-stats-checkbox" ${activeMode === 'draw' ? 'hidden' : ''}>
-              <span class="option-title">Show Live Stats Bar</span>
-              <input type="checkbox" id="toggle-stats-checkbox" class="option-switch" ${showTypingStats ? 'checked' : ''} />
-            </label>
+                <!-- Toggle: Status Tags -->
+                <label class="typing-option-row" id="actions-tags-row" for="toggle-tags-checkbox">
+                  <span class="option-title">Show Status Tags (Spoken, Read, Typed)</span>
+                  <input type="checkbox" id="toggle-tags-checkbox" class="option-switch" ${showProgressTags ? 'checked' : ''} />
+                </label>
 
-            <!-- Toggle: Status Tags -->
-            <label class="typing-option-row" id="actions-tags-row" for="toggle-tags-checkbox">
-              <span class="option-title">Show Status Tags (Spoken, Read, Typed)</span>
-              <input type="checkbox" id="toggle-tags-checkbox" class="option-switch" ${showProgressTags ? 'checked' : ''} />
-            </label>
-
-            <!-- Action: Restart Passage -->
-            <div class="typing-option-row option-action-row" id="actions-restart-row" ${activeMode === 'draw' ? 'hidden' : ''}>
-              <span class="option-title">Cursor Position</span>
-              <button type="button" class="btn btn-secondary btn-sm" id="modal-restart-btn">↺ Reset to Start</button>
+                <!-- Action: Restart Passage -->
+                <div class="typing-option-row option-action-row" id="actions-restart-row" ${activeMode === 'draw' ? 'hidden' : ''}>
+                  <span class="option-title">Cursor Position</span>
+                  <button type="button" class="btn btn-secondary btn-sm" id="modal-restart-btn">↺ Reset to Start</button>
+                </div>
+              </div>
             </div>
           </div>
 
