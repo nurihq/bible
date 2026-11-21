@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261121_v17';
+} from '../bible-data.js?v=20261121_v18';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -97,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261121_v17';
+} from '../api.js?v=20261121_v18';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261121_v17';
-import { trackEvent } from '../analytics.js?v=20261121_v17';
-import { navigate } from '../router.js?v=20261121_v17';
+} from '../meditate-art.js?v=20261121_v18';
+import { trackEvent } from '../analytics.js?v=20261121_v18';
+import { navigate } from '../router.js?v=20261121_v18';
 
 function escapeHtml(str) {
   return String(str)
@@ -1690,6 +1690,20 @@ export function renderTypingScreen(container, params = {}) {
     listen: '🎧 Listen Mode Settings'
   };
 
+  function getModeSettingsPanelsForMode(targetMode) {
+    if (targetMode === 'draw') {
+      return [modeSettingsDrawBody].filter(Boolean);
+    }
+    if (targetMode === 'speak') {
+      return [modeSettingsTypeSpeakBody, modeSettingsSpeakTuning].filter(Boolean);
+    }
+    if (targetMode === 'listen') {
+      return [modeSettingsTypeSpeakBody, modeSettingsListenTuning].filter(Boolean);
+    }
+    // Default: 'type' mode only shows Chapter / Single Verse scope settings
+    return [modeSettingsTypeSpeakBody].filter(Boolean);
+  }
+
   // Show only the settings panels that belong to `targetMode` and refresh their control values.
   function applyModeSettingsPanels(targetMode) {
     syncScopeRadioUI(singleVerseMode);
@@ -1713,7 +1727,7 @@ export function renderTypingScreen(container, params = {}) {
     }
   }
 
-  // Move the mode settings panels back into the Mode Settings modal card (before its footer).
+  // Move all mode settings panels back into the Mode Settings modal card (before its footer).
   function restoreModeSettingsPanels() {
     const card = modeSettingsBackdrop ? modeSettingsBackdrop.querySelector('.mode-settings-card') : null;
     const footer = card ? card.querySelector('.typing-options-footer') : null;
@@ -1770,11 +1784,14 @@ export function renderTypingScreen(container, params = {}) {
       actionsRestartRow.hidden = activeMode === 'draw';
     }
 
-    // Show the current mode's settings inline in the Actions modal
+    // Return any previously moved panels to the Mode Settings modal card, then move ONLY
+    // the panels belonging to the current activeMode into the Actions modal host.
+    restoreModeSettingsPanels();
+    applyModeSettingsPanels(activeMode);
     if (actionsModeSettingsHost) {
-      applyModeSettingsPanels(activeMode);
-      [modeSettingsTypeSpeakBody, modeSettingsSpeakTuning, modeSettingsListenTuning, modeSettingsDrawBody].forEach(panel => {
-        if (panel) actionsModeSettingsHost.appendChild(panel);
+      actionsModeSettingsHost.innerHTML = '';
+      getModeSettingsPanelsForMode(activeMode).forEach(panel => {
+        actionsModeSettingsHost.appendChild(panel);
       });
       if (actionsModeSettingsTitle) {
         actionsModeSettingsTitle.textContent = MODE_SETTINGS_TITLES[activeMode] || MODE_SETTINGS_TITLES.type;

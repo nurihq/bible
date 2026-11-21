@@ -91,3 +91,17 @@ Applies to paths matching:
 5. **Local Storage Self-Healing**:
    - Any historical sessions in local storage or synced from cloud with `wpm === 0` must never pollute typing metrics or progression charts.
 
+---
+
+## Actions Modal — Strict Per-Mode Settings Isolation (`screens/typing.js`, `styles.css`)
+
+1. **Current Mode Settings Only**:
+   - Opening the `⚡ Actions` modal (`openActionsModal()`) must **only** display the mode settings belonging to the currently active mode (`activeMode`), via `getModeSettingsPanelsForMode(activeMode)`:
+     - **`type` (Type Mode)**: Shows only Chapter Mode / Single Verse Mode scope selection (`#mode-settings-type-speak-body`). Must **never** display Speak tuning (`#mode-settings-speak-tuning`), Listen tuning (`#mode-settings-listen-tuning`), or Draw settings (`#mode-settings-draw-body`).
+     - **`speak` (Speak Mode)**: Shows Chapter Mode / Single Verse Mode scope selection (`#mode-settings-type-speak-body`) + Pronunciation strictness & Recognition timing (`#mode-settings-speak-tuning`).
+     - **`listen` (Listen Mode)**: Shows Chapter Mode / Single Verse Mode scope selection (`#mode-settings-type-speak-body`) + Narration voice & Playback speed (`#mode-settings-listen-tuning`).
+     - **`draw` (Draw Mode)**: Shows only Draw settings (`#mode-settings-draw-body`).
+2. **CSS `[hidden]` Protection**:
+   - Never apply an unscoped `display: flex !important` rule to `.typing-options-body` or `.typing-option-row` inside `.typing-actions-card` without `:not([hidden])`. Any `[hidden]` panel or row inside `.typing-actions-card` must remain `display: none !important`.
+
+

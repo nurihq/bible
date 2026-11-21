@@ -6592,8 +6592,8 @@ sup.verse-num.is-listen,
 }
 
 /* Individual setting rows inside the group — completely flat, uniform 46px height */
-.typing-actions-card .typing-options-group .typing-option-row,
-.typing-actions-card .typing-options-group .mode-radio-item {
+.typing-actions-card .typing-options-group .typing-option-row:not([hidden]),
+.typing-actions-card .typing-options-group .mode-radio-item:not([hidden]) {
   background: transparent !important;
   border: none !important;
   border-bottom: 1px solid var(--border-color-subtle, rgba(148, 163, 184, 0.14)) !important;
@@ -6629,7 +6629,9 @@ sup.verse-num.is-listen,
   border-bottom: none !important;
 }
 
-.typing-actions-card .typing-options-group > [hidden] {
+.typing-actions-card [hidden],
+.typing-actions-card .typing-options-group > [hidden],
+.typing-actions-card #actions-mode-settings-host > .typing-options-body[hidden] {
   display: none !important;
 }
 
@@ -6769,7 +6771,7 @@ sup.verse-num.is-listen,
   gap: 0 !important;
 }
 
-.typing-actions-card #actions-mode-settings-host > .typing-options-body {
+.typing-actions-card #actions-mode-settings-host > .typing-options-body:not([hidden]) {
   padding: 0 !important;
   margin: 0 !important;
   border: none !important;
@@ -6779,11 +6781,11 @@ sup.verse-num.is-listen,
   gap: 0 !important;
 }
 
-.typing-actions-card #actions-mode-settings-host > .typing-options-body:not(:last-child) > :last-child {
+.typing-actions-card #actions-mode-settings-host > .typing-options-body:not([hidden]):not(:last-child) > :last-child {
   border-bottom: 1px solid var(--border-color-subtle, rgba(148, 163, 184, 0.14)) !important;
 }
 
-.typing-actions-card #actions-mode-settings-host > .typing-options-body:last-child > :last-child {
+.typing-actions-card #actions-mode-settings-host > .typing-options-body:not([hidden]):last-child > :last-child {
   border-bottom: none !important;
 }
 

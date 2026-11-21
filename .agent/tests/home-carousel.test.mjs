@@ -376,3 +376,20 @@ test('6. Source code invariant guard on screens/home.js', () => {
   assert.ok(markReadIdx > nextBranchIdx, 'markVerseAsRead in navigateVerse must be strictly inside the direction === "next" branch');
   assert.equal(navBody.indexOf('unmarkVerseAsRead'), -1, 'navigateVerse must never unmark a verse as read');
 });
+
+test('7. Actions modal strictly isolates mode settings to the current activeMode', () => {
+  const typingSrc = fs.readFileSync(path.join(ROOT_DIR, 'screens/typing.js'), 'utf8');
+  const cssSrc = fs.readFileSync(path.join(ROOT_DIR, 'styles.css'), 'utf8');
+
+  // Verify getModeSettingsPanelsForMode exists and openActionsModal uses it instead of appending all 4 panels
+  assert.match(typingSrc, /function getModeSettingsPanelsForMode\(targetMode\)/);
+  assert.match(typingSrc, /getModeSettingsPanelsForMode\(activeMode\)\.forEach/);
+
+  // Verify styles.css does not use unscoped `#actions-mode-settings-host > .typing-options-body { ... display: flex !important }`
+  assert.doesNotMatch(
+    cssSrc,
+    /#actions-mode-settings-host\s*>\s*\.typing-options-body\s*\{/,
+    'styles.css must scope #actions-mode-settings-host > .typing-options-body with :not([hidden]) so [hidden] panels are never forced visible'
+  );
+  assert.match(cssSrc, /\.typing-actions-card \[hidden\]/);
+});
