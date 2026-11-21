@@ -3,10 +3,10 @@ import {
   removeVerseFavorite,
   updateFavoriteComment,
   setActiveModePref
-} from '../api.js?v=20261118_v18';
-import { getBookById } from '../bible-data.js?v=20261118_v18';
-import { trackEvent } from '../analytics.js?v=20261118_v18';
-import { navigate } from '../router.js?v=20261118_v18';
+} from '../api.js?v=20261121_v1';
+import { getBookById } from '../bible-data.js?v=20261121_v1';
+import { trackEvent } from '../analytics.js?v=20261121_v1';
+import { navigate } from '../router.js?v=20261121_v1';
 
 function escapeHtml(str) {
   return String(str || '')

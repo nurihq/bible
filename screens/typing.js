@@ -12,7 +12,7 @@ import {
   getRandomVerseRef,
   getNextPreloadedRandomVerse,
   replenishRandomVersePreloads
-} from '../bible-data.js?v=20261118_v18';
+} from '../bible-data.js?v=20261121_v1';
 import {
   getLocalStore,
   getPreferredTranslation,
@@ -97,13 +97,13 @@ import {
   DEFAULT_MEDITATE_FONT_CASE,
   DEFAULT_MEDITATE_FONT_COLOR,
   DEFAULT_MEDITATE_BOX_WIDTH
-} from '../api.js?v=20261118_v18';
+} from '../api.js?v=20261121_v1';
 import {
   renderMeditateArtworkSvg,
   TOTAL_MEDITATE_ART_TEMPLATES
-} from '../meditate-art.js?v=20261118_v18';
-import { trackEvent } from '../analytics.js?v=20261118_v18';
-import { navigate } from '../router.js?v=20261118_v18';
+} from '../meditate-art.js?v=20261121_v1';
+import { trackEvent } from '../analytics.js?v=20261121_v1';
+import { navigate } from '../router.js?v=20261121_v1';
 
 function escapeHtml(str) {
   return String(str)
@@ -334,7 +334,7 @@ export function renderTypingScreen(container, params = {}) {
   let shuffleVerses = getShuffleVersesPref();
   let speakStrictness = getSpeakStrictnessPref();
   let speakTrackingMode = getSpeakTrackingModePref();
-  let activeMode = ['type', 'speak', 'draw'].includes(params.mode) ? params.mode : getActiveModePref();
+  let activeMode = ['type', 'speak', 'draw', 'listen'].includes(params.mode) ? params.mode : getActiveModePref();
   if (!singleVerseMode && activeMode === 'draw') {
     activeMode = 'type';
   }
@@ -5184,12 +5184,31 @@ export function renderTypingScreen(container, params = {}) {
     clearTimer();
     const trObj = getTranslationByCode(activeTranslation);
 
-    // Instant zero-delay render if already in synchronous cache
+    // 1. Instant zero-delay render if already in synchronous cache
     const cached = getCachedChapterVerses(activeTranslation, book.id, initialChapter);
     if (cached && cached.length > 0) {
       buildPassageDOM(cached);
       triggerBackgroundPrefetches();
       return;
+    }
+
+    // 2. Instant single-verse render if singleVerseMode and verse text is already known
+    if (singleVerseMode && targetSingleVerseNum) {
+      let knownText = '';
+      try {
+        knownText = sessionStorage.getItem(`bible_single_verse_${book.id}_${initialChapter}_${targetSingleVerseNum}`) || '';
+      } catch (_) {}
+      if (knownText) {
+        buildPassageDOM([{ verse: targetSingleVerseNum, text: knownText }]);
+        triggerBackgroundPrefetches();
+        // Quietly fetch full chapter in background so chapter switching works seamlessly
+        fetchChapterVerses(activeTranslation, book.id, initialChapter).then(loaded => {
+          if (loaded && loaded.length > 0 && container.contains(passageContent)) {
+            allChapterVerses = loaded;
+          }
+        }).catch(() => {});
+        return;
+      }
     }
 
     passageContent.innerHTML = `

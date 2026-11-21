@@ -8,13 +8,17 @@ Applies to paths matching:
 - `meditate-art.js`
 
 ### Guidelines & Requirements:
-1. **Mobile-Only Scope (`@media (max-width: 720px)`)**:
-   - The custom "cute" design applies strictly to mobile screens. Desktop retains the full hero layout and desktop actions row.
-2. **Tag Removal**:
-   - The theme tag (e.g. `"Hope & Future"`, `votd-tag`) must NOT appear on mobile.
-3. **Open Verse Action**:
-   - On mobile, replace the text `"Open verse →"` with just the arrow outline icon (`→`), with no circular background or button border.
-4. **Four Bottom Actions on Mobile**:
+1. **Universal Card Features & Responsive Layout (`styles.css`, `screens/home.js`)**:
+   - The card features (procedural SVG artwork, clean header with arrow hint, and cute 4-action bar: Favourite, Bookmark, Share, and 3-Dots menu) apply universally on both mobile and desktop screens.
+   - On desktop (> 720px), the card is flanked by sleek circular carousel chevron buttons (`#votd-carousel-prev-btn`, `#votd-carousel-next-btn`) with support for mouse drag-to-swipe physics and left/right keyboard arrow navigation (`ArrowLeft` / `ArrowRight`).
+   - On mobile (<= 720px), the carousel chevron buttons are hidden in favor of natural 1:1 touch swipe physics.
+2. **Auto-Mark Verse as Read on Swipe**:
+   - Whenever the user swipes away from a verse on mobile, clicks a carousel button on desktop, or advances via keyboard arrow, the departing verse is automatically marked as read via `markVerseAsRead(departingVerse.bookId, departingVerse.chapter, departingVerse.verse, activeTranslation)`.
+3. **Open Verse Action & Zero-Delay Instant Navigation**:
+   - Tapping or clicking the card anywhere (except on bottom action buttons) transitions immediately to the practice screen (`/type`, `/draw`, `/speak`, or `/listen`).
+   - The single verse text is synchronously saved to `sessionStorage` (`bible_single_verse_${bookId}_${chapter}_${verse}`) prior to navigation, enabling `screens/typing.js` to render `buildPassageDOM` in 0ms without waiting for full chapter network requests or flashing a loading spinner.
+   - `touch-action: manipulation` across `.votd-card-wrapper, .votd-card, .votd-card *` removes the 300ms mobile tap delay.
+4. **Four Bottom Actions (Universal)**:
    - **Order**: `Favourite`, `Bookmark`, `Share`, `Ellipses (⋯)`.
    - **Even Spacing & Centered Width**: Actions are centered and evenly spaced across ~80% of the card width (no left/right splitting).
    - **No Dividing Line**: No border line or divider between the verse text and the bottom actions row.
@@ -29,19 +33,17 @@ Applies to paths matching:
      - Shares the image file together with the link to the verse/domain.
      - Falls back gracefully to sharing verse text/link or clipboard copy.
 5. **Procedural Background Image**:
-   - Each verse renders an elegant, soft procedural background SVG artwork behind the card text on mobile (`generateArtBackgroundSvg(templateIdx)` in `meditate-art.js`), keyed deterministically to the verse reference.
+   - Each verse renders an elegant, soft procedural background SVG artwork behind the card text (`generateArtBackgroundSvg(templateIdx)` in `meditate-art.js`), keyed deterministically to the verse reference.
 6. **Pure Random Verses (No Curated Pool)**:
    - Daily and home verses must strictly be chosen purely at random across the entire Bible canon (all 66 books and 31,102 verses) via `getRandomVerseRef()` in `bible-data.js`.
    - Never reintroduce curated verse pools, hardcoded highlight lists, or artificial theme filters for the verse of the day.
-7. **Mobile-Only Interactive Card Drag, Instant Tap & Prefetching**:
-   - On mobile screens (`@media (max-width: 720px)` and touch screens), the verse card provides a tactile 1:1 finger-following drag experience:
-     - **Interactive 1:1 Drag**: The entire `#votd-card` moves with the user's finger with dynamic rotation tilt, subtle opacity fade, and elastic rubber-band resistance when at the start of history.
+7. **Interactive Card Drag, Instant Tap & Swipe Physics**:
+   - The verse card provides a tactile 1:1 drag experience on both touch (mobile) and mouse (desktop):
+     - **Interactive 1:1 Drag**: The entire `#votd-card` moves with user input with dynamic rotation tilt, subtle opacity fade, and elastic rubber-band resistance when at the start of history.
      - **Swipe Left**: Flinging or dragging past the threshold dismisses the card offscreen to the left and smoothly slides in a fresh random Bible verse from the right.
      - **Swipe Right**: Flinging or dragging right dismisses the card offscreen to the right and smoothly slides back to the previous verse in the history stack.
      - **Snap-Back Physics**: Releasing below the threshold smoothly springs the card back into its centered home position with cubic-bezier easing.
      - **Daily Index & History Persistence**: Whenever the user swipes away to a new verse, that new verse becomes the active daily verse and the entire history stack is saved in local storage for the remainder of the day. Refreshing or reopening the app stays on the current verse, while still allowing the user to swipe back through all previous verses seen earlier that day.
-     - **Instant Tap & Zero-Delay Passage Switch**: `touch-action: manipulation` eliminates the 300ms tap delay. Clean taps trigger immediate routing on `touchend` without synthetic click latency, while proactive background prefetching (`prefetchChapterVerses`) guarantees the target chapter is already cached in memory, eliminating loading spinners when opening the verse.
-     - Preserves vertical page scrolling, button clicks, and card taps without touch conflicts.
 8. **Mobile Read-Only Mode Default**:
    - On mobile devices, the app defaults to read-only mode (`draw` mode / verse coloring view) instead of type mode when no preference has been explicitly set.
 9. **Speak Mode On-Demand Microphone Prompt & Zero-Reload Recovery**:

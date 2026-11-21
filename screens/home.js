@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261118_v18';
+} from '../api.js?v=20261121_v1';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261118_v18';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261118_v18';
-import { trackEvent } from '../analytics.js?v=20261118_v18';
-import { navigate } from '../router.js?v=20261118_v18';
+} from '../bible-data.js?v=20261121_v1';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v1';
+import { trackEvent } from '../analytics.js?v=20261121_v1';
+import { navigate } from '../router.js?v=20261121_v1';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -309,6 +309,13 @@ export function renderLandingScreen(container) {
   async function navigateVerse(direction, animated = true) {
     if (isTransitioning) return;
 
+    // 1. Auto-mark departing verse as read on swipe / carousel navigation
+    const departingVerse = getActiveVerse();
+    if (departingVerse && departingVerse.bookId && departingVerse.chapter && departingVerse.verse) {
+      markVerseAsRead(departingVerse.bookId, departingVerse.chapter, departingVerse.verse, activeTranslation);
+      trackEvent('votd_swipe_auto_mark_read', { verse: `${departingVerse.bookName} ${departingVerse.chapter}:${departingVerse.verse}`, direction });
+    }
+
     if (direction === 'prev') {
       if (historyIndex <= 0) return;
       isTransitioning = true;
@@ -382,7 +389,25 @@ export function renderLandingScreen(container) {
     }
   }
 
+  function navigateToPracticeScreen(verse) {
+    if (!verse || !verse.bookId || !verse.chapter || !verse.verse) return;
+    const mode = getActiveModePref() || 'type';
+    if (verse.text) {
+      try {
+        sessionStorage.setItem(`bible_single_verse_${verse.bookId}_${verse.chapter}_${verse.verse}`, verse.text);
+      } catch (e) {}
+    }
+    trackEvent('votd_card_click', { ref: `${verse.bookName} ${verse.chapter}:${verse.verse}`, mode });
+    navigate(`/${mode}/${verse.bookId}/${verse.chapter}/${verse.verse}`);
+  }
+
   function renderCard(animClass = '') {
+    // Clean up previous window / document listeners
+    if (window.__bibleHomeCleanup) {
+      window.__bibleHomeCleanup();
+      window.__bibleHomeCleanup = null;
+    }
+
     const currentVerse = getActiveVerse();
     if (currentVerse && currentVerse.bookId && currentVerse.chapter) {
       prefetchChapterVerses(activeTranslation, currentVerse.bookId, currentVerse.chapter);
@@ -415,143 +440,148 @@ export function renderLandingScreen(container) {
           </button>
         </div>
 
-        <!-- Daily Random Verse Card with Direct Read & Type Controls -->
-        <div class="votd-card-wrapper">
-          <div class="votd-card ${animClass}" id="votd-card" role="button" tabindex="0" title="Click to open ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
-            <!-- Background Artwork (Mobile-Only Art Layer) -->
-            <div class="votd-bg-art" aria-hidden="true">${bgSvg}</div>
-            <div class="votd-card-content">
-              <div class="votd-top-row">
-                <div class="votd-ref-header">
-                  <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
-                  <span class="votd-ref-sub">${escapeHtml(activeTranslation)}</span>
-                  ${currentVerse.theme ? `<span class="votd-tag">${escapeHtml(currentVerse.theme)}</span>` : ''}
+        <!-- Daily Verse Carousel Layout: Chevrons flanking the Card on Desktop -->
+        <div class="votd-carousel-layout">
+          <button
+            type="button"
+            class="votd-carousel-btn votd-carousel-prev"
+            id="votd-carousel-prev-btn"
+            aria-label="Previous verse"
+            title="Previous verse"
+            ${historyIndex <= 0 ? 'disabled' : ''}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+
+          <div class="votd-card-wrapper">
+            <div class="votd-card ${animClass}" id="votd-card" role="button" tabindex="0" title="Click to open ${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}">
+              <!-- Background Artwork Layer (Universal on Mobile & Desktop) -->
+              <div class="votd-bg-art" aria-hidden="true">${bgSvg}</div>
+              <div class="votd-card-content">
+                <div class="votd-top-row">
+                  <div class="votd-ref-header">
+                    <strong class="votd-ref-title">${escapeHtml(currentVerse.bookName)} ${currentVerse.chapter}:${currentVerse.verse}</strong>
+                    <span class="votd-ref-sub">${escapeHtml(activeTranslation)}</span>
+                    ${currentVerse.theme ? `<span class="votd-tag">${escapeHtml(currentVerse.theme)}</span>` : ''}
+                  </div>
+                  <div class="votd-action-hint" id="votd-open-verse-btn" role="button" tabindex="0" title="Open verse in ${activeMode} mode" aria-label="Open verse">
+                    <span class="votd-open-text">Open verse →</span>
+                    <span class="votd-open-arrow">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </span>
+                  </div>
                 </div>
-                <button type="button" class="votd-action-hint" id="votd-open-verse-btn" title="Open verse in ${activeMode} mode" aria-label="Open verse">
-                  <span class="votd-open-text">Open verse →</span>
-                  <span class="votd-open-arrow">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                      <polyline points="12 5 19 12 12 19"/>
-                    </svg>
-                  </span>
-                </button>
-              </div>
 
-              <div class="votd-quote">
-                “${escapeHtml(currentVerse.text || 'Loading verse text...')}”
-              </div>
+                <div class="votd-quote">
+                  “${escapeHtml(currentVerse.text || 'Loading verse text...')}”
+                </div>
 
-              <!-- Desktop Bottom Actions (Unchanged) -->
-              <div class="votd-bottom-row desktop-only-votd">
-                <button
-                  type="button"
-                  class="btn ${isCompleted ? 'btn-secondary is-read-active' : 'btn-secondary'} btn-sm votd-mark-btn"
-                  id="votd-mark-verse-btn"
-                  data-stop-card-nav="true"
-                  title="Mark verse ${currentVerse.verse} as read and load a new daily verse"
-                >
-                  ${isCompleted ? '✓ Marked Read' : '📖 Mark Verse Read'}
-                </button>
-                <a
-                  href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
-                  class="btn btn-secondary btn-sm"
-                  id="votd-type-chapter-btn"
-                  data-stop-card-nav="true"
-                  title="Open the full chapter"
-                >
-                  📖 Open Whole Ch.
-                </a>
-              </div>
-
-              <!-- Mobile Bottom Actions (Cute 4-Action Bar: Fav, Bookmark, Share, 3-Dots) -->
-              <div class="votd-mobile-actions-wrapper mobile-only-votd" data-stop-card-nav="true">
-                <div class="votd-mobile-actions">
-                  <!-- 1. Favourite (Heart Outline) -->
-                  <button
-                    type="button"
-                    class="votd-mobile-action-btn votd-fav-btn ${isFav ? 'is-favorited' : ''}"
-                    id="votd-mobile-fav-btn"
-                    title="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
-                    aria-label="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
-                  >
-                    <svg class="votd-heart-icon" width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                    </svg>
-                  </button>
-
-                  <!-- 2. Bookmark (Ribbon Outline) -->
-                  <button
-                    type="button"
-                    class="votd-mobile-action-btn votd-bookmark-btn ${isBookmarked ? 'is-bookmarked' : ''}"
-                    id="votd-mobile-bookmark-btn"
-                    title="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
-                    aria-label="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
-                  >
-                    <svg class="votd-bookmark-icon" width="21" height="21" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </button>
-
-                  <!-- 3. Share (Tray Outline) -->
-                  <button
-                    type="button"
-                    class="votd-mobile-action-btn votd-share-btn"
-                    id="votd-mobile-share-btn"
-                    title="Share verse card"
-                    aria-label="Share verse card"
-                  >
-                    <svg class="votd-share-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                      <polyline points="16 6 12 2 8 6"/>
-                      <line x1="12" y1="2" x2="12" y2="15"/>
-                    </svg>
-                  </button>
-
-                  <!-- 4. Ellipses (Three Horizontal Dots) -->
-                  <div class="votd-dots-wrapper">
+                <!-- Universal 4-Action Bar: Fav, Bookmark, Share, 3-Dots Menu -->
+                <div class="votd-mobile-actions-wrapper" data-stop-card-nav="true">
+                  <div class="votd-mobile-actions">
+                    <!-- 1. Favourite (Heart Outline) -->
                     <button
                       type="button"
-                      class="votd-mobile-action-btn votd-dots-btn"
-                      id="votd-mobile-dots-btn"
-                      aria-label="More actions"
-                      title="More actions"
-                      aria-haspopup="true"
-                      aria-expanded="false"
+                      class="votd-mobile-action-btn votd-fav-btn ${isFav ? 'is-favorited' : ''}"
+                      id="votd-mobile-fav-btn"
+                      title="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
+                      aria-label="${isFav ? 'Remove from favorites' : 'Save to favorites'}"
                     >
-                      <svg class="votd-dots-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="1.25" fill="currentColor"/>
-                        <circle cx="19" cy="12" r="1.25" fill="currentColor"/>
-                        <circle cx="5" cy="12" r="1.25" fill="currentColor"/>
+                      <svg class="votd-heart-icon" width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                       </svg>
                     </button>
-                    <!-- Three Horizontal Dots Dropdown Popover -->
-                    <div class="votd-dots-menu" id="votd-dots-menu" hidden>
+
+                    <!-- 2. Bookmark (Ribbon Outline) -->
+                    <button
+                      type="button"
+                      class="votd-mobile-action-btn votd-bookmark-btn ${isBookmarked ? 'is-bookmarked' : ''}"
+                      id="votd-mobile-bookmark-btn"
+                      title="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
+                      aria-label="${isBookmarked ? 'Bookmark saved' : 'Add bookmark'}"
+                    >
+                      <svg class="votd-bookmark-icon" width="21" height="21" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </button>
+
+                    <!-- 3. Share (Tray Outline) -->
+                    <button
+                      type="button"
+                      class="votd-mobile-action-btn votd-share-btn"
+                      id="votd-mobile-share-btn"
+                      title="Share verse card"
+                      aria-label="Share verse card"
+                    >
+                      <svg class="votd-share-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                        <polyline points="16 6 12 2 8 6"/>
+                        <line x1="12" y1="2" x2="12" y2="15"/>
+                      </svg>
+                    </button>
+
+                    <!-- 4. Ellipses (Three Horizontal Dots) -->
+                    <div class="votd-dots-wrapper">
                       <button
                         type="button"
-                        class="votd-dots-item ${isCompleted ? 'is-read' : ''}"
-                        id="votd-mobile-mark-btn"
+                        class="votd-mobile-action-btn votd-dots-btn"
+                        id="votd-mobile-dots-btn"
+                        aria-label="More actions"
+                        title="More actions"
+                        aria-haspopup="true"
+                        aria-expanded="false"
                       >
-                        <span class="dots-item-icon">${isCompleted ? '✓' : '📖'}</span>
-                        <span>${isCompleted ? 'Marked Read' : 'Mark Verse Read'}</span>
+                        <svg class="votd-dots-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="1.25" fill="currentColor"/>
+                          <circle cx="19" cy="12" r="1.25" fill="currentColor"/>
+                          <circle cx="5" cy="12" r="1.25" fill="currentColor"/>
+                        </svg>
                       </button>
-                      <a
-                        href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
-                        class="votd-dots-item"
-                        id="votd-mobile-chapter-btn"
-                      >
-                        <span class="dots-item-icon">📜</span>
-                        <span>Open Whole Ch.</span>
-                      </a>
+                      <!-- Three Horizontal Dots Dropdown Popover -->
+                      <div class="votd-dots-menu" id="votd-dots-menu" hidden>
+                        <button
+                          type="button"
+                          class="votd-dots-item ${isCompleted ? 'is-read' : ''}"
+                          id="votd-mobile-mark-btn"
+                        >
+                          <span class="dots-item-icon">${isCompleted ? '✓' : '📖'}</span>
+                          <span>${isCompleted ? 'Marked Read' : 'Mark Verse Read'}</span>
+                        </button>
+                        <a
+                          href="/${activeMode}/${currentVerse.bookId}/${currentVerse.chapter}"
+                          class="votd-dots-item"
+                          id="votd-mobile-chapter-btn"
+                        >
+                          <span class="dots-item-icon">📜</span>
+                          <span>Open Whole Ch.</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <button
+            type="button"
+            class="votd-carousel-btn votd-carousel-next"
+            id="votd-carousel-next-btn"
+            aria-label="Next verse"
+            title="Next verse"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
         </div>
 
-        <!-- Bookmark Modal Backdrop for Mobile Home Card -->
+        <!-- Bookmark Modal Backdrop -->
         <div class="typing-options-backdrop votd-bookmark-backdrop" id="votd-bookmark-backdrop" hidden>
           <div class="typing-options-card typing-bookmark-card" role="dialog" aria-modal="true" aria-labelledby="votd-bookmark-modal-title">
             <div class="typing-options-header">
@@ -612,6 +642,13 @@ export function renderLandingScreen(container) {
       let currentDeltaX = 0;
       let startTime = 0;
 
+      // Mouse dragging state for desktop
+      let isMouseDown = false;
+      let mouseStartX = 0;
+      let mouseDeltaX = 0;
+      let mouseStartTime = 0;
+      let hasMouseDragged = false;
+
       function resetCardPosition(animate = true) {
         if (animate) {
           votdCard.classList.remove('is-dragging');
@@ -630,8 +667,9 @@ export function renderLandingScreen(container) {
         }
       }
 
+      // ── Touch Events (Mobile) ──
       votdCard.addEventListener('touchstart', (e) => {
-        if (window.innerWidth > 720 || e.touches.length !== 1 || isTransitioning) return;
+        if (e.touches.length !== 1 || isTransitioning) return;
         const touch = e.touches[0];
         startX = touch.clientX;
         startY = touch.clientY;
@@ -645,7 +683,7 @@ export function renderLandingScreen(container) {
       }, { passive: true });
 
       votdCard.addEventListener('touchmove', (e) => {
-        if (!isCardDragging || window.innerWidth > 720 || e.touches.length !== 1 || isTransitioning) return;
+        if (!isCardDragging || e.touches.length !== 1 || isTransitioning) return;
         const touch = e.touches[0];
         const diffX = touch.clientX - startX;
         const diffY = touch.clientY - startY;
@@ -662,14 +700,13 @@ export function renderLandingScreen(container) {
         }
 
         if (isHorizontalDrag) {
-          // If dragging to the right at the beginning of history, apply elastic rubber-band resistance
           let effectiveDeltaX = diffX;
           if (diffX > 0 && historyIndex === 0) {
             effectiveDeltaX = Math.sign(diffX) * Math.pow(Math.abs(diffX), 0.72) * 2.2;
           }
 
           currentDeltaX = effectiveDeltaX;
-          const rotationDeg = (effectiveDeltaX / window.innerWidth) * 12; // Natural tilt while moving
+          const rotationDeg = (effectiveDeltaX / window.innerWidth) * 12;
           const opacityVal = Math.max(0.35, 1 - (Math.abs(effectiveDeltaX) / (window.innerWidth * 1.15)));
 
           votdCard.style.transform = `translate3d(${effectiveDeltaX}px, 0, 0) rotate(${rotationDeg}deg)`;
@@ -689,13 +726,11 @@ export function renderLandingScreen(container) {
           resetCardPosition(false);
           const elapsed = Date.now() - startTime;
           const touchEndTarget = e.target;
-          if (!hasSwiped && elapsed < 350 && Math.abs(currentDeltaX) < 10) {
-            if (touchEndTarget && !touchEndTarget.closest('[data-stop-card-nav="true"]') && !touchEndTarget.closest('a') && !touchEndTarget.closest('button')) {
+          if (!hasSwiped && elapsed < 400 && Math.abs(currentDeltaX) < 15) {
+            if (touchEndTarget && !touchEndTarget.closest('[data-stop-card-nav="true"]') && !touchEndTarget.closest('a')) {
               justNavigatedOnTouch = true;
-              setTimeout(() => { justNavigatedOnTouch = false; }, 500);
-              trackEvent('votd_card_click', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-              const mode = getActiveModePref() || 'type';
-              navigate(`/${mode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+              setTimeout(() => { justNavigatedOnTouch = false; }, 600);
+              navigateToPracticeScreen(currentVerse);
               return;
             }
           }
@@ -705,28 +740,24 @@ export function renderLandingScreen(container) {
         const elapsed = Math.max(1, Date.now() - startTime);
         const velocity = Math.abs(currentDeltaX) / elapsed; // px per ms
         const cardWidth = votdCard.offsetWidth || 340;
-        const threshold = cardWidth * 0.28; // Displace by ~28% of width or flick fast
+        const threshold = cardWidth * 0.28;
 
         const isFlick = velocity > 0.48 && Math.abs(currentDeltaX) > 35;
         const isPastThreshold = Math.abs(currentDeltaX) >= threshold;
 
         if (isFlick || isPastThreshold) {
           if (currentDeltaX < 0) {
-            // Dragged / flicked Left -> Advance to Next Verse
             trackEvent('votd_swipe_next', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
             navigateVerse('next', true);
           } else {
-            // Dragged / flicked Right -> Go to Previous Verse (or snap back if at start)
             if (historyIndex > 0) {
               trackEvent('votd_swipe_prev', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
               navigateVerse('prev', true);
             } else {
-              // Elastic bounce back when no previous verse exists
               resetCardPosition(true);
             }
           }
         } else {
-          // Did not reach swipe threshold -> spring back into original place
           resetCardPosition(true);
         }
       };
@@ -737,58 +768,136 @@ export function renderLandingScreen(container) {
         resetCardPosition(true);
       }, { passive: true });
 
+      // ── Mouse Drag Events (Desktop) ──
+      votdCard.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || isTransitioning) return;
+        if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;
+        isMouseDown = true;
+        hasMouseDragged = false;
+        mouseStartX = e.clientX;
+        mouseDeltaX = 0;
+        mouseStartTime = Date.now();
+        votdCard.classList.remove('swipe-incoming-left', 'swipe-incoming-right', 'is-snapping-back');
+      });
+
+      const onMouseMove = (e) => {
+        if (!isMouseDown) return;
+        const diffX = e.clientX - mouseStartX;
+        if (!hasMouseDragged && Math.abs(diffX) > 8) {
+          hasMouseDragged = true;
+          votdCard.classList.add('is-dragging');
+        }
+        if (hasMouseDragged) {
+          let effectiveDeltaX = diffX;
+          if (diffX > 0 && historyIndex === 0) {
+            effectiveDeltaX = Math.sign(diffX) * Math.pow(Math.abs(diffX), 0.72) * 2.2;
+          }
+          mouseDeltaX = effectiveDeltaX;
+          const rotationDeg = (effectiveDeltaX / window.innerWidth) * 10;
+          const opacityVal = Math.max(0.4, 1 - (Math.abs(effectiveDeltaX) / (window.innerWidth * 1.2)));
+          votdCard.style.transform = `translate3d(${effectiveDeltaX}px, 0, 0) rotate(${rotationDeg}deg)`;
+          votdCard.style.opacity = opacityVal;
+        }
+      };
+
+      const onMouseUp = (e) => {
+        if (!isMouseDown) return;
+        isMouseDown = false;
+        if (!hasMouseDragged) {
+          resetCardPosition(false);
+          return;
+        }
+        const elapsed = Math.max(1, Date.now() - mouseStartTime);
+        const velocity = Math.abs(mouseDeltaX) / elapsed;
+        const cardWidth = votdCard.offsetWidth || 340;
+        const threshold = cardWidth * 0.28;
+        const isFlick = velocity > 0.45 && Math.abs(mouseDeltaX) > 35;
+        const isPastThreshold = Math.abs(mouseDeltaX) >= threshold;
+
+        if (isFlick || isPastThreshold) {
+          if (mouseDeltaX < 0) {
+            trackEvent('votd_swipe_next', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`, input: 'mouse' });
+            navigateVerse('next', true);
+          } else {
+            if (historyIndex > 0) {
+              trackEvent('votd_swipe_prev', { from: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`, input: 'mouse' });
+              navigateVerse('prev', true);
+            } else {
+              resetCardPosition(true);
+            }
+          }
+        } else {
+          resetCardPosition(true);
+        }
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+
+      // Card tap / click handler with 0ms delay
       votdCard.addEventListener('click', (e) => {
         if (justNavigatedOnTouch) {
           justNavigatedOnTouch = false;
           return;
         }
-        if (hasSwiped) {
+        if (hasSwiped || hasMouseDragged) {
           hasSwiped = false;
+          hasMouseDragged = false;
           return;
         }
-        if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a') || e.target.closest('button')) return;
-        trackEvent('votd_card_click', { ref: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-        const mode = getActiveModePref() || 'type';
-        navigate(`/${mode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+        if (e.target.closest('[data-stop-card-nav="true"]') || e.target.closest('a')) return;
+        navigateToPracticeScreen(currentVerse);
       });
 
       votdCard.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.target === votdCard) {
-          const mode = getActiveModePref() || 'type';
-          navigate(`/${mode}/${currentVerse.bookId}/${currentVerse.chapter}/${currentVerse.verse}`);
+          navigateToPracticeScreen(currentVerse);
+        }
+      });
+
+      const openVerseHint = container.querySelector('#votd-open-verse-btn');
+      if (openVerseHint) {
+        openVerseHint.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigateToPracticeScreen(currentVerse);
+        });
+      }
+    }
+
+    // ── Desktop Carousel Chevrons ──
+    const prevBtn = container.querySelector('#votd-carousel-prev-btn');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (historyIndex > 0) {
+          navigateVerse('prev', true);
         }
       });
     }
 
-    const markVerseBtn = container.querySelector('#votd-mark-verse-btn');
-    if (markVerseBtn) {
-      markVerseBtn.addEventListener('click', async (e) => {
+    const nextBtn = container.querySelector('#votd-carousel-next-btn');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        markVerseAsRead(currentVerse.bookId, currentVerse.chapter, currentVerse.verse, activeTranslation);
-        trackEvent('votd_mark_verse_read', { verse: `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}` });
-
-        markVerseBtn.disabled = true;
-        markVerseBtn.textContent = '✓ Marked Read!';
-        markVerseBtn.classList.add('is-read-active');
-
-        // Immediately rotate to a new unread/untyped verse for the user
-        setTimeout(async () => {
-          const fresh = await resolveDailyVerse(activeTranslation, true);
-          await populateVerseText(fresh, activeTranslation);
-          verseHistory.push(fresh);
-          historyIndex = verseHistory.length - 1;
-          persistCurrentState();
-          renderCard('swipe-incoming-left');
-        }, 320);
+        navigateVerse('next', true);
       });
     }
 
-    const typeChBtn = container.querySelector('#votd-type-chapter-btn');
-    if (typeChBtn) {
-      typeChBtn.addEventListener('click', () => {
-        trackEvent('votd_type_chapter_click', { bookId: currentVerse.bookId, chapter: currentVerse.chapter });
-      });
-    }
+    // ── Keyboard Arrow Navigation ──
+    const onKeyDown = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+      const backdrop = container.querySelector('#votd-bookmark-backdrop');
+      if (backdrop && !backdrop.hidden) return;
+
+      if (e.key === 'ArrowLeft') {
+        if (historyIndex > 0) {
+          navigateVerse('prev', true);
+        }
+      } else if (e.key === 'ArrowRight') {
+        navigateVerse('next', true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
 
     const startBtn = container.querySelector('#home-start-btn');
     if (startBtn) {
@@ -798,9 +907,10 @@ export function renderLandingScreen(container) {
       });
     }
 
-    // ── Mobile Three-Dots Popover Menu ──
+    // ── Three-Dots Popover Menu ──
     const dotsBtn = container.querySelector('#votd-mobile-dots-btn');
     const dotsMenu = container.querySelector('#votd-dots-menu');
+    let onDocClick = null;
     if (dotsBtn && dotsMenu) {
       dotsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -809,7 +919,7 @@ export function renderLandingScreen(container) {
         dotsBtn.setAttribute('aria-expanded', String(!isOpen));
       });
 
-      const onDocClick = (e) => {
+      onDocClick = (e) => {
         if (!dotsBtn.contains(e.target) && !dotsMenu.contains(e.target)) {
           dotsMenu.hidden = true;
           dotsBtn.setAttribute('aria-expanded', 'false');
@@ -818,7 +928,17 @@ export function renderLandingScreen(container) {
       document.addEventListener('click', onDocClick);
     }
 
-    // Mobile Mark Read in Popover
+    // Register cleanup for this render pass
+    window.__bibleHomeCleanup = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('keydown', onKeyDown);
+      if (onDocClick) {
+        document.removeEventListener('click', onDocClick);
+      }
+    };
+
+    // Mark Read in Popover
     const mobileMarkBtn = container.querySelector('#votd-mobile-mark-btn');
     if (mobileMarkBtn) {
       mobileMarkBtn.addEventListener('click', async (e) => {
@@ -841,7 +961,7 @@ export function renderLandingScreen(container) {
       });
     }
 
-    // Mobile Open Whole Chapter in Popover
+    // Open Whole Chapter in Popover
     const mobileChBtn = container.querySelector('#votd-mobile-chapter-btn');
     if (mobileChBtn) {
       mobileChBtn.addEventListener('click', () => {
