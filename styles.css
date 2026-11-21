@@ -2815,9 +2815,13 @@ sup.verse-num.is-both {
   transform: none !important;
 }
 
-.votd-card-wrapper,
-.votd-card,
-.votd-card * {
+.votd-card {
+  touch-action: pan-y;
+}
+
+.votd-mobile-actions button,
+.votd-action-hint,
+.votd-carousel-btn {
   touch-action: manipulation;
 }
 

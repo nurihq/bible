@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261121_v2';
+} from '../api.js?v=20261121_v3';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261121_v2';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v2';
-import { trackEvent } from '../analytics.js?v=20261121_v2';
-import { navigate } from '../router.js?v=20261121_v2';
+} from '../bible-data.js?v=20261121_v3';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v3';
+import { trackEvent } from '../analytics.js?v=20261121_v3';
+import { navigate } from '../router.js?v=20261121_v3';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -223,6 +223,7 @@ export async function populateVerseText(verseObj, activeTranslation = 'ESV') {
 }
 
 export function renderLandingScreen(container) {
+  const mountTime = Date.now();
   const activeTranslation = getPreferredTranslation() || 'ESV';
 
   // Synchronously resolve initial random daily verse and restore today's history stack if present
@@ -667,14 +668,20 @@ export function renderLandingScreen(container) {
         }
       }
 
+      let touchBeganOnThisCard = false;
+
       // ── Touch Events (Mobile) ──
       votdCard.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1 || isTransitioning) return;
         const touch = e.touches[0];
+        // Allow native edge-swipe back navigation in mobile browsers without card interference
+        if (touch.clientX < 45) return;
+
         startX = touch.clientX;
         startY = touch.clientY;
         currentDeltaX = 0;
         startTime = Date.now();
+        touchBeganOnThisCard = true;
         isCardDragging = true;
         dragDetermined = false;
         isHorizontalDrag = false;
@@ -719,17 +726,25 @@ export function renderLandingScreen(container) {
       }, { passive: true });
 
       const finishDrag = (e) => {
-        if (!isCardDragging) return;
+        if (!isCardDragging || !touchBeganOnThisCard) return;
         isCardDragging = false;
+        const wasTouchOnCard = touchBeganOnThisCard;
+        touchBeganOnThisCard = false;
+
+        // Discard any gesture within 500ms of mounting or 600ms of popstate back navigation
+        if (Date.now() - mountTime < 500 || Date.now() - (window.__bibleLastPopstateTime || 0) < 600) {
+          resetCardPosition(false);
+          return;
+        }
 
         if (!isHorizontalDrag) {
           resetCardPosition(false);
           const elapsed = Date.now() - startTime;
           const touchEndTarget = e.target;
-          if (!hasSwiped && elapsed < 400 && Math.abs(currentDeltaX) < 15) {
+          if (!hasSwiped && elapsed < 350 && Math.abs(currentDeltaX) < 12 && wasTouchOnCard) {
             if (touchEndTarget && !touchEndTarget.closest('[data-stop-card-nav="true"]') && !touchEndTarget.closest('a')) {
               justNavigatedOnTouch = true;
-              setTimeout(() => { justNavigatedOnTouch = false; }, 600);
+              setTimeout(() => { justNavigatedOnTouch = false; }, 800);
               navigateToPracticeScreen(currentVerse);
               return;
             }
@@ -765,6 +780,7 @@ export function renderLandingScreen(container) {
       votdCard.addEventListener('touchend', finishDrag, { passive: true });
       votdCard.addEventListener('touchcancel', () => {
         isCardDragging = false;
+        touchBeganOnThisCard = false;
         resetCardPosition(true);
       }, { passive: true });
 
@@ -836,6 +852,10 @@ export function renderLandingScreen(container) {
 
       // Card tap / click handler with 0ms delay
       votdCard.addEventListener('click', (e) => {
+        // Discard phantom clicks from browser back navigation or immediately after page mount
+        if (Date.now() - mountTime < 500 || Date.now() - (window.__bibleLastPopstateTime || 0) < 600) {
+          return;
+        }
         if (justNavigatedOnTouch) {
           justNavigatedOnTouch = false;
           return;
@@ -858,6 +878,7 @@ export function renderLandingScreen(container) {
       const openVerseHint = container.querySelector('#votd-open-verse-btn');
       if (openVerseHint) {
         openVerseHint.addEventListener('click', (e) => {
+          if (Date.now() - mountTime < 500 || Date.now() - (window.__bibleLastPopstateTime || 0) < 600) return;
           e.stopPropagation();
           navigateToPracticeScreen(currentVerse);
         });

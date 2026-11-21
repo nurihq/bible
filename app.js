@@ -1,5 +1,5 @@
-import { Navbar } from './components/navbar.js?v=20261121_v2';
-import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261121_v2';
+import { Navbar } from './components/navbar.js?v=20261121_v3';
+import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261121_v3';
 import {
   Auth,
   syncLocalToCloud,
@@ -10,19 +10,19 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261121_v2';
-import { initGA, trackPageView } from './analytics.js?v=20261121_v2';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261121_v2';
-import { navigate, parseActiveRoute } from './router.js?v=20261121_v2';
-export { navigate, parseActiveRoute } from './router.js?v=20261121_v2';
+} from './api.js?v=20261121_v3';
+import { initGA, trackPageView } from './analytics.js?v=20261121_v3';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261121_v3';
+import { navigate, parseActiveRoute } from './router.js?v=20261121_v3';
+export { navigate, parseActiveRoute } from './router.js?v=20261121_v3';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261121_v2';
-import { renderLandingScreen } from './screens/home.js?v=20261121_v2';
-import { renderTypingScreen } from './screens/typing.js?v=20261121_v2';
-import { renderProgressScreen } from './screens/progress.js?v=20261121_v2';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261121_v2';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261121_v2';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261121_v2';
+import { renderSignInScreen } from './screens/signin.js?v=20261121_v3';
+import { renderLandingScreen } from './screens/home.js?v=20261121_v3';
+import { renderTypingScreen } from './screens/typing.js?v=20261121_v3';
+import { renderProgressScreen } from './screens/progress.js?v=20261121_v3';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261121_v3';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261121_v3';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261121_v3';
 
 class App {
   constructor() {
@@ -46,7 +46,10 @@ class App {
     });
 
     window.addEventListener('hashchange', () => this.handleRoute());
-    window.addEventListener('popstate', () => this.handleRoute());
+    window.addEventListener('popstate', () => {
+      window.__bibleLastPopstateTime = Date.now();
+      this.handleRoute();
+    });
     window.addEventListener('bible:route-changed', () => this.handleRoute());
 
     // Intercept internal links for instant SPA navigation without page reload
