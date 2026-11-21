@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261121_v13';
+} from '../api.js?v=20261121_v14';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261121_v13';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v13';
-import { trackEvent } from '../analytics.js?v=20261121_v13';
-import { navigate } from '../router.js?v=20261121_v13';
+} from '../bible-data.js?v=20261121_v14';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v14';
+import { trackEvent } from '../analytics.js?v=20261121_v14';
+import { navigate } from '../router.js?v=20261121_v14';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -632,6 +632,8 @@ export function renderLandingScreen(container) {
     `;
 
     const votdCard = container.querySelector('#votd-card');
+    let onMouseMove = null;
+    let onMouseUp = null;
     if (votdCard) {
       let isCardDragging = false;
       let dragDetermined = false;
@@ -796,7 +798,7 @@ export function renderLandingScreen(container) {
         votdCard.classList.remove('swipe-incoming-left', 'swipe-incoming-right', 'is-snapping-back');
       });
 
-      const onMouseMove = (e) => {
+      onMouseMove = (e) => {
         if (!isMouseDown) return;
         const diffX = e.clientX - mouseStartX;
         if (!hasMouseDragged && Math.abs(diffX) > 8) {
@@ -816,7 +818,7 @@ export function renderLandingScreen(container) {
         }
       };
 
-      const onMouseUp = (e) => {
+      onMouseUp = (e) => {
         if (!isMouseDown) return;
         isMouseDown = false;
         if (!hasMouseDragged) {
@@ -951,8 +953,8 @@ export function renderLandingScreen(container) {
 
     // Register cleanup for this render pass
     window.__bibleHomeCleanup = () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      if (onMouseMove) window.removeEventListener('mousemove', onMouseMove);
+      if (onMouseUp) window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('keydown', onKeyDown);
       if (onDocClick) {
         document.removeEventListener('click', onDocClick);

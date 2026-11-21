@@ -1,5 +1,5 @@
-import { Navbar } from './components/navbar.js?v=20261121_v13';
-import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261121_v13';
+import { Navbar } from './components/navbar.js?v=20261121_v14';
+import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261121_v14';
 import {
   Auth,
   syncLocalToCloud,
@@ -10,20 +10,20 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261121_v13';
-import { initGA, trackPageView } from './analytics.js?v=20261121_v13';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261121_v13';
-import { navigate, parseActiveRoute } from './router.js?v=20261121_v13';
-export { navigate, parseActiveRoute } from './router.js?v=20261121_v13';
+} from './api.js?v=20261121_v14';
+import { initGA, trackPageView } from './analytics.js?v=20261121_v14';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261121_v14';
+import { navigate, parseActiveRoute } from './router.js?v=20261121_v14';
+export { navigate, parseActiveRoute } from './router.js?v=20261121_v14';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261121_v13';
-import { renderLandingScreen } from './screens/home.js?v=20261121_v13';
-import { renderTypingScreen } from './screens/typing.js?v=20261121_v13';
-import { renderProgressScreen } from './screens/progress.js?v=20261121_v13';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261121_v13';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261121_v13';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261121_v13';
-import { renderAboutScreen, renderCharitiesScreen } from './screens/about.js?v=20261121_v13';
+import { renderSignInScreen } from './screens/signin.js?v=20261121_v14';
+import { renderLandingScreen } from './screens/home.js?v=20261121_v14';
+import { renderTypingScreen } from './screens/typing.js?v=20261121_v14';
+import { renderProgressScreen } from './screens/progress.js?v=20261121_v14';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261121_v14';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261121_v14';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261121_v14';
+import { renderAboutScreen, renderCharitiesScreen } from './screens/about.js?v=20261121_v14';
 
 class App {
   constructor() {
