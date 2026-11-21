@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v11';
-import { CONFIG } from '../config.js?v=20261121_v11';
+import { trackEvent } from '../analytics.js?v=20261121_v12';
+import { CONFIG } from '../config.js?v=20261121_v12';
 
 /**
  * About + Charities screens.
@@ -89,8 +89,8 @@ export function renderAboutScreen(container) {
           </div>
 
           <label class="about-field about-custom-amount-field">
-            <span>Or enter a custom amount (USD)</span>
-            <input type="number" id="about-donate-custom-input" min="1" max="10000" step="1" placeholder="Custom amount ($)" />
+            <span>Amount (USD)</span>
+            <input type="number" id="about-donate-custom-input" min="1" max="10000" step="1" value="1" placeholder="Amount ($)" />
           </label>
 
           <div class="about-paypal-status" id="about-paypal-status">Loading secure checkout…</div>
@@ -185,14 +185,20 @@ export function renderAboutScreen(container) {
   amountPills.forEach((pill) => {
     pill.addEventListener('click', () => {
       selectedPresetAmount = Number(pill.getAttribute('data-amount')) || 1;
-      customAmountInput.value = '';
+      customAmountInput.value = String(selectedPresetAmount);
       amountPills.forEach((p) => p.classList.toggle('is-selected', p === pill));
     });
   });
 
   customAmountInput.addEventListener('input', () => {
-    const hasCustom = customAmountInput.value.trim().length > 0;
-    amountPills.forEach((p) => p.classList.toggle('is-selected', !hasCustom && Number(p.getAttribute('data-amount')) === selectedPresetAmount));
+    const typedVal = parseFloat(customAmountInput.value);
+    if (Number.isFinite(typedVal) && typedVal >= 1) {
+      selectedPresetAmount = typedVal;
+    }
+    amountPills.forEach((p) => {
+      const pillAmt = Number(p.getAttribute('data-amount'));
+      p.classList.toggle('is-selected', Number.isFinite(typedVal) && pillAmt === typedVal);
+    });
   });
 
   async function ensurePayPalButtonsRendered() {
