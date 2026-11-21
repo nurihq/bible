@@ -16,7 +16,7 @@ import {
   createBookmark,
   updateBookmarkLocation,
   findBookmarkByName
-} from '../api.js?v=20261121_v14';
+} from '../api.js?v=20261121_v15';
 import {
   getBookById,
   getNextChapterRef,
@@ -27,10 +27,10 @@ import {
   fetchChapterVerses,
   getCachedChapterVerses,
   prefetchChapterVerses
-} from '../bible-data.js?v=20261121_v14';
-import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v14';
-import { trackEvent } from '../analytics.js?v=20261121_v14';
-import { navigate } from '../router.js?v=20261121_v14';
+} from '../bible-data.js?v=20261121_v15';
+import { generateArtBackgroundSvg } from '../meditate-art.js?v=20261121_v15';
+import { trackEvent } from '../analytics.js?v=20261121_v15';
+import { navigate } from '../router.js?v=20261121_v15';
 
 export { renderLandingScreen as renderHomeScreen };
 
@@ -310,13 +310,6 @@ export function renderLandingScreen(container) {
   async function navigateVerse(direction, animated = true) {
     if (isTransitioning) return;
 
-    // 1. Auto-mark departing verse as read on swipe / carousel navigation
-    const departingVerse = getActiveVerse();
-    if (departingVerse && departingVerse.bookId && departingVerse.chapter && departingVerse.verse) {
-      markVerseAsRead(departingVerse.bookId, departingVerse.chapter, departingVerse.verse, activeTranslation);
-      trackEvent('votd_swipe_auto_mark_read', { verse: `${departingVerse.bookName} ${departingVerse.chapter}:${departingVerse.verse}`, direction });
-    }
-
     if (direction === 'prev') {
       if (historyIndex <= 0) return;
       isTransitioning = true;
@@ -348,6 +341,13 @@ export function renderLandingScreen(container) {
         }
       }, delay);
     } else if (direction === 'next') {
+      // Auto-mark departing verse as read only on forward ('next') swipe / carousel navigation
+      const departingVerse = getActiveVerse();
+      if (departingVerse && departingVerse.bookId && departingVerse.chapter && departingVerse.verse) {
+        markVerseAsRead(departingVerse.bookId, departingVerse.chapter, departingVerse.verse, activeTranslation);
+        trackEvent('votd_swipe_auto_mark_read', { verse: `${departingVerse.bookName} ${departingVerse.chapter}:${departingVerse.verse}`, direction });
+      }
+
       isTransitioning = true;
       const cardEl = container.querySelector('#votd-card');
       if (cardEl && animated) {
