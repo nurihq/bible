@@ -1,5 +1,5 @@
-import { Navbar } from './components/navbar.js?v=20261121_v4';
-import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261121_v4';
+import { Navbar } from './components/navbar.js?v=20261121_v5';
+import { initPullToRefresh } from './components/pull-to-refresh.js?v=20261121_v5';
 import {
   Auth,
   syncLocalToCloud,
@@ -10,20 +10,20 @@ import {
   setActiveModePref,
   getLocalStore,
   initFirebaseAuthObserver
-} from './api.js?v=20261121_v4';
-import { initGA, trackPageView } from './analytics.js?v=20261121_v4';
-import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261121_v4';
-import { navigate, parseActiveRoute } from './router.js?v=20261121_v4';
-export { navigate, parseActiveRoute } from './router.js?v=20261121_v4';
+} from './api.js?v=20261121_v5';
+import { initGA, trackPageView } from './analytics.js?v=20261121_v5';
+import { getBookById, replenishRandomVersePreloads, getNextPreloadedRandomVerse } from './bible-data.js?v=20261121_v5';
+import { navigate, parseActiveRoute } from './router.js?v=20261121_v5';
+export { navigate, parseActiveRoute } from './router.js?v=20261121_v5';
 
-import { renderSignInScreen } from './screens/signin.js?v=20261121_v4';
-import { renderLandingScreen } from './screens/home.js?v=20261121_v4';
-import { renderTypingScreen } from './screens/typing.js?v=20261121_v4';
-import { renderProgressScreen } from './screens/progress.js?v=20261121_v4';
-import { renderDrawingsScreen } from './screens/drawings.js?v=20261121_v4';
-import { renderFavoritesScreen } from './screens/favorites.js?v=20261121_v4';
-import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261121_v4';
-import { renderAboutScreen, renderCharitiesScreen } from './screens/about.js?v=20261121_v4';
+import { renderSignInScreen } from './screens/signin.js?v=20261121_v5';
+import { renderLandingScreen } from './screens/home.js?v=20261121_v5';
+import { renderTypingScreen } from './screens/typing.js?v=20261121_v5';
+import { renderProgressScreen } from './screens/progress.js?v=20261121_v5';
+import { renderDrawingsScreen } from './screens/drawings.js?v=20261121_v5';
+import { renderFavoritesScreen } from './screens/favorites.js?v=20261121_v5';
+import { renderBookmarksScreen } from './screens/bookmarks.js?v=20261121_v5';
+import { renderAboutScreen, renderCharitiesScreen } from './screens/about.js?v=20261121_v5';
 
 class App {
   constructor() {
@@ -143,6 +143,10 @@ class App {
     if (path !== '/drawings' && path !== '/meditations' && window.__bibleDrawingsCleanup) {
       window.__bibleDrawingsCleanup();
     }
+
+    // About/Charities lock the viewport; release it whenever any route renders (they re-apply it)
+    document.documentElement.classList.remove('about-active-view');
+    document.body.classList.remove('about-active-view');
 
     // Re-render navbar (and global unauthenticated warning banner on non-landing/non-signin screens)
     this.navbar.render(this.navContainer, path);

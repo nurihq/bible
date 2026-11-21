@@ -1,4 +1,4 @@
-import { trackEvent } from '../analytics.js?v=20261121_v4';
+import { trackEvent } from '../analytics.js?v=20261121_v5';
 
 /**
  * About + Charities screens.
@@ -18,41 +18,35 @@ export function renderAboutScreen(container) {
     ? `<a class="about-btn about-btn-primary" href="${SUPPORT_DONATION_URL}" target="_blank" rel="noopener noreferrer" id="about-support-btn">Support this project</a>`
     : `<span class="about-soon-note">Donations will open here soon. Thank you for the thought.</span>`;
 
+  document.documentElement.classList.add('about-active-view');
+  document.body.classList.add('about-active-view');
+
   container.innerHTML = `
     <div class="about-screen-container">
       <article class="about-card">
-        <header class="about-header">
-          <h1 class="about-title">About Promises to Creation</h1>
-          <p class="about-lede">A quiet place to spend time with scripture.</p>
-        </header>
-
-        <section class="about-section">
+        <section class="about-section about-story">
           <p>
-            I wanted a simple way to track my progress through the Bible, verse by verse and chapter by chapter,
-            and to see how far I have come.
+            Promises to Creation makes it simple to track progress through the Bible, verse by verse and chapter by
+            chapter, with a clear view of how far you have come.
           </p>
           <p>
-            I also like to make the most of my time. If I am going to be in the Word anyway, I might as well
+            Time is precious, so it is worth making the most of it. While you are in the Word, you may as well
             practice <strong>typing</strong> it, <strong>speaking</strong> it aloud, or <strong>drawing</strong> it,
-            and when my hands are busy I can simply <strong>listen</strong> while doing chores.
+            and when your hands are busy with chores, you can simply <strong>listen</strong>.
           </p>
-          <p>
-            That is all this is: one small tool, built to make daily time in scripture a little easier to keep.
-          </p>
+          <p>One small tool, built to make daily time in scripture easier to keep.</p>
         </section>
 
         <section class="about-section about-support">
-          <h2 class="about-heading">Support this project</h2>
           <p>
-            Promises to Creation is free and always will be. If it has been useful to you and you would like to
-            help keep it running and growing, you are welcome to contribute.
+            Promises to Creation is free to use. If it has been a blessing and you would like to help keep it
+            running and growing, you are welcome to contribute.
           </p>
           <div class="about-actions">${supportAction}</div>
         </section>
 
         <section class="about-section about-contact">
-          <h2 class="about-heading">Get in touch</h2>
-          <p>Questions, ideas, or a bug to report? I would love to hear from you.</p>
+          <p>Questions, ideas, or something not working? Get in touch.</p>
           <div class="about-actions">
             <button type="button" class="about-btn about-btn-secondary" id="about-contact-btn">Contact</button>
           </div>
@@ -92,7 +86,7 @@ export function renderAboutScreen(container) {
             </label>
             <label class="about-field">
               <span>Message</span>
-              <textarea name="message" rows="5" placeholder="How can I help?" required></textarea>
+              <textarea name="message" rows="5" placeholder="Your message" required></textarea>
             </label>
 
             <!-- HONEYPOT (anti-spam) -->
@@ -114,7 +108,7 @@ export function renderAboutScreen(container) {
       <div class="about-modal-backdrop" id="about-success-backdrop" hidden>
         <div class="about-modal about-modal-small" role="dialog" aria-modal="true" aria-labelledby="about-success-title">
           <h2 id="about-success-title">Thank you</h2>
-          <p>Your message is on its way. I will get back to you as soon as I can.</p>
+          <p>Your message is on its way. Thank you for reaching out.</p>
           <button type="button" class="about-btn about-btn-primary" id="about-success-close">Close</button>
         </div>
       </div>
@@ -164,16 +158,14 @@ export function renderAboutScreen(container) {
 }
 
 export function renderCharitiesScreen(container) {
+  document.documentElement.classList.add('about-active-view');
+  document.body.classList.add('about-active-view');
+
   container.innerHTML = `
     <div class="about-screen-container">
       <article class="about-card">
-        <header class="about-header">
-          <a class="about-back-link" href="/about">← About</a>
-          <h1 class="about-title">Charities</h1>
-          <p class="about-lede">
-            My hope is that this project can one day give back. These are the two causes closest to my heart.
-          </p>
-        </header>
+        <a class="about-back-link" href="/about">← About</a>
+        <p class="about-lede">Two causes this project hopes to support one day.</p>
 
         <div class="charity-grid">
           <section class="charity-card">
@@ -197,8 +189,7 @@ export function renderCharitiesScreen(container) {
         </div>
 
         <p class="charity-note">
-          Both charities are still being built, so there are no links yet. Thank you for your patience and kindness;
-          I will share more here as they come to life.
+          Both charities are still in development, so there are no links yet. Thank you for your patience and kindness.
         </p>
       </article>
     </div>

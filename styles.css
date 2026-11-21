@@ -6826,19 +6826,56 @@ sup.verse-num.is-listen,
   .nav-info-btn .nav-info-text { display: none; }
 }
 
+/* Viewport-locked layout: the page never scrolls, so nothing slides under the title bar.
+   If content is taller than the space available, only the card scrolls internally. */
+html.about-active-view,
+body.about-active-view {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+body.about-active-view {
+  display: flex;
+  flex-direction: column;
+}
+
+body.about-active-view #nav-container { flex-shrink: 0; }
+
+body.about-active-view .main-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
 .about-screen-container {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .about-card {
+  width: 100%;
+  max-width: 880px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 2.5rem 2.25rem;
+  padding: 2.5rem 3rem;
   color: var(--text-primary);
 }
+
+.about-card::-webkit-scrollbar { display: none; }
 
 .about-header { margin-bottom: 1.75rem; }
 
@@ -7078,6 +7115,10 @@ sup.verse-num.is-listen,
 .about-submit { width: 100%; margin-top: 0.25rem; }
 
 @media (max-width: 600px) {
-  .about-card { padding: 1.75rem 1.25rem; }
+  body.about-active-view .main-content { padding: 0.75rem 0.75rem 1rem; }
+  .about-card { padding: 1.5rem 1.25rem; border-radius: 16px; }
   .charity-grid { grid-template-columns: 1fr; }
 }
+
+.about-story { margin-top: 0; }
+.about-card > .about-lede { margin-bottom: 1.5rem; }
