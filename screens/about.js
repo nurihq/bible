@@ -1,5 +1,5 @@
-import { trackEvent } from '../analytics.js?v=20261121_v6';
-import { CONFIG } from '../config.js?v=20261121_v6';
+import { trackEvent } from '../analytics.js?v=20261121_v7';
+import { CONFIG } from '../config.js?v=20261121_v7';
 
 /**
  * About + Charities screens.
@@ -101,10 +101,9 @@ export function renderAboutScreen(container) {
           <p class="about-donate-subtitle">Choose an amount (USD)</p>
 
           <div class="about-donate-amounts" id="about-donate-amounts">
-            <button type="button" class="about-amount-pill" data-amount="5">$5</button>
-            <button type="button" class="about-amount-pill is-selected" data-amount="10">$10</button>
-            <button type="button" class="about-amount-pill" data-amount="25">$25</button>
-            <button type="button" class="about-amount-pill" data-amount="50">$50</button>
+            <button type="button" class="about-amount-pill is-selected" data-amount="1">$1</button>
+            <button type="button" class="about-amount-pill" data-amount="1000">$1,000</button>
+            <button type="button" class="about-amount-pill" data-amount="10000">$10,000</button>
           </div>
 
           <label class="about-field about-custom-amount-field">
@@ -190,7 +189,7 @@ export function renderAboutScreen(container) {
   const paypalStatusEl = container.querySelector('#about-paypal-status');
   const paypalButtonsEl = container.querySelector('#about-paypal-buttons');
 
-  let selectedPresetAmount = 10;
+  let selectedPresetAmount = 1;
   let paypalButtonsRendered = false;
 
   function getSelectedDonationAmount() {
@@ -203,7 +202,7 @@ export function renderAboutScreen(container) {
 
   amountPills.forEach((pill) => {
     pill.addEventListener('click', () => {
-      selectedPresetAmount = Number(pill.getAttribute('data-amount')) || 10;
+      selectedPresetAmount = Number(pill.getAttribute('data-amount')) || 1;
       customAmountInput.value = '';
       amountPills.forEach((p) => p.classList.toggle('is-selected', p === pill));
     });
