@@ -6984,7 +6984,7 @@ body.about-active-view .main-content {
   margin-bottom: 0.9rem;
 }
 
-/* Charity cards (standalone on the canvas, 880px wide total) */
+/* Charity cards (each tile is full 880px width, matching .about-card) */
 .charities-stage {
   width: 100%;
   max-width: 880px;
@@ -7001,17 +7001,18 @@ body.about-active-view .main-content {
 
 .charity-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1.25rem;
   width: 100%;
 }
 
 .charity-card {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 2rem 1.85rem;
+  padding: 2.25rem 3rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
@@ -7128,7 +7129,8 @@ body.about-active-view .main-content {
 
 @media (max-width: 600px) {
   body.about-active-view .main-content { padding: 0.75rem 0.75rem 1rem; }
-  .about-card { padding: 1.5rem 1.25rem; border-radius: 16px; }
+  .about-card,
+  .charity-card { padding: 1.5rem 1.25rem; border-radius: 16px; }
   .charity-grid { grid-template-columns: 1fr; }
 }
 
